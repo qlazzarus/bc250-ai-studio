@@ -1,0 +1,452 @@
+# Operator configuration. Only klein-4b-q4 has passed the recorded BC-250 test.
+models:
+- model_id: fake
+  display_name: Fake Engine — CPU test image
+  family: fake
+  engine: fake
+  model_path: null
+  text_encoder_path: null
+  vae_path: null
+  quantization: ''
+  supported_resolutions:
+  - - 64
+    - 64
+  - - 512
+    - 512
+  - - 768
+    - 768
+  supported_parameters:
+  - width
+  - height
+  - steps
+  - seed
+  - cfg_scale
+  - negative_prompt
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+    balanced:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+    quality:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+  generation_options:
+    cfg_scale:
+      mode: verified
+      default: 1.0
+      allowed_values: []
+      minimum: 0.0
+      maximum: 30.0
+    negative_prompt:
+      mode: verified
+    sampling_method:
+      mode: fixed
+      default: null
+      allowed_values: []
+    scheduler:
+      mode: fixed
+      default: null
+      allowed_values: []
+  enabled: true
+  validation_status: tested
+  cli_args: []
+- model_id: klein-4b-q4
+  display_name: FLUX.2 Klein 4B Q4_0
+  family: flux2
+  engine: sdcpp
+  model_path: /opt/sd-models/flux2-klein-4b/flux-2-klein-4b-Q4_0.gguf
+  text_encoder_path: /opt/sd-models/flux2-klein-4b/Qwen3-4B-Q4_K_M.gguf
+  vae_path: /opt/sd-models/flux2-klein-4b/ae.safetensors
+  quantization: Q4_0
+  supported_resolutions:
+  - - 512
+    - 512
+  - - 768
+    - 768
+  supported_parameters:
+  - width
+  - height
+  - steps
+  - seed
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 4
+      cfg_scale: 1.0
+    balanced:
+      width: 512
+      height: 512
+      steps: 4
+      cfg_scale: 1.0
+    quality:
+      width: 512
+      height: 512
+      steps: 4
+      cfg_scale: 1.0
+  generation_options:
+    cfg_scale:
+      mode: fixed
+      default: 1.0
+      allowed_values: [1.0]
+    negative_prompt:
+      mode: unsupported
+    sampling_method:
+      mode: fixed
+      default: euler
+      allowed_values: [euler]
+    scheduler:
+      mode: fixed
+      default: null
+      allowed_values: []
+  enabled: true
+  validation_status: tested
+  cli_args:
+  - --backend
+  - Vulkan0
+  - --sampling-method
+  - euler
+- model_id: klein-4b-q8
+  display_name: FLUX.2 Klein 4B Q8_0
+  family: flux2
+  engine: sdcpp
+  model_path: /opt/sd-models/flux2-klein-4b/flux-2-klein-4b-Q8_0.gguf
+  text_encoder_path: /opt/sd-models/flux2-klein-4b/Qwen3-4B-Q4_K_M.gguf
+  vae_path: /opt/sd-models/flux2-klein-4b/ae.safetensors
+  quantization: Q8_0
+  supported_resolutions:
+  - - 512
+    - 512
+  - - 768
+    - 768
+  supported_parameters:
+  - width
+  - height
+  - steps
+  - seed
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 4
+      cfg_scale: 1.0
+    balanced:
+      width: 512
+      height: 512
+      steps: 4
+      cfg_scale: 1.0
+    quality:
+      width: 512
+      height: 512
+      steps: 4
+      cfg_scale: 1.0
+  generation_options:
+    cfg_scale:
+      mode: fixed
+      default: 1.0
+      allowed_values: [1.0]
+    negative_prompt:
+      mode: unsupported
+    sampling_method:
+      mode: fixed
+      default: euler
+      allowed_values: [euler]
+    scheduler:
+      mode: fixed
+      default: null
+      allowed_values: []
+  enabled: true
+  validation_status: configured
+  cli_args:
+  - --sampling-method
+  - euler
+- model_id: pornmaster-klein-9b
+  display_name: PornMaster FLUX.2 Klein 9B Turbo Q4_K
+  family: flux2
+  engine: sdcpp
+  model_path: /opt/sd-models/pornmaster-klein/unet/turbo/PornMaster_Flux2Klein_v4_Turbo_Q4_K.gguf
+  text_encoder_path: /opt/sd-models/flux2-klein-9b/Qwen3-8B-Q4_K_M.gguf
+  vae_path: /opt/sd-models/flux2-klein-4b/ae.safetensors
+  quantization: Q4_K
+  supported_resolutions:
+  - - 512
+    - 512
+  - - 768
+    - 768
+  supported_parameters:
+  - width
+  - height
+  - steps
+  - seed
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 4
+      cfg_scale: 1.0
+    balanced:
+      width: 512
+      height: 512
+      steps: 4
+      cfg_scale: 1.0
+    quality:
+      width: 512
+      height: 512
+      steps: 4
+      cfg_scale: 1.0
+  generation_options:
+    cfg_scale:
+      mode: verified
+      default: 1.0
+      allowed_values: [1.0, 1.5, 2.0]
+      note: "BC-250 verified at 512x512, 4 steps, Euler, seed 4242. Negative prompt requires cfg_scale 2.0; 8-step recipes remain unverified."
+    negative_prompt:
+      mode: verified
+      requires:
+        cfg_scale: [2.0]
+      note: "BC-250 verified at 512x512, 4 steps, Euler, seed 4242; 8-step recipes remain unverified."
+    sampling_method:
+      mode: fixed
+      default: euler
+      allowed_values: [euler]
+    scheduler:
+      mode: fixed
+      default: null
+      allowed_values: []
+  enabled: true
+  validation_status: tested
+  cli_args:
+  - --sampling-method
+  - euler
+- model_id: z-image-turbo
+  display_name: Z-Image-Turbo 6B Q4_K
+  family: z-image
+  engine: sdcpp
+  model_path: /opt/sd-models/z-image-turbo/z_image_turbo-Q4_K.gguf
+  text_encoder_path: /opt/sd-models/z-image-turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf
+  vae_path: /opt/sd-models/z-image-turbo/ae.safetensors
+  quantization: Q4_K
+  supported_resolutions:
+  - - 512
+    - 512
+  - - 768
+    - 768
+  supported_parameters:
+  - width
+  - height
+  - steps
+  - seed
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 4
+      cfg_scale: 1.0
+    balanced:
+      width: 512
+      height: 512
+      steps: 8
+      cfg_scale: 1.0
+    quality:
+      width: 512
+      height: 512
+      steps: 8
+      cfg_scale: 1.0
+  generation_options:
+    cfg_scale:
+      mode: fixed
+      default: 1.0
+      allowed_values: [1.0]
+    negative_prompt:
+      mode: unsupported
+    sampling_method:
+      mode: fixed
+      default: euler
+      allowed_values: [euler]
+    scheduler:
+      mode: fixed
+      default: null
+      allowed_values: []
+  enabled: true
+  validation_status: configured
+  cli_args:
+  - --sampling-method
+  - euler
+- model_id: z-image-nsfw-v2
+  display_name: Z-Image NSFW v2 Q8_0
+  family: z-image
+  engine: sdcpp
+  model_path: /opt/sd-models/z-image-nsfw-v2/z_image_nsfw_v2-Q8_0.gguf
+  text_encoder_path: /opt/sd-models/z-image-turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf
+  vae_path: /opt/sd-models/z-image-turbo/ae.safetensors
+  quantization: Q8_0
+  supported_resolutions:
+  - - 512
+    - 512
+  - - 768
+    - 768
+  supported_parameters:
+  - width
+  - height
+  - steps
+  - seed
+  presets:
+    fast:
+      width: 768
+      height: 768
+      steps: 4
+      cfg_scale: 1.0
+    balanced:
+      width: 768
+      height: 768
+      steps: 6
+      cfg_scale: 1.0
+    quality:
+      width: 768
+      height: 768
+      steps: 8
+      cfg_scale: 1.0
+  generation_options:
+    cfg_scale:
+      mode: fixed
+      default: 1.0
+      allowed_values: [1.0]
+    negative_prompt:
+      mode: unsupported
+    sampling_method:
+      mode: fixed
+      default: euler
+      allowed_values: [euler]
+    scheduler:
+      mode: fixed
+      default: null
+      allowed_values: []
+  enabled: true
+  validation_status: configured
+  cli_args:
+  - --sampling-method
+  - euler
+- model_id: realistic-vision-v6
+  display_name: SD 1.5 Realistic Vision V6
+  family: sd15
+  engine: sdcpp
+  model_path: /opt/sd-models/realistic-vision-v6-fp16.safetensors
+  text_encoder_path: null
+  vae_path: null
+  quantization: ''
+  supported_resolutions:
+  - - 512
+    - 512
+  - - 768
+    - 768
+  supported_parameters:
+  - width
+  - height
+  - steps
+  - seed
+  - cfg_scale
+  - negative_prompt
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 15
+      cfg_scale: 7.0
+    balanced:
+      width: 512
+      height: 512
+      steps: 20
+      cfg_scale: 7.0
+    quality:
+      width: 512
+      height: 512
+      steps: 30
+      cfg_scale: 7.0
+  generation_options:
+    cfg_scale:
+      mode: verified
+      default: 7.0
+      allowed_values: []
+      minimum: 0.0
+      maximum: 30.0
+    negative_prompt:
+      mode: verified
+    sampling_method:
+      mode: fixed
+      default: euler
+      allowed_values: [euler]
+    scheduler:
+      mode: fixed
+      default: null
+      allowed_values: []
+  enabled: true
+  validation_status: tested
+  cli_args:
+  - --sampling-method
+  - euler
+  - --backend
+  - Vulkan0
+- model_id: moss-image-nsfw
+  display_name: MOSS-Image SFT 5B NSFW Q4_K
+  family: moss-image
+  engine: sdcpp
+  model_path: /opt/sd-models/moss-image/MOSS-Image-SFT-Q4_K.gguf
+  text_encoder_path: /opt/sd-models/moss-image/text_encoder/Qwen3.5-9B-Q4_K_M.gguf
+  vae_path: /opt/sd-models/moss-image/vae/flux2-vae.safetensors
+  tokenizer_path: /opt/sd-models/moss-image/tokenizer/tokenizer.json
+  quantization: Q4_K
+  supported_resolutions: [[512, 512], [768, 768]]
+  supported_parameters: [width, height, steps, seed, cfg_scale]
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 12
+      cfg_scale: 3.0
+      validation_status: experimental
+    balanced:
+      width: 512
+      height: 512
+      steps: 20
+      cfg_scale: 3.0
+      validation_status: tested
+    quality:
+      width: 768
+      height: 768
+      steps: 20
+      cfg_scale: 3.0
+      validation_status: experimental
+  generation_options:
+    cfg_scale:
+      mode: verified
+      default: 3.0
+      allowed_values: [3.0]
+      note: "Operator verified only at 512x512, 20 steps, LoRA 0.7, flow shift 5. Other combinations are experimental."
+    negative_prompt:
+      mode: unsupported
+    sampling_method:
+      mode: fixed
+      default: euler
+      allowed_values: [euler]
+    scheduler:
+      mode: fixed
+      default: discrete
+      allowed_values: [discrete]
+  lora:
+    path: /opt/sd-models/moss-image/loras/MOSS-Image-NSFW-Uncensored-LoRA-F16.gguf
+    strength: 0.7
+    trigger: moss_xvstyle
+    enabled: true
+  flow_shift: 5.0
+  enabled: true
+  # Operator-supplied validation: balanced preset with LoRA strength 0.7 only.
+  validation_status: tested
+  cli_args: [--backend, Vulkan0, --sampling-method, euler]

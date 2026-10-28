@@ -1,0 +1,15 @@
+# Replace ai.example.com with your actual DNS name.
+# Merge this site into an existing Caddyfile; do not overwrite unrelated sites.
+ai.example.com {
+    # Built locally by `cd frontend && npm run build`, then copied to this path.
+    # Keep the API loopback-only; the browser reaches it through this same origin.
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8090 {
+            flush_interval -1
+        }
+    }
+
+    root * /opt/bc250-ai-studio/frontend/dist
+    try_files {path} /index.html
+    file_server
+}

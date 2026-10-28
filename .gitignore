@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.env
+.env.*
+!.env.example
+config/settings.yaml
+node_modules/
+dist/
+*.sqlite*
+.DS_Store
+
+# Local diagnostics and generated test artifacts
+/bc250-gpu-diagnostics.txt
+/bc250-verified.json
+/bc250-*.png
+/klein-autofit-*.png
+/docs/t08-pornmaster-20261026-073336/

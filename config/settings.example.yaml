@@ -1,0 +1,21 @@
+# Environment-variable equivalents; documentation template, not automatically loaded.
+# Runtime uses STUDIO_<UPPERCASE_NAME> environment variables.
+# Paths below are examples to verify before enabling real execution.
+data_dir: /opt/ai-studio-data
+registry_path: /opt/bc250-ai-studio/config/models.yaml
+engine: fake
+policy: manual
+cors_origins: [http://localhost:5173]
+sd_cli: /opt/stable-diffusion.cpp/build-vulkan/bin/sd-cli
+gpu_test_approved: false
+llm_service: ''  # Discover, do not assume llama-server.service.
+allowed_services: []
+llm_url: http://127.0.0.1:8080
+admission_url: ''
+gpu_lock_path: /run/bc250-ai-studio/gpu.lock
+gpu_memory_used_path: null  # Optional verified sysfs counter; shared VRAM may not be measurable.
+gpu_memory_limit_bytes: 536870912
+drain_timeout: 60
+health_timeout: 120
+worker_timeout: 600
+# api_key, admin_key, llm_api_key and admission_key belong in a protected environment file.

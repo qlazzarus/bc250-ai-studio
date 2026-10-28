@@ -1,0 +1,28 @@
+# Template only; inspect paths and create the unprivileged account before installation.
+[Unit]
+Description=BC-250 AI Studio API and serialized worker
+After=network.target
+
+[Service]
+Type=simple
+User=ai-studio
+Group=ai-studio
+WorkingDirectory=/opt/bc250-ai-studio
+EnvironmentFile=/etc/bc250-ai-studio.env
+ExecStart=/opt/bc250-ai-studio/.venv/bin/uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8090 --workers 1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=900
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ai-studio-data
+RuntimeDirectory=bc250-ai-studio
+# Grant render-node group access only after checking actual Fedora device ownership.
+# SupplementaryGroups=render
+
+[Install]
+WantedBy=multi-user.target
