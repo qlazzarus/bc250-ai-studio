@@ -1,7 +1,8 @@
+import hmac
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from starlette.responses import JSONResponse
@@ -9,6 +10,7 @@ from starlette.responses import JSONResponse
 from app.api.routes import authenticate, router
 from app.core.config import Settings
 from app.core.files import FileLock
+from app.core.middleware import BodyLimit
 from app.engines.fake import FakeEngine
 from app.engines.sdcpp import SdCppEngine
 from app.models.database import Database
@@ -16,36 +18,6 @@ from app.scheduler.runner import Scheduler
 from app.services.gpu import GPUManager
 from app.services.llm import FakeLLM, SystemdLLM
 from app.services.registry import Registry
-
-
-class BodyLimit:
-    def __init__(self, app, limit):
-        self.app, self.limit = app, limit
-
-    async def __call__(self, scope, receive, send):
-        if scope["type"] != "http":
-            return await self.app(scope, receive, send)
-        # Buffer only mutation bodies; includes chunked uploads, without trusting Content-Length.
-        if scope["method"] not in {"POST", "PUT", "PATCH"}:
-            return await self.app(scope, receive, send)
-        messages, total = [], 0
-        while True:
-            message = await receive()
-            if message["type"] == "http.disconnect":
-                return
-            total += len(message.get("body", b""))
-            if total > self.limit:
-                return await JSONResponse({"detail": "Request body too large"}, 413)(
-                    scope, receive, send
-                )
-            messages.append(message)
-            if not message.get("more_body", False):
-                break
-
-        async def replay():
-            return messages.pop(0) if messages else await receive()
-
-        await self.app(scope, replay, send)
 
 
 def create_app(settings=None, engine=None, llm=None):
@@ -101,6 +73,24 @@ def create_app(settings=None, engine=None, llm=None):
         allow_headers=["Authorization", "Content-Type", "Last-Event-ID"],
     )
     app.include_router(router)
+
+    @app.get("/internal/model-switch/coordination", include_in_schema=False)
+    async def coordination(authorization: str | None = Header(default=None)):
+        key = settings.coordination_key
+        supplied = authorization.removeprefix("Bearer ") if authorization else ""
+        if (not key or not authorization or not authorization.startswith("Bearer ")
+                or not hmac.compare_digest(supplied.encode(), key.encode())):
+            return JSONResponse({"code": "invalid_credential"}, status_code=401)
+        s = app.state
+        enabled = s.gpu.model_switch_coordination_enabled()
+        if enabled:
+            try:
+                enabled = await s.gpu.llm.owned_control_identity()
+            except Exception:
+                enabled = False
+        transition_clear = (not s.gpu.blocked and not s.gpu.leased
+                            and not s.db.get_state("transition", {}))
+        return {"protocol": 1, "enabled": bool(enabled), "transition_clear": bool(transition_clear)}
 
     @app.get("/openapi.json", include_in_schema=False, dependencies=[Depends(authenticate)])
     async def schema():

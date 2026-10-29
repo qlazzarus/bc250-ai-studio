@@ -1,0 +1,15 @@
+# Candidate only: do not enable until the complete migration is reviewed.
+[Unit]
+Description=BC-250 read-only model control socket
+
+[Socket]
+ListenStream=/run/bc250-model-control/control.sock
+Accept=yes
+SocketUser=ai-studio
+SocketGroup=ai-studio
+SocketMode=0600
+DirectoryMode=0755
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

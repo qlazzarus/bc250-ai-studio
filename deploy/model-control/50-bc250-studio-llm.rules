@@ -1,0 +1,9 @@
+// Studio requires only start/stop on this fixed unit. No sudo or arbitrary units.
+polkit.addRule(function(action, subject) {
+    if (action.id === "org.freedesktop.systemd1.manage-units" &&
+        subject.user === "ai-studio" &&
+        action.lookup("unit") === "llama-server.service" &&
+        (action.lookup("verb") === "start" || action.lookup("verb") === "stop")) {
+        return polkit.Result.YES;
+    }
+});

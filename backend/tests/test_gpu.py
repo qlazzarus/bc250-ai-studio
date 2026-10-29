@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+from app.core.files import FileLock, LockBusyError
 from app.engines.fake import FakeEngine
 from app.main import create_app
 from app.models.database import Database
@@ -140,11 +141,32 @@ async def test_gpu_lock_across_instances(settings):
     first = GPUManager(settings, db, FakeLLM())
     second = GPUManager(settings, db, FakeLLM())
     await first.acquire("first")
-    with pytest.raises(RuntimeError, match="owns lock"):
+    with pytest.raises(LockBusyError, match="owns lock"):
         await second.acquire("second")
     await first.release()
     assert not second.lock.locked()
     db.engine.dispose()
+
+
+def test_external_gpu_lock_retries_without_losing_manual_grant(settings):
+    from conftest import ADMIN
+
+    settings.policy = "manual"
+    external = FileLock(settings.data_dir / "gpu.lock")
+    external.acquire()
+    try:
+        with TestClient(create_app(settings), headers=HEADERS) as client:
+            job_id = submit(client)
+            client.post("/api/v1/system/manual-grant", headers=ADMIN)
+            import time
+            time.sleep(0.15)
+            job = client.get(f"/api/v1/jobs/{job_id}").json()
+            assert job["status"] in {"queued", "waiting_for_gpu"}
+            assert not job["error_message"]
+            external.release()
+            assert wait_job(client, job_id)["status"] == "completed"
+    finally:
+        external.release()
 
 
 class CountingEngine(FakeEngine):
@@ -218,3 +240,60 @@ def test_policy_change_waits_for_image_boundary(settings):
         assert llm.active and not llm.paused
         client.post("/api/v1/system/manual-grant", headers=ADMIN)
         assert wait_job(client, id)["status"] == "completed"
+
+
+async def test_inactive_llm_gate_failure_remains_recoverable(settings):
+    class ResumeFailsOnce(FakeLLM):
+        def __init__(self):
+            super().__init__()
+            self.active = False
+            self.fail_resume = True
+
+        async def resume(self):
+            if self.fail_resume:
+                raise RuntimeError("gate unavailable")
+            await super().resume()
+
+    from app.services.gpu import RecoveryError
+
+    db = Database(settings.data_dir)
+    db.migrate()
+    llm = ResumeFailsOnce()
+    gpu = GPUManager(settings, db, llm)
+    await gpu.acquire("image")
+    with pytest.raises(RecoveryError):
+        await gpu.release()
+    assert gpu.blocked and db.get_state("transition", {})
+    llm.fail_resume = False
+    await gpu.recover()
+    assert not gpu.blocked and not db.get_state("transition", {}) and not llm.active
+    db.engine.dispose()
+
+
+async def test_legacy_administrator_pause_is_not_released_by_image(settings):
+    db = Database(settings.data_dir)
+    db.migrate()
+    llm = FakeLLM()
+    llm.paused = True
+    gpu = GPUManager(settings, db, llm)
+    await gpu.acquire("image")
+    await gpu.release()
+    assert llm.paused and "resume" not in llm.calls and not gpu.blocked
+    db.engine.dispose()
+
+
+async def test_legacy_pause_response_loss_does_not_resume_unknown_pause(settings):
+    class LostPauseResponse(FakeLLM):
+        async def pause(self):
+            await super().pause()
+            raise RuntimeError("pause response lost")
+
+    db = Database(settings.data_dir)
+    db.migrate()
+    llm = LostPauseResponse()
+    gpu = GPUManager(settings, db, llm)
+    with pytest.raises(RuntimeError, match="pause response lost"):
+        await gpu.acquire("image")
+    assert llm.paused and gpu.blocked and "resume" not in llm.calls
+    assert db.get_state("transition", {})["legacy_pause_started"]
+    db.engine.dispose()

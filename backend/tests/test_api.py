@@ -476,7 +476,8 @@ def test_single_instance_lock(settings):
 def test_journal_blocks_until_admin_recovery(settings):
     db = Database(settings.data_dir)
     db.migrate()
-    db.state("transition", {"stage": "image_execution"})
+    db.state("transition", {"stage": "image_execution", "legacy_pause_started": True,
+                            "legacy_initially_paused": False, "legacy_pause_confirmed": True})
     db.engine.dispose()
     with TestClient(create_app(settings), headers=HEADERS) as client:
         id = submit(client)
@@ -487,3 +488,16 @@ def test_journal_blocks_until_admin_recovery(settings):
         )
         assert result.status_code == 200
         assert wait_job(client, id)["status"] == "completed"
+
+
+def test_old_journal_with_unknown_pause_ownership_fails_closed(settings):
+    db = Database(settings.data_dir)
+    db.migrate()
+    db.state("transition", {"stage": "image_execution"})
+    db.engine.dispose()
+    with TestClient(create_app(settings), headers=HEADERS) as client:
+        result = client.post(
+            "/api/v1/system/recover", headers=ADMIN, json={"confirmed_no_image_worker": True}
+        )
+        assert result.status_code == 503
+        assert client.get("/api/v1/system/status").json()["recovery_required"]

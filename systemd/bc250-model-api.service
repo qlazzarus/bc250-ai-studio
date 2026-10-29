@@ -1,0 +1,23 @@
+[Unit]
+Description=BC-250 private model management HTTP API
+Requires=bc250-model-worker.socket
+After=bc250-model-worker.socket
+
+[Service]
+Type=simple
+User=ai-studio
+Group=ai-studio
+WorkingDirectory=/opt/bc250-model-control
+ExecStart=/opt/bc250-model-control/.venv/bin/python -I -m uvicorn app.services.model_management_server:create_app --factory --host 127.0.0.1 --port 8091 --workers 1 --no-access-log
+LoadCredential=api-key:/etc/bc250-model-control/api-key
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

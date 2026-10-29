@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Candidate only: do not install until a GPU-lock/gate coordinator wraps ALL switches.
+set -euo pipefail
+
+BASE=/opt/ai/config
+SERVICE=llama-server.service
+
+get_active() {
+  sed -n 's/^ACTIVE_MODEL=//p' "$BASE/active-model.conf"
+}
+
+valid_name() {
+  [[ "$1" =~ ^[a-zA-Z0-9_-]+$ ]]
+}
+
+set_active() {
+  local name="$1" temporary
+  temporary="$(mktemp "$BASE/.active-model.conf.XXXXXXXX")" || return 1
+  if ! printf 'ACTIVE_MODEL=%s\n' "$name" > "$temporary" ||
+     ! chmod --reference="$BASE/active-model.conf" "$temporary" ||
+     ! chown --reference="$BASE/active-model.conf" "$temporary" ||
+     ! mv -f -- "$temporary" "$BASE/active-model.conf"; then
+    rm -f -- "$temporary"
+    return 1
+  fi
+}
+
+healthy() {
+  local i state
+  for i in $(seq 1 120); do
+    if curl -fsS --max-time 2 http://127.0.0.1:8080/health 2>/dev/null |
+      python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("status") == "ok" else 1)' 2>/dev/null; then
+      return 0
+    fi
+    state="$(systemctl is-active "$SERVICE" 2>/dev/null || true)"
+    [[ "$state" != failed ]] || return 1
+    sleep 2
+  done
+  return 1
+}
+
+case "${1:-}" in
+  list)
+    [[ $# == 1 ]] || exit 2
+    for file in "$BASE"/models/*.conf; do
+      [[ -f "$file" ]] || continue
+      basename "$file" .conf
+    done
+    ;;
+  status)
+    [[ $# == 1 ]] || exit 2
+    echo "Active model: $(get_active)"
+    systemctl --no-pager status "$SERVICE" | head -n 12
+    ;;
+  switch)
+    [[ $# == 2 ]] || exit 2
+    MODEL="$2"
+    TARGET="$BASE/models/$MODEL.conf"
+    if ! valid_name "$MODEL" || [[ ! -f "$TARGET" ]]; then
+      echo "Unknown model: $MODEL" >&2
+      exit 2
+    fi
+    OLD="$(get_active)"
+    if ! valid_name "$OLD" || [[ ! -f "$BASE/models/$OLD.conf" ]]; then
+      echo "Cannot identify a valid previous model; no change made" >&2
+      exit 2
+    fi
+    if [[ "$MODEL" == "$OLD" ]]; then
+      echo "Already selected: $MODEL"
+      exit 0
+    fi
+    MODEL_PATH="$(sed -n 's/^MODEL_PATH=//p' "$TARGET")"
+    if [[ ! -s "$MODEL_PATH" ]]; then
+      echo "Model file missing or empty" >&2
+      exit 2
+    fi
+
+    echo "Switching: $OLD -> $MODEL"
+    if ! set_active "$MODEL"; then
+      echo "Could not write active model" >&2
+      exit 2
+    fi
+    if systemctl restart "$SERVICE" && healthy; then
+      echo "Model ready: $MODEL"
+      exit 0
+    fi
+
+    echo "Model failed. Restoring: $OLD" >&2
+    if ! set_active "$OLD"; then
+      echo "RECOVERY_REQUIRED: failed to restore active configuration" >&2
+      exit 3
+    fi
+    if ! systemctl restart "$SERVICE" || ! healthy; then
+      echo "RECOVERY_REQUIRED: previous model restart or health failed" >&2
+      exit 3
+    fi
+    echo "Previous model restored and healthy: $OLD" >&2
+    exit 1
+    ;;
+  *)
+    echo "Usage: ai-model {list|status|switch MODEL}" >&2
+    exit 2
+    ;;
+esac

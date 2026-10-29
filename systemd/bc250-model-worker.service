@@ -1,0 +1,30 @@
+[Unit]
+Description=BC-250 singleton model switch and recovery worker
+Requires=bc250-model-worker.socket
+After=bc250-model-worker.socket bc250-llm-gate.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/bc250-model-control
+ExecStart=/opt/bc250-model-control/.venv/bin/python -I -m app.services.model_control_runtime
+EnvironmentFile=/etc/bc250-model-control/worker.env
+LoadCredential=gate-key:/etc/bc250-model-control/switch-gate-key
+LoadCredential=llm-key:/etc/bc250-model-control/llm-key
+UMask=0077
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=1800
+KillMode=control-group
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/ai/config /var/lib/bc250-model-control /run/bc250-gpu
+InaccessiblePaths=/etc/bc250-model-control/gate-admin-key /etc/bc250-model-control/studio-gate-key /etc/bc250-model-control/api-key /etc/bc250-model-control/gate.env /etc/bc250-model-control/studio-gate.env
+RestrictAddressFamilies=AF_UNIX AF_INET
+CapabilityBoundingSet=CAP_CHOWN
+
+[Install]
+WantedBy=multi-user.target

@@ -20,7 +20,11 @@ PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
 ReadWritePaths=/opt/ai-studio-data
+# Optional until the root-managed GPU lock directory is provisioned.
+ReadWritePaths=-/run/bc250-gpu
 RuntimeDirectory=bc250-ai-studio
+# A different service may hold gpu.lock while Studio is stopped or restarted.
+RuntimeDirectoryPreserve=yes
 # Grant render-node group access only after checking actual Fedora device ownership.
 # SupplementaryGroups=render
 

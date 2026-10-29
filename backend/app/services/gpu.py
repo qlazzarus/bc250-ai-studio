@@ -1,7 +1,9 @@
 import asyncio
+from uuid import uuid4
 
-from app.core.files import FileLock
+from app.core.files import FileLock, LockBusyError
 from app.models.database import now
+from app.services.model_switch import StudioSwitchBarrier
 
 
 class RecoveryError(RuntimeError):
@@ -16,15 +18,29 @@ class GPUManager:
     def __init__(self, settings, db, llm):
         self.s, self.db, self.llm = settings, db, llm
         self.lock = asyncio.Lock()
-        self.file_lock = FileLock(settings.gpu_lock_path or settings.data_dir / "gpu.lock")
+        self.file_lock = FileLock(
+            settings.gpu_lock_path or settings.data_dir / "gpu.lock",
+            secure_precreated=settings.gpu_lock_secure_precreated,
+        )
         self.owner = None
+        self.switch_barrier = (
+            StudioSwitchBarrier(settings.switch_journal_path) if settings.switch_journal_path else None
+        )
         self.leased = False
         self.transition = db.get_state("transition", {})
         self.blocked = bool(self.transition)
         self.memory_status = {"verified": False, "reason": "not measured"}
 
+    def model_switch_coordination_enabled(self):
+        return bool(
+            self.s.admission_owned_holds and self.s.gpu_lock_secure_precreated
+            and str(self.file_lock.path) == "/run/bc250-gpu/gpu.lock"
+            and self.switch_barrier is not None
+            and str(self.switch_barrier.path) == "/var/lib/bc250-model-control/switch.json"
+        )
+
     def journal(self, stage, **details):
-        self.transition = {"stage": stage, "at": now(), **self.transition, **details}
+        self.transition = {**self.transition, **details, "stage": stage, "at": now()}
         self.db.state("transition", self.transition)
 
     def error(self, message):
@@ -41,7 +57,11 @@ class GPUManager:
             if self.blocked:
                 raise RuntimeError("GPU recovery required before execution")
             self.file_lock.acquire()
+            self._check_switch_barrier()
+            if self.s.admission_owned_holds:
+                await self.llm.ensure_image_admission()
         except BaseException:
+            self.file_lock.release()
             self.lock.release()
             raise
         self.owner, self.leased = owner, True
@@ -49,7 +69,10 @@ class GPUManager:
             "originally_running": False,
             "stopped_by_studio": False,
             "gpu_verified_idle": False,
+            "legacy_pause_started": False,
         }
+        if self.s.admission_owned_holds:
+            self.transition["admission_hold_id"] = f"studio-{uuid4().hex}"
         try:
             # Inspect systemd before touching /slots. An inactive server has no
             # endpoint to drain, but the admission proxy is still paused first.
@@ -60,7 +83,16 @@ class GPUManager:
                 raise RuntimeError("LLM service state is neither active nor safely inactive")
             self.transition["originally_running"] = active
             self.journal("pausing_admission")
-            await self.llm.pause()
+            hold_id = self.transition.get("admission_hold_id")
+            if hold_id:
+                await self.llm.pause_owned(hold_id)
+            else:
+                self.transition["legacy_initially_paused"] = await self.llm.admission_paused()
+                self.transition["legacy_pause_started"] = True
+                self.journal("pausing_admission")
+                await self.llm.pause()
+                self.transition["legacy_pause_confirmed"] = True
+                self.journal("paused_admission")
             if active:
                 self.journal("draining")
                 await self.llm.drain()
@@ -95,7 +127,17 @@ class GPUManager:
                 await self.llm.start()
                 await self.llm.healthy()
             # A previously inactive LLM must not be started or health-checked.
-            await self.llm.resume()
+            hold_id = self.transition.get("admission_hold_id")
+            if hold_id:
+                await self.llm.resume_owned(hold_id)
+            elif self.transition.get("legacy_initially_paused") is True:
+                pass  # Preserve an administrator pause that predates this image.
+            elif self.transition.get("legacy_pause_started") is False:
+                pass  # No legacy pause was attempted.
+            elif self.transition.get("legacy_pause_confirmed") is True:
+                await self.llm.resume()
+            else:
+                raise RuntimeError("Legacy admission pause ownership is unknown; inspect manually")
             self.db.state("transition", {})
             self.transition = {}
             self.blocked = False
@@ -111,7 +153,9 @@ class GPUManager:
                     gpu_safe = True
                 except BaseException:
                     pass
-            self.blocked = not gpu_safe
+            # A failed restoration needs reconciliation even if the GPU is idle:
+            # admission state and the transition record may still be unresolved.
+            self.blocked = True
             guidance = (
                 "Inspect systemctl state and GPU processes, then call /system/recover."
                 if self.blocked
@@ -130,6 +174,10 @@ class GPUManager:
         self.file_lock.release()
         self.lock.release()
 
+    def _check_switch_barrier(self):
+        if self.switch_barrier and self.switch_barrier.read():
+            raise LockBusyError("Model switch recovery required before GPU work")
+
     async def release(self):
         if not self.leased:
             return
@@ -144,6 +192,7 @@ class GPUManager:
                 return
             self.file_lock.acquire()
             try:
+                self._check_switch_barrier()
                 await self._restore()
                 self.db.state("error", {})
             finally:

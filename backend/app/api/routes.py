@@ -162,6 +162,8 @@ async def status(request: Request):
 
 @router.get("/system/capabilities")
 async def capabilities(request: Request):
+    s = state(request)
+    coordination = s.gpu.model_switch_coordination_enabled()
     return {
         "phase": 1,
         "engine": state(request).settings.engine,
@@ -171,6 +173,7 @@ async def capabilities(request: Request):
         "phaser_export": False,
         "integrated_chat_proxy": False,
         "uploads": False,
+        "model_switch_coordination": {"protocol": 1, "enabled": bool(coordination)},
     }
 
 

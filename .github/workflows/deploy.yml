@@ -1,8 +1,8 @@
 name: Deploy BC-250 AI Studio
 
 on:
-  push:
-    branches: [main]
+  # Coordinated model-control deployment is not supported by the legacy
+  # deploy script. Keep the legacy workflow manual until migration is complete.
   workflow_dispatch:
 
 permissions:

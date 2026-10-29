@@ -1,0 +1,17 @@
+# Candidate only: switching and recovery are intentionally not implemented.
+[Unit]
+Description=BC-250 read-only model control connection
+
+[Service]
+Type=exec
+User=root
+Group=root
+WorkingDirectory=/opt/bc250-ai-studio
+StandardInput=socket
+ExecStart=/opt/bc250-ai-studio/.venv/bin/python -m app.services.model_control_server
+NoNewPrivileges=true
+CapabilityBoundingSet=
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX

@@ -8,6 +8,10 @@ def configured(settings):
     return SystemdLLM(settings)
 
 
+async def paused_idle_gate(*args):
+    return {"paused": True, "active_requests": 0, "waiting_requests": 0}
+
+
 def test_service_name_must_be_explicitly_allowlisted(settings):
     settings.llm_service = "other.service"
     with pytest.raises(ValueError, match="allowlisted"):
@@ -66,6 +70,7 @@ async def test_unknown_slot_state_fails_closed(settings, monkeypatch, payload):
     import httpx
 
     llm = configured(settings)
+    llm.gate = paused_idle_gate
     original = httpx.AsyncClient
     transport = httpx.MockTransport(lambda request: httpx.Response(200, json=payload))
     monkeypatch.setattr(
@@ -81,6 +86,7 @@ async def test_slots_busy_timeout_and_idle(settings, monkeypatch):
     from app.services.llm import BusyError
 
     llm = configured(settings)
+    llm.gate = paused_idle_gate
     settings.drain_timeout = 0.001
     busy = True
     original = httpx.AsyncClient
@@ -116,6 +122,7 @@ async def test_optional_llm_key_is_not_sent_when_unconfigured(settings, monkeypa
     import httpx
 
     llm = configured(settings)
+    llm.gate = paused_idle_gate
     observed = []
     original = httpx.AsyncClient
 
@@ -129,3 +136,55 @@ async def test_optional_llm_key_is_not_sent_when_unconfigured(settings, monkeypa
     )
     await llm.drain()
     assert "authorization" not in observed[0]
+
+
+async def test_drain_waits_for_gate_requests_before_checking_slots(settings, monkeypatch):
+    import app.services.llm as module
+    import httpx
+
+    llm = configured(settings)
+    counts = iter([1, 0])
+    calls = []
+
+    async def gate(*args):
+        return {"paused": True, "active_requests": next(counts), "waiting_requests": 0}
+
+    original = httpx.AsyncClient
+    transport = httpx.MockTransport(lambda request: (calls.append(request),
+                                     httpx.Response(200, json=[{"is_processing": False}]))[1])
+    monkeypatch.setattr(module.httpx, "AsyncClient", lambda **kw: original(transport=transport, **kw))
+    llm.gate = gate
+    await llm.drain()
+    assert len(calls) == 1
+
+
+async def test_drain_rejects_unpaused_gate(settings):
+    llm = configured(settings)
+
+    async def gate(*args):
+        return {"paused": False, "active_requests": 0, "waiting_requests": 0}
+
+    llm.gate = gate
+    with pytest.raises(RuntimeError, match="not paused"):
+        await llm.drain()
+
+
+async def test_owned_resume_allows_another_hold_to_remain(settings, monkeypatch):
+    import app.services.llm as module
+    import httpx
+
+    llm = configured(settings)
+    settings.admission_url = "http://localhost/control"
+    original = httpx.AsyncClient
+    seen = []
+
+    def gate(request):
+        seen.append(request)
+        return httpx.Response(200, json={"paused": True, "held": False})
+
+    transport = httpx.MockTransport(gate)
+    monkeypatch.setattr(
+        module.httpx, "AsyncClient", lambda **kwargs: original(transport=transport, **kwargs)
+    )
+    await llm.resume_owned("studio-" + "a" * 32)
+    assert seen[0].method == "DELETE"

@@ -1,6 +1,6 @@
 # GitHub Actions 배포
 
-`main` push 또는 수동 실행 시 백엔드 테스트와 프런트엔드 빌드 후 SSH로 배포합니다.
+현재 워크플로는 수동 실행 시 백엔드 테스트와 프런트엔드 빌드 후 SSH로 배포합니다. `main` push의 자동 배포는 모델 전환 구성의 안전한 이전을 위해 중지했습니다. 기존 배포 스크립트는 gate·root 작업자·공유 잠금을 함께 이전하지 않으므로 모델 전환 구성이 배포된 서버에서는 이 수동 워크플로도 사용하지 말고 [수동 배포 초안](./LLM_MODEL_SWITCH_DEPLOYMENT_DRAFT.md)의 호환 절차를 확인하세요.
 기존 `bc250-llm-client`와 같은 GitHub `production` 환경과 다음 Secrets를 사용합니다.
 해당 저장소의 Secrets는 자동 공유되지 않으므로 이 저장소 또는 조직에서 설정해야 합니다.
 

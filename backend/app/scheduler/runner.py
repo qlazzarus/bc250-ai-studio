@@ -3,7 +3,7 @@ import copy
 
 from sqlalchemy import select
 
-from app.core.files import atomic_json, safe_path
+from app.core.files import LockBusyError, atomic_json, safe_path
 from app.models.database import Asset, Job, emit, now, uid
 from app.services.llm import BusyError
 
@@ -158,8 +158,12 @@ class Scheduler:
                 ):
                     final_status = "queued"  # Resume remaining images with the same seeds.
                     break
-        except BusyError:
+        except (BusyError, LockBusyError):
             final_status = "queued"
+            # A manual grant authorizes one attempt that reaches the GPU, not
+            # an arbitrary number of retries while another process holds it.
+            if starting_mode == "manual":
+                self.grants += 1
         except Exception as exception:
             final_status, error = "failed", str(exception)
         finally:
