@@ -6,6 +6,8 @@ set -Eeuo pipefail
 }
 archive=$1
 expected=$2
+resume=no
+guest_extra=''
 case $3 in
   label-rollback)
     guest_dir=bc250-label-rollback-source
@@ -47,6 +49,221 @@ case $3 in
     guest_dir=bc250-backup-units-source
     guest_script=scripts/test-backup-units-vm.sh
     ;;
+  backup-units-cgroup)
+    guest_dir=bc250-backup-units-cgroup-source
+    guest_script=scripts/test-backup-units-vm.sh
+    ;;
+  preserve-new-archive)
+    guest_dir=bc250-preserve-new-archive-source
+    guest_script=scripts/test-preserve-new-archive-vm.sh
+    ;;
+  check-new-switch-state)
+    guest_dir=bc250-check-new-switch-state-source
+    guest_script=scripts/test-check-new-switch-state-vm.sh
+    ;;
+  preserved-switch-state)
+    guest_dir=bc250-preserved-switch-state-source
+    guest_script=scripts/test-preserved-switch-state-vm.sh
+    ;;
+  restore-legacy-files)
+    guest_dir=bc250-restore-legacy-files-source
+    guest_script=scripts/test-restore-legacy-files-vm.sh
+    ;;
+  backup-path-guard)
+    guest_dir=bc250-backup-path-guard-source
+    guest_script=scripts/test-backup-path-guard-vm.sh
+    ;;
+  backup-dropins)
+    guest_dir=bc250-backup-dropins-source
+    guest_script=scripts/test-backup-dropins-vm.sh
+    ;;
+  backup-dropin-link)
+    guest_dir=bc250-backup-dropin-link-source
+    guest_script=scripts/test-backup-dropin-link-vm.sh
+    ;;
+  service-migration-rollback)
+    guest_dir=bc250-linked-service-rollback-v2-source
+    guest_script=scripts/test-service-migration-rollback-vm.sh
+    ;;
+  legacy-backup-sequence)
+    guest_dir=bc250-legacy-backup-sequence-source
+    guest_script=scripts/test-service-migration-rollback-vm.sh
+    ;;
+  legacy-rollback-sequence)
+    guest_dir=bc250-legacy-rollback-sequence-source
+    guest_script=scripts/test-service-migration-rollback-vm.sh
+    ;;
+  legacy-backup-adapter)
+    guest_dir=bc250-legacy-backup-adapter-source
+    guest_script=scripts/test-service-migration-rollback-vm.sh
+    ;;
+  linked-legacy-restore)
+    guest_dir=bc250-linked-legacy-restore-source
+    guest_script=scripts/test-service-migration-rollback-vm.sh
+    ;;
+  install-units)
+    guest_dir=bc250-install-units-source
+    guest_script=scripts/test-install-units-vm.sh
+    ;;
+  install-studio-release)
+    guest_dir=bc250-install-studio-release-source
+    guest_script=scripts/test-install-studio-release-vm.sh
+    ;;
+  install-studio-release-resume)
+    guest_dir="bc250-install-studio-resume-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-install-studio-release-vm.sh
+    resume=yes
+    ;;
+  install-studio-failure-resume)
+    guest_dir="bc250-install-studio-failure-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-install-studio-release-vm.sh
+    guest_extra=' failure-only'
+    resume=yes
+    ;;
+  installed-studio-services-resume)
+    guest_dir="bc250-installed-studio-services-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-installed-studio-services-vm.sh
+    resume=yes
+    ;;
+  installed-studio-repair-resume)
+    guest_dir="bc250-installed-studio-repair-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-installed-studio-services-vm.sh
+    guest_extra=' repair-lock'
+    resume=yes
+    ;;
+  new-service-start-resume)
+    guest_dir="bc250-new-service-start-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-installed-studio-services-vm.sh
+    guest_extra=' startup-phases'
+    resume=yes
+    ;;
+  staged-secrets-resume)
+    guest_dir="bc250-staged-secrets-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-staged-secrets-vm.sh
+    resume=yes
+    ;;
+  staged-config-adapter-resume)
+    guest_dir="bc250-staged-config-adapter-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-staged-configuration-adapter-vm.sh
+    resume=yes
+    ;;
+  caddy-linked-migration-resume|caddy-maintenance-adapter-resume|caddy-systemd-adapter-resume|caddy-systemd-linked-resume)
+    host_caddy=$(readlink -e -- "$(command -v caddy)")
+    [[ -f $host_caddy && -x $host_caddy && $(stat -c '%u' "$host_caddy") == 0 \
+      && -z $(find "$host_caddy" -maxdepth 0 -perm /022 -print) ]] || exit 1
+    caddy_digest=$(sha256sum "$host_caddy" | cut -d ' ' -f 1)
+    [[ $caddy_digest =~ ^[a-f0-9]{64}$ ]] || exit 1
+    guest_dir="bc250-caddy-linked-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-caddy-linked-migration-vm.sh
+    guest_extra=" $caddy_digest"
+    if [[ $3 == caddy-maintenance-adapter-resume ]]; then guest_extra+=' adapter'; fi
+    if [[ $3 == caddy-systemd-adapter-resume ]]; then guest_extra+=' adapter-systemd'; fi
+    if [[ $3 == caddy-systemd-linked-resume ]]; then guest_extra+=' systemd-linked'; fi
+    resume=yes
+    ;;
+  migration-journal-resume)
+    guest_dir="bc250-migration-journal-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-migration-journal-vm.sh
+    resume=yes
+    ;;
+  migration-backup-record-resume)
+    guest_dir="bc250-migration-backup-record-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-migration-backup-record-vm.sh
+    resume=yes
+    ;;
+  preserve-new-adapter-resume)
+    guest_dir="bc250-preserve-new-adapter-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-preserve-new-adapter-vm.sh
+    resume=yes
+    ;;
+  preserve-recovery-check-resume)
+    guest_dir="bc250-preserve-recovery-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-preserve-recovery-check-vm.sh
+    resume=yes
+    ;;
+  assemble-coordinator-resume)
+    guest_dir="bc250-assemble-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-assemble-coordinator-vm.sh
+    resume=yes
+    ;;
+  staged-release-resume)
+    guest_dir="bc250-staged-release-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-staged-release-vm.sh
+    resume=yes
+    ;;
+  stage-release-resume)
+    guest_dir="bc250-stage-release-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-stage-release-vm.sh
+    resume=yes
+    ;;
+  pinned-coordinator-resume)
+    guest_dir="bc250-pinned-coordinator-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-pinned-coordinator-vm.sh
+    resume=yes
+    ;;
+  initial-install-adapter-resume)
+    guest_dir="bc250-initial-install-adapter-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-initial-install-adapter-vm.sh
+    resume=yes
+    ;;
+  initial-install-real-studio-resume)
+    guest_dir="bc250-initial-install-real-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-initial-install-adapter-vm.sh
+    guest_extra=' real-studio'
+    resume=yes
+    ;;
+  service-migration-rollback-resume)
+    guest_dir=bc250-linked-service-rollback-v2-source
+    guest_script=scripts/test-service-migration-rollback-vm.sh
+    resume=yes
+    ;;
+  api-services-resume)
+    guest_dir=bc250-api-services-v3-source
+    guest_script=scripts/test-api-services-vm.sh
+    resume=yes
+    ;;
+  api-services-continue)
+    guest_dir=bc250-api-services-continue-source
+    guest_script=scripts/resume-api-services-vm.sh
+    resume=yes
+    ;;
+  current-code-resume)
+    guest_dir=bc250-current-code-v2-source
+    guest_script=scripts/test-current-code-vm.sh
+    resume=yes
+    ;;
+  current-studio-code-resume)
+    guest_dir=bc250-current-studio-code-source
+    guest_script=scripts/test-current-studio-code-vm.sh
+    resume=yes
+    ;;
+  current-release-services-resume)
+    guest_dir=bc250-current-release-services-source
+    guest_script=scripts/test-current-release-services-vm.sh
+    resume=yes
+    ;;
+  separated-release-services-resume)
+    guest_dir=bc250-separated-release-services-source
+    guest_script=scripts/test-separated-release-services-vm.sh
+    resume=yes
+    ;;
+  caddy-metadata-resume)
+    guest_dir=bc250-caddy-metadata-source
+    guest_script=scripts/test-caddy-metadata-vm.sh
+    resume=yes
+    ;;
+  caddy-capture)
+    guest_dir=bc250-caddy-capture-source
+    guest_script=scripts/test-caddy-capture-vm.sh
+    ;;
+  caddy-snapshot-verify)
+    guest_dir=bc250-caddy-snapshot-verify-source
+    guest_script=scripts/test-caddy-snapshot-verify-vm.sh
+    ;;
+  caddy-file-swap)
+    guest_dir=bc250-caddy-file-swap-source
+    guest_script=scripts/test-caddy-file-swap-vm.sh
+    ;;
   verify-backup)
     guest_dir=bc250-verify-backup-source
     guest_script=scripts/test-verify-backup-vm.sh
@@ -76,6 +293,28 @@ test -f "$vm_dir/test-disk.qcow2"
 test -f "$vm_dir/seed.iso"
 test -f "$vm_dir/vm-key"
 test -f "$vm_dir/known_hosts"
+if [[ $resume == yes ]]; then
+  [[ -f $vm_dir/vm.pid ]] || { echo '실행 중인 시험 VM의 PID 파일이 없습니다.' >&2; exit 1; }
+  pid=$(cat "$vm_dir/vm.pid")
+  [[ $pid =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null || {
+    echo '시험 VM 프로세스를 확인하지 못했습니다.' >&2; exit 1;
+  }
+  ssh_options=(-i "$vm_dir/vm-key" -o BatchMode=yes -o ConnectTimeout=5
+    -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$vm_dir/known_hosts")
+  ssh -n "${ssh_options[@]}" -p 22223 vmtest@127.0.0.1 \
+    'test "$(hostname)" = bc250-fedora43-test && test "$(systemd-detect-virt)" = qemu'
+  ssh -n "${ssh_options[@]}" -p 22223 vmtest@127.0.0.1 \
+    "mkdir -m 700 \"\$HOME/$guest_dir\""
+  scp "${ssh_options[@]}" -P 22223 "$archive" \
+    "vmtest@127.0.0.1:$guest_dir/source.tar.gz" </dev/null
+  ssh -n "${ssh_options[@]}" -p 22223 vmtest@127.0.0.1 \
+    "set -e; cd \"\$HOME/$guest_dir\"; \
+     printf '%s  %s\\n' '$expected' source.tar.gz | sha256sum -c -; \
+     tar -xzf source.tar.gz; \
+     sudo bash '$guest_script' \"\$HOME/$guest_dir\"$guest_extra"
+  echo '시험 완료. 이전 실패 기록을 보존하기 위해 VM은 실행 상태로 둡니다.'
+  exit 0
+fi
 available=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
 [[ $available -ge 3000000 ]] || { echo '사용 가능한 메모리가 부족합니다.' >&2; exit 1; }
 [[ -z $(ss -H -ltn 'sport = :22223') ]] || { echo '포트 22223이 사용 중입니다.' >&2; exit 1; }

@@ -9,11 +9,11 @@ caddy_original=$1
 [[ $caddy_original == /* && -f $caddy_original && ! -L $caddy_original ]] || {
   echo '보존된 기존 Caddyfile을 확인할 수 없습니다.' >&2; exit 1;
 }
-[[ $(stat -c '%u %a %h' "$caddy_original") == '0 600 1' ]] || {
-  echo '보존된 Caddyfile은 root 소유 0600 단일 링크여야 합니다.' >&2; exit 1;
+[[ $(stat -c '%u %h' "$caddy_original") == '0 1' ]] || {
+  echo '보존된 Caddyfile은 root 소유 단일 링크여야 합니다.' >&2; exit 1;
 }
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
-python3 - "$caddy_original" "$script_dir/backup-archive.sh" <<'PY'
+python3 - "$caddy_original" "$script_dir/backup-archive.sh" "$script_dir/check-service-cgroup.py" <<'PY'
 import os
 import stat
 import sys
@@ -29,6 +29,8 @@ for text in sys.argv[1:]:
             raise SystemExit('신뢰할 수 없는 소유권 또는 경로 권한입니다.')
         if item != path and not stat.S_ISDIR(info.st_mode):
             raise SystemExit('상위 경로가 디렉터리가 아닙니다.')
+if Path(sys.argv[1]).parent.lstat().st_mode & 0o077:
+    raise SystemExit('보존된 Caddyfile의 디렉터리는 root 전용이어야 합니다.')
 PY
 source "$script_dir/backup-archive.sh"
 bc250_require_stopped bc250-ai-studio.service bc250-llm-gate.service bc250-llm-client.service

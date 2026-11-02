@@ -20,4 +20,23 @@ tar --extract --file="$backup/legacy.tar" --acls --xattrs --xattrs-include='*' \
 tar --compare --file="$backup/legacy.tar" --directory="$stage/files"
 cp -a -- "$backup/Caddyfile.original" "$stage/Caddyfile.original"
 cmp -- "$backup/Caddyfile.original" "$stage/Caddyfile.original"
+python3 - "$backup/Caddyfile.original" "$stage/Caddyfile.original" <<'PY'
+import os
+import stat
+import sys
+
+source, restored = sys.argv[1:]
+a = os.stat(source, follow_symlinks=False)
+b = os.stat(restored, follow_symlinks=False)
+if (not stat.S_ISREG(a.st_mode) or not stat.S_ISREG(b.st_mode)
+        or (a.st_uid, a.st_gid, a.st_mode) != (b.st_uid, b.st_gid, b.st_mode)):
+    raise SystemExit('Caddyfile 복원 소유권 또는 권한이 다릅니다.')
+attrs = set(os.listxattr(source, follow_symlinks=False))
+if attrs != set(os.listxattr(restored, follow_symlinks=False)):
+    raise SystemExit('Caddyfile 복원 확장 속성 목록이 다릅니다.')
+for attr in attrs:
+    if (os.getxattr(source, attr, follow_symlinks=False)
+            != os.getxattr(restored, attr, follow_symlinks=False)):
+        raise SystemExit('Caddyfile 복원 확장 속성이 다릅니다.')
+PY
 echo '격리된 복원 파일의 아카이브 비교 완료; 서비스는 변경하지 않았습니다.'

@@ -16,7 +16,13 @@ REQUIRED = frozenset({
     'etc/systemd/system/bc250-llm-client.service',
     'opt/ai/config/active-model.conf', 'var/lib/bc250-model-control/legacy-pause.json',
 })
-TREES = ('opt/bc250-ai-studio/', 'opt/ai-studio-data/')
+OPTIONAL_TREES = frozenset({
+    'etc/systemd/system/bc250-ai-studio.service.d',
+    'etc/systemd/system/bc250-llm-gate.service.d',
+    'etc/systemd/system/bc250-llm-client.service.d',
+})
+TREES = ('opt/bc250-ai-studio/', 'opt/ai-studio-data/',
+         *(name + '/' for name in sorted(OPTIONAL_TREES)))
 
 
 def trusted_backup(path):
@@ -34,8 +40,9 @@ def checked_file(path):
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     file = os.fdopen(fd, 'rb')
     info = os.fstat(fd)
+    forbidden = 0o022 if path.name == 'Caddyfile.original' else 0o077
     if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or
-            info.st_nlink != 1 or info.st_mode & 0o077):
+            info.st_nlink != 1 or info.st_mode & forbidden):
         file.close()
         raise ValueError('신뢰할 수 없는 백업 파일입니다.')
     return file
@@ -69,7 +76,7 @@ def archive_name(name):
     if path.is_absolute() or '..' in path.parts or not path.parts:
         raise ValueError('아카이브 경로가 올바르지 않습니다.')
     name = str(path)
-    if name not in REQUIRED and not name.startswith(TREES):
+    if name not in REQUIRED and name not in OPTIONAL_TREES and not name.startswith(TREES):
         raise ValueError('예상하지 않은 아카이브 경로가 있습니다.')
     return name
 
@@ -81,7 +88,9 @@ def verify_archive(directory):
             name = archive_name(member.name)
             if name in names or not (member.isfile() or member.isdir() or member.issym() or member.islnk()):
                 raise ValueError('중복 또는 지원하지 않는 아카이브 항목이 있습니다.')
-            if name in {'opt/bc250-ai-studio', 'opt/ai-studio-data'}:
+            if member.issym() and any(name.startswith(root + '/') for root in OPTIONAL_TREES):
+                raise ValueError('drop-in 심볼릭 링크는 지원하지 않습니다.')
+            if name in {'opt/bc250-ai-studio', 'opt/ai-studio-data'} | OPTIONAL_TREES:
                 if not member.isdir():
                     raise ValueError('백업 디렉터리 항목의 형식이 올바르지 않습니다.')
             elif name in REQUIRED and not member.isfile():
@@ -95,6 +104,9 @@ def verify_archive(directory):
                 regular_files.add(name)
     if not REQUIRED.issubset(names) or not set(hardlinks).issubset(regular_files):
         raise ValueError('아카이브 대상이 누락됐습니다.')
+    if any(name.startswith(root + '/') and root not in names
+           for root in OPTIONAL_TREES for name in names):
+        raise ValueError('drop-in 디렉터리 항목이 누락됐습니다.')
     if any(any(parent.as_posix() in symlinks for parent in PurePosixPath(name).parents)
            for name in names):
         raise ValueError('심볼릭 링크 내부에 아카이브 항목이 있습니다.')

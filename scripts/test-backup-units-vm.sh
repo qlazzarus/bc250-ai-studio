@@ -7,6 +7,35 @@ set -Eeuo pipefail
 }
 [[ $# == 1 && -f $1/deploy/model-control/backup-archive.sh ]] || exit 1
 source "$1/deploy/model-control/backup-archive.sh"
+python3 - "$1/deploy/model-control/check-service-cgroup.py" <<'PY'
+import importlib.util
+import sys
+import tempfile
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location('check_cgroup', sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+unit = 'bc250-cgroup-fixture.service'
+properties = 'Slice=system.slice\nControlGroup=\n'
+with tempfile.TemporaryDirectory(prefix='bc250-cgroup-fixture-') as temp:
+    root = Path(temp)
+    (root / 'cgroup.controllers').touch()
+    group = root / 'system.slice' / unit
+    (group / 'child').mkdir(parents=True)
+    (group / 'cgroup.procs').write_text('')
+    procs = group / 'child/cgroup.procs'
+    procs.write_text('')
+    module.check(unit, properties, root)
+    procs.write_text('1234\n')
+    try:
+        module.check(unit, properties, root)
+    except ValueError:
+        pass
+    else:
+        raise SystemExit('시험 하위 cgroup의 프로세스를 잘못 허용했습니다.')
+print('모의 하위 cgroup의 잔류 프로세스 거절 확인', flush=True)
+PY
 units=(bc250-backup-fixture-one.service bc250-backup-fixture-two.service bc250-backup-fixture-three.service)
 for unit in "${units[@]}"; do
   [[ ! -e /run/systemd/system/$unit && ! -e /etc/systemd/system/$unit ]] || {

@@ -45,6 +45,9 @@ jobs:
             COMMIT pyproject.toml uv.lock backend config frontend/dist deploy systemd docs scripts
           cd "$RUNNER_TEMP"
           sha256sum bc250-model-control-candidate.tar.gz > bc250-model-control-candidate.sha256
+          python "$GITHUB_WORKSPACE/deploy/model-control/verify-release-candidate.py" \
+            "$RUNNER_TEMP/bc250-model-control-candidate.tar.gz" \
+            "$(cut -d ' ' -f1 bc250-model-control-candidate.sha256)" "$GITHUB_SHA"
       - name: Upload candidate and checksum
         uses: actions/upload-artifact@v4
         with:
