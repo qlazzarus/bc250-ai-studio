@@ -81,6 +81,41 @@ async def test_startup_release_keeps_hold_when_model_health_fails():
     assert not llm.released and not lock.held
 
 
+async def test_startup_release_preserves_hold_if_client_credential_check_fails(monkeypatch):
+    from app.services import client_gate_check, gate_admin
+
+    lock, llm = Lock(), LLM()
+    calls = []
+    monkeypatch.setattr(gate_admin, "coordinated_studio_is_ready", lambda: calls.append("studio"))
+    def fail_client(user):
+        assert lock.held
+        calls.append(user)
+        raise RuntimeError("client credential mismatch")
+    monkeypatch.setattr(client_gate_check, "verify_client_gate", fail_client)
+    with pytest.raises(RuntimeError, match="client credential mismatch"):
+        await confirm_startup(
+            lock, Journal(), Client(), llm, Service(), Registry(),
+            lambda: gate_admin.coordinated_participants_are_ready("yeppyshiba"),
+        )
+    assert calls == ["studio", "yeppyshiba"]
+    assert not llm.released and not lock.held
+
+
+async def test_startup_release_verifies_client_while_holding_lock(monkeypatch):
+    from app.services import client_gate_check, gate_admin
+
+    lock, llm = Lock(), LLM()
+    monkeypatch.setattr(gate_admin, "coordinated_studio_is_ready", lambda: None)
+    def verify_client(user):
+        assert lock.held and user == "yeppyshiba"
+    monkeypatch.setattr(client_gate_check, "verify_client_gate", verify_client)
+    await confirm_startup(
+        lock, Journal(), Client(), llm, Service(), Registry(),
+        lambda: gate_admin.coordinated_participants_are_ready("yeppyshiba"),
+    )
+    assert llm.released and not lock.held
+
+
 def test_startup_confirmation_checks_both_running_service_configurations(monkeypatch):
     from app.services import gate_admin
 

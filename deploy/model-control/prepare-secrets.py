@@ -46,6 +46,9 @@ def main():
         "GATE_API_KEY=" + admin, "GATE_STUDIO_KEY=" + studio,
         "GATE_SWITCH_KEY=" + switch, "",
     ]))
+    # The existing client uses this administrator key for legacy /control.
+    # systemd reads this root-only file; the client account must not read it.
+    write("client-gate.env", "LLM_GATE_API_KEY=" + admin + "\n")
     write("studio-gate.env", "\n".join([
         "STUDIO_GPU_LOCK_PATH=/run/bc250-gpu/gpu.lock",
         "STUDIO_GPU_LOCK_SECURE_PRECREATED=true",

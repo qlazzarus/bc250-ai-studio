@@ -83,6 +83,15 @@ def coordinated_studio_is_ready():
         raise RuntimeError("Service restarted during coordination verification")
 
 
+def coordinated_participants_are_ready(expected_client_user=None):
+    coordinated_studio_is_ready()
+    if expected_client_user is not None:
+        # Import lazily because the client check reuses the service helpers above.
+        from app.services.client_gate_check import verify_client_gate
+
+        verify_client_gate(expected_client_user)
+
+
 async def confirm_startup(lock, journal, client, llm, service, registry, check_studio,
                           *, release_id="startup"):
     lock.acquire()
@@ -166,7 +175,9 @@ class GateAdministrator(SystemdLLM):
             raise RuntimeError("Could not verify administrator hold")
 
 
-async def run_confirm(operation, hold_id=None):
+async def run_confirm(operation, hold_id=None, *, expected_client_user=None):
+    if expected_client_user is not None and operation != "confirm-startup":
+        raise ValueError("Client verification is only available for startup confirmation")
     llm_key = read_key("llm-key", optional=True)
     settings = SimpleNamespace(
         llm_service="llama-server.service", allowed_services=["llama-server.service"],
@@ -208,10 +219,14 @@ async def run_confirm(operation, hold_id=None):
                                     coordinated_studio_is_ready, owner_gate, hold_id, owner=owner)
         return
     release_id = "startup" if operation == "confirm-startup" else "admin-reconciliation"
+    check_participants = (
+        (lambda: coordinated_participants_are_ready(expected_client_user))
+        if expected_client_user is not None else coordinated_studio_is_ready
+    )
     await confirm_startup(FileLock(GPU_LOCK, secure_precreated=True),
                           SwitchJournal(STATE / "switch.json", secure_precreated=True),
                           ModelControlClient(SOCKET), gate, service,
-                          registry, coordinated_studio_is_ready, release_id=release_id)
+                          registry, check_participants, release_id=release_id)
 
 
 def main():
@@ -220,13 +235,17 @@ def main():
                                               "release-reconciliation", "release-orphan-switch",
                                               "release-orphan-studio"))
     parser.add_argument("hold_id", nargs="?")
+    parser.add_argument("--expected-client-user")
     args = parser.parse_args()
     if (args.operation in {"release-orphan-switch", "release-orphan-studio"}) != (args.hold_id is not None):
         parser.error("Only orphan-hold release requires a hold ID")
+    if args.expected_client_user is not None and args.operation != "confirm-startup":
+        parser.error("Client verification is only available for startup confirmation")
     if os.geteuid() != 0:
         parser.error("Run as root")
     try:
-        result = asyncio.run(run_confirm(args.operation, args.hold_id))
+        result = asyncio.run(run_confirm(args.operation, args.hold_id,
+                                         expected_client_user=args.expected_client_user))
     except Exception:
         raise SystemExit("Verification or release failed; inspect gate status before proceeding") from None
     if args.operation == "status":

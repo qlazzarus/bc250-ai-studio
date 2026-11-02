@@ -6,10 +6,13 @@ from types import SimpleNamespace
 
 import pytest
 from app.core.files import FileLock, LockBusyError
+from app.main import create_app
 from app.models.database import Database
 from app.services.gpu import GPUManager
 from app.services.llm import FakeLLM
 from app.services.model_switch import StudioSwitchBarrier, SwitchJournal, SwitchRecoveryRequired
+from conftest import HEADERS, submit, wait_job
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture
@@ -64,6 +67,25 @@ def test_invalid_journal_fails_closed(barrier, data):
     path.write_text(data)
     with pytest.raises((ValueError, SwitchRecoveryRequired)):
         check.read()
+
+
+@pytest.mark.parametrize("data", [None, "not json", '{"old":"old"}'])
+def test_unreadable_journal_reports_action_on_job(settings, barrier, data):
+    check, path = barrier
+    if data is None:
+        path.unlink()
+    else:
+        path.write_text(data)
+    llm = FakeLLM()
+    app = create_app(settings, llm=llm)
+    with TestClient(app, headers=HEADERS) as client:
+        app.state.gpu.switch_barrier = check
+        job = wait_job(client, submit(client))
+        assert job["status"] == "failed"
+        assert "journal cannot be verified" in job["error_message"]
+        assert "permissions before retrying" in job["error_message"]
+        assert not llm.calls
+        assert not app.state.gpu.leased
 
 
 def test_barrier_refuses_untrusted_file_metadata():

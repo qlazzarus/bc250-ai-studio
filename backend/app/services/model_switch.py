@@ -116,6 +116,27 @@ class SwitchJournal:
             if os.path.exists(temporary):
                 os.unlink(temporary)
 
+    def validate_replacement(self):
+        """Test the protected replacement metadata without changing the journal."""
+        self.read()
+        metadata = self.path.lstat()
+        current = os.open(self.path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        try:
+            if os.fstat(current).st_ino != metadata.st_ino:
+                raise SwitchRecoveryRequired("Switch journal changed during validation")
+            attributes = protected_xattrs(current)
+        finally:
+            os.close(current)
+        fd, temporary = tempfile.mkstemp(prefix=".switch-", dir=self.path.parent)
+        try:
+            os.fchown(fd, metadata.st_uid, metadata.st_gid)
+            os.fchmod(fd, stat.S_IMODE(metadata.st_mode))
+            if protected_xattrs(fd) != attributes:
+                raise SwitchRecoveryRequired("Switch journal ACL or SELinux label would change")
+        finally:
+            os.close(fd)
+            os.unlink(temporary)
+
     def clear(self):
         self.write({})
 
@@ -187,6 +208,14 @@ class ModelSwitch:
                 await self.service.ensure_settled()
                 await self.service.healthy(old)
                 return "already_selected"
+            try:
+                if getattr(self.journal, "secure_precreated", False):
+                    self.journal.validate_replacement()
+                if hasattr(self.service, "validate_switch_preconditions"):
+                    await self.service.validate_switch_preconditions()
+            except Exception as error:
+                # No hold, journal, or model mutation has occurred yet.
+                raise SwitchAdmissionBlocked("Replacement metadata cannot be preserved") from error
             state = dict(hold_id=f"switch-{uuid4().hex}", old=old, target=target,
                          stage="pausing", mutation_started=False)
             if operation_id is not None:

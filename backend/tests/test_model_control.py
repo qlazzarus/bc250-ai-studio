@@ -102,6 +102,15 @@ def test_writer_rejects_missing_or_empty_model_without_changing_active(registry,
     assert (tmp_path / "active-model.conf").read_text() == "ACTIVE_MODEL=model-a\n"
 
 
+def test_writer_preflight_rejects_changed_security_attributes(registry, tmp_path, monkeypatch):
+    attributes = iter([{"security.selinux": b"existing"}, {"security.selinux": b"new"}])
+    monkeypatch.setattr("app.services.model_control.protected_xattrs", lambda fd: next(attributes))
+    with pytest.raises(RuntimeError, match="ACL or SELinux"):
+        ActiveModelWriter(registry).validate_replacement()
+    assert (tmp_path / "active-model.conf").read_text() == "ACTIVE_MODEL=model-a\n"
+    assert not list(tmp_path.glob(".active-model-*"))
+
+
 def test_failed_file_sync_preserves_previous_active_model(registry, tmp_path, monkeypatch):
     model = tmp_path / "model-b.gguf"
     model.write_bytes(b"gguf")

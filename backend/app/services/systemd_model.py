@@ -76,6 +76,9 @@ class SystemdModelService:
     async def current(self):
         return self.registry.current_model()
 
+    async def validate_switch_preconditions(self):
+        self.writer.validate_replacement()
+
     async def apply(self, model):
         if not isinstance(model, str) or not MODEL_NAME.fullmatch(model):
             raise ValueError("Invalid management model name")

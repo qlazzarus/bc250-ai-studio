@@ -3,9 +3,26 @@
 
 import grp
 import os
+import subprocess
 from pathlib import Path
 
 DIRECTORY = Path("/var/lib/bc250-model-control")
+SELINUX_ENFORCE = Path("/sys/fs/selinux/enforce")
+RESTORECON = "/usr/sbin/restorecon"
+
+
+def label_new_state():
+    """Apply policy defaults only to the newly created directory and journal."""
+    try:
+        mode = SELINUX_ENFORCE.read_text(encoding="ascii").strip()
+    except FileNotFoundError:
+        return
+    if mode not in {"0", "1"}:
+        raise RuntimeError("Cannot determine SELinux mode")
+    # -F is required: the ordinary restorecon may retain an unconfined SELinux
+    # user, causing systemd-created replacement files to have a different label.
+    subprocess.run([RESTORECON, "-F", str(DIRECTORY), str(DIRECTORY / "switch.json")],
+                   check=True)
 
 
 def main():
@@ -26,6 +43,12 @@ def main():
         file.write("{}\n")
         file.flush()
         os.fsync(file.fileno())
+    label_new_state()
+    fd = os.open(DIRECTORY / "switch.json", os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
     for path in (DIRECTORY, DIRECTORY.parent):
         fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
         try:

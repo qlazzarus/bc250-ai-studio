@@ -8,6 +8,8 @@
 - `bc250-model-worker.socket` → `bc250-model-worker.service`: 단일 root 작업자. 소켓 호출자는 `ai-studio` 또는 root이며 허용된 모델 목록·상태·전환·복구 요청만 처리합니다. 같은 `ai-studio` UID의 모든 로컬 프로세스가 이 제한된 소켓 기능을 호출할 수 있으므로 UID 자체가 신뢰 경계입니다.
 - `bc250-model-api.service`: `ai-studio`가 실행하는 127.0.0.1:8091 HTTP API. 전용 키를 systemd credential로 받습니다. client 백엔드와 다른 호스트 사이의 TLS·접근 제한은 실제 네트워크 환경에 맞춰 별도 구성해야 합니다. 키를 브라우저에 전달하지 않습니다.
 - gate는 별도 `ai-gate` 계정으로 실행하는 후보입니다. 관리자·Studio·전환 작업자 키를 분리하고 gate 상태를 `/var/lib/bc250-llm-gate`에 저장합니다. 기존 관리자 key가 바뀌므로 외부 관리자 도구도 같은 시점에 이전해야 합니다.
+- 현재 LLM Client는 gate의 관리자 키로 기존 `/control`을 호출합니다. 신규 준비 도구는 같은 키를 root 전용 `client-gate.env`에 기록하고 [클라이언트 drop-in 후보](../deploy/model-control/llm-client.conf)가 기존 환경에 추가합니다. 이 파일을 직접 읽을 수 없어도 키는 클라이언트 프로세스 환경으로 전달되므로 실행 계정과 그 계정으로 실행되는 다른 프로세스는 신뢰해야 합니다. 설치 순서·실제 적용된 키·롤백은 검증 전입니다.
+- Client 재시작 후 root 전용 `python -I -m app.services.client_gate_check --expected-user yeppyshiba` 후보는 실행 중인 프로세스의 키가 신규 관리자 키와 같은지와 gate 관리자 역할을 검증합니다. 키 값은 출력하지 않으며 PID나 서비스가 바뀌거나 `/proc`을 읽을 수 없으면 실패합니다. 실제 서버 적용 및 end-to-end 시험 전까지 유지보수 해제 기준으로 간주하지 않습니다.
 - `/run/bc250-gpu/gpu.lock`: Studio와 전환 작업자가 함께 사용하는 root 소유의 사전 생성 flock. 별도 `model-worker.lock`은 작업자의 생명주기 잠금입니다. `/var/lib/bc250-model-control/switch.json`은 root가 쓰고 Studio가 읽는 복구 차단 기록입니다. DB는 root만 접근합니다.
 - Studio는 같은 잠금·복구 기록을 사용하고, root가 소유한 polkit 규칙은 `ai-studio`에 `llama-server.service`의 `start`·`stop`만 허용합니다. 이 권한은 해당 UID의 모든 프로세스에 적용되므로 다른 비신뢰 코드를 같은 계정에서 실행하지 않습니다.
 - `MODEL_CONTROL_SWITCH_ENABLED=false`가 초기값입니다. 소켓과 HTTP를 배포하더라도 전환은 503 `switch_disabled`로 거절됩니다.
@@ -45,9 +47,9 @@ getenforce
 
 1. `ai-gate` 시스템 계정, root 소유 `/run/bc250-gpu` 잠금 파일, root:`ai-studio` 소유 0750 전환 상태 디렉터리와 0640 빈 journal (`{}`), `ai-gate` 전용 gate 상태 디렉터리·파일을 신규 생성합니다. 잠금은 [tmpfiles 후보](../systemd/bc250-gpu-lock.conf)를 사용하고 기존 파일·복구 상태를 덮어쓰지 않습니다. 상태 파일에는 위에서 기록한 기존 관리자 pause를 반영합니다. 기존 Studio 설치 경로에도 이 릴리스의 Studio 코드가 필요합니다. root 작업자용 코드만 준비해서는 Studio가 새 잠금·hold 계약을 사용하지 않습니다.
 2. 이미지가 유휴이고 이전 gate가 정상인 상태에서 [기존 gate 이전 도구](../deploy/model-control/migrate-legacy-gate.py)의 `capture`를 실행하면 기존 관리자 pause를 root 전용 기록에 먼저 저장하고 gate를 pause합니다. 응답 유실 시 기록을 보존하고 `pause`로 재시도합니다. Studio와 기존 gate가 모두 정상적으로 중지된 뒤 `create-state`로 새 gate 상태를 생성합니다. 이미 상태 디렉터리가 있으면 덮어쓰지 않습니다. 이 도구는 이전 gate의 환경 파일에서 키를 읽으며 값을 출력하지 않습니다. 기존 환경 파일의 키 문법이 지원되지 않으면 중단합니다. 운영과 유사한 환경에서 이 단계를 시험하기 전에는 명령을 실행하지 않습니다.
-3. [gate drop-in](../deploy/model-control/gate.conf), [Studio drop-in](../deploy/model-control/studio.conf), [polkit 규칙](../deploy/model-control/50-bc250-studio-llm.rules), [작업자 소켓](../systemd/bc250-model-worker.socket), [작업자 서비스](../systemd/bc250-model-worker.service), [관리 API 서비스](../systemd/bc250-model-api.service)를 설치합니다. 기존 unit을 덮어쓰지 않고 drop-in 및 독립 unit을 사용합니다. systemd 설정에 따른 쓰기 경로와 SELinux 접근을 먼저 확인합니다.
+3. [gate drop-in](../deploy/model-control/gate.conf), [Studio drop-in](../deploy/model-control/studio.conf), [LLM Client drop-in](../deploy/model-control/llm-client.conf), [polkit 규칙](../deploy/model-control/50-bc250-studio-llm.rules), [작업자 소켓](../systemd/bc250-model-worker.socket), [작업자 서비스](../systemd/bc250-model-worker.service), [관리 API 서비스](../systemd/bc250-model-api.service)를 설치합니다. 기존 unit을 덮어쓰지 않고 drop-in 및 독립 unit을 사용합니다. systemd 설정에 따른 쓰기 경로와 SELinux 접근을 먼저 확인합니다. Client의 기존 환경 파일과 drop-in 우선순위를 확인하고 새 키가 실제 적용된 뒤에만 유지보수를 해제합니다.
 4. `daemon-reload` 및 tmpfiles 적용을 수행합니다. 동일한 잠금 inode를 사용하는 새 Studio·root 작업자와 영구 상태를 사용하는 새 gate를 함께 올립니다. 구버전과 신버전 Studio, gate 또는 잠금 경로를 혼용하지 않습니다. 운영 서비스 중지·시작 및 polkit 설치 명령은 Fedora 격리 환경 검증 후 확정합니다.
-5. gate 시작 시 자동으로 `startup` hold가 생깁니다. 다른 Studio·전환 hold, journal, 시스템 상태를 먼저 확인합니다. root의 `gate_admin confirm-startup`은 공통 GPU 잠금을 획득하고 작업·복구 기록, 실행 중인 Studio와 gate의 계정·실제 환경 설정·키 일치, gate hold, systemd 안정 상태, 요청 drain, 활성 GGUF ID 및 health를 확인한 뒤 `startup` hold만 해제합니다. 관리자 `legacy` 및 `admin-*` hold는 유지합니다. 환경값은 출력하지 않습니다.
+5. gate 시작 시 자동으로 `startup` hold가 생깁니다. 다른 Studio·전환 hold, journal, 시스템 상태를 먼저 확인합니다. 이 서버에서는 root의 `gate_admin confirm-startup --expected-client-user yeppyshiba` 후보를 사용합니다. 공통 GPU 잠금을 획득하고 작업·복구 기록, 실행 중인 Studio·gate·LLM Client의 계정과 키, gate hold, systemd 안정 상태, 요청 drain, 활성 GGUF ID 및 health를 확인한 뒤 `startup` hold만 해제합니다. 관리자 `legacy` 및 `admin-*` hold는 유지합니다. 환경값은 출력하지 않습니다. 변경된 확인 경로의 실제 systemd 통합 시험은 남았습니다.
 6. 우선 전환이 꺼진 상태에서 모델 목록, 현재 모델, 인증 실패 및 `switch_disabled` 응답을 확인합니다. 실제 전환을 켜기 전 별도 프로세스 강제 종료·복구, systemd 및 SELinux 검증과 롤백 시험을 완료합니다. 그다음 운영자가 설정을 변경하고 사용자 본인이 검증 전환을 실행합니다.
 
 위 2번에 대한 명령 후보입니다. `capture` 전에 Studio의 이미지 작업과 복구가 유휴이고 관리자 pause 상태가 안정적인지 확인해야 합니다. `create-state`는 Studio와 구 gate가 모두 완전히 중지된 뒤에만 성공합니다. ingress 차단과 시스템 계정 준비는 별도입니다.
@@ -75,7 +77,8 @@ sudo python3 ./deploy/model-control/migrate-legacy-gate.py create-state
 - 모든 복구 확인 후 gate의 시작 hold를 해제하려면 운영자가 다음 명령을 직접 실행합니다. 검증 도중 실패하면 해제를 시도하지 않습니다. 해제 요청의 응답이 유실되면 실제 hold 상태가 불확실하므로 gate 상태를 다시 조회합니다.
 
   ```bash
-  sudo /opt/bc250-model-control/.venv/bin/python -I -m app.services.gate_admin confirm-startup
+  sudo /opt/bc250-model-control/.venv/bin/python -I -m app.services.gate_admin \
+    confirm-startup --expected-client-user yeppyshiba
   ```
 
 - 구버전 gate는 소유권 hold를 이해하지 못합니다. 롤백 전에 호출자를 차단하고, 실행 중인 작업을 중지·복구해 활성 모델과 health를 확인한 뒤, 백업한 코드·설정·unit·상태를 호환되는 단위로 복원해야 합니다. 구버전 gate를 먼저 시작하면 LLM 요청이 무조건 열릴 수 있습니다. 아직 실제 롤백 절차는 시험하지 않았습니다.

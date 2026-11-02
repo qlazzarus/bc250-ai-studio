@@ -112,6 +112,21 @@ def pause(key, snapshot=SNAPSHOT):
     return state
 
 
+def restore_pause(key, snapshot=SNAPSHOT):
+    """Restore the captured legacy pause while callers remain blocked externally."""
+    previous = read_snapshot(snapshot)['paused_before_maintenance']
+    state = pause(key, snapshot)
+    if (state['active_requests'] != 0 or state['waiting_requests'] != 0 or
+            'protocol' in state):
+        raise RuntimeError('Legacy gate must be drained before restoring pause')
+    if not previous:
+        request(key, 'PUT', {'paused': False})
+    state = request(key, 'GET')
+    if 'protocol' in state or state['paused'] is not previous:
+        raise RuntimeError('Legacy gate pause restoration could not be verified')
+    return state
+
+
 def verify_stopped(unit):
     output = subprocess.run(
         ["/usr/bin/systemctl", "show", "--all",
@@ -143,20 +158,34 @@ def create_state(snapshot=SNAPSHOT, gate_dir=GATE_DIR):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("operation", choices=("capture", "pause", "create-state"))
+    parser.add_argument("operation", choices=("status", "capture", "pause", "restore-pause", "create-state"))
     args = parser.parse_args()
     if os.geteuid() != 0:
         parser.error("Run as root")
     os.umask(0o077)
     try:
-        validate_root_path(SNAPSHOT.parent, directory=True)
-        if args.operation == "create-state":
+        if args.operation == "status":
+            validate_root_path(OLD_ENV, directory=False)
+            result = request(legacy_key(), "GET")
+            if "protocol" in result:
+                raise RuntimeError("Gate is not the legacy control protocol")
+            print("기존 gate 환경 파일의 키로 인증 성공")
+            print("관리자 보류:", "설정" if result["paused"] else "없음")
+            print("진행 중 요청:", result["active_requests"])
+            print("대기 중 요청:", result["waiting_requests"])
+        elif args.operation == "create-state":
+            validate_root_path(SNAPSHOT.parent, directory=True)
             create_state()
             print("Gate state created; prior administrator pause preserved.")
         else:
+            validate_root_path(SNAPSHOT.parent, directory=True)
             validate_root_path(OLD_ENV, directory=False)
-            result = (capture if args.operation == "capture" else pause)(legacy_key())
-            print("Legacy gate paused; active requests:", result["active_requests"])
+            operation = {'capture': capture, 'pause': pause, 'restore-pause': restore_pause}[args.operation]
+            result = operation(legacy_key())
+            if args.operation == 'restore-pause':
+                print('기존 gate 관리자 보류 복원 확인:', '설정' if result['paused'] else '없음')
+            else:
+                print("Legacy gate paused; active requests:", result["active_requests"])
     except Exception:
         raise SystemExit("Migration step failed; preserve existing state and inspect the procedure") from None
 

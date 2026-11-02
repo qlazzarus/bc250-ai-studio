@@ -97,7 +97,7 @@ def test_root_secret_staging_is_private_and_never_overwrites(root_area, monkeypa
     monkeypatch.setattr(module, "DIRECTORY", config_dir)
     module.main()
     files = list(config_dir.iterdir())
-    assert len(files) == 9
+    assert len(files) == 10
     assert config_dir.stat().st_uid == 0 and config_dir.stat().st_mode & 0o777 == 0o700
     assert all(p.stat().st_uid == 0 and p.stat().st_mode & 0o777 == 0o600 for p in files)
     output = capsys.readouterr().out
@@ -106,6 +106,8 @@ def test_root_secret_staging_is_private_and_never_overwrites(root_area, monkeypa
     assert len({(config_dir / name).read_text() for name in names}) == len(names)
     for name in names:
         assert (config_dir / name).read_text().strip() not in output
+    admin_key = (config_dir / "gate-admin-key").read_text().strip()
+    assert (config_dir / "client-gate.env").read_text() == f"LLM_GATE_API_KEY={admin_key}\n"
     before = (config_dir / "api-key").read_text()
     with pytest.raises(SystemExit):
         module.main()

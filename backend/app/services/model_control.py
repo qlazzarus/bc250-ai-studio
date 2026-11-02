@@ -145,6 +145,32 @@ class ActiveModelWriter:
     def __init__(self, registry):
         self.registry = registry
 
+    def validate_replacement(self):
+        """Check replacement metadata before admission is paused or a journal is written."""
+        base = self.registry._open_base()
+        temporary = ".active-model-" + secrets.token_hex(16)
+        try:
+            current = os.open("active-model.conf", os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                              dir_fd=base)
+            try:
+                metadata = os.fstat(current)
+                self.registry._check_file(metadata)
+                attributes = protected_xattrs(current)
+            finally:
+                os.close(current)
+            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW |
+                         os.O_CLOEXEC, 0o600, dir_fd=base)
+            try:
+                os.fchown(fd, metadata.st_uid, metadata.st_gid)
+                os.fchmod(fd, stat.S_IMODE(metadata.st_mode))
+                if protected_xattrs(fd) != attributes:
+                    raise RuntimeError("Model configuration ACL or SELinux label would change")
+            finally:
+                os.close(fd)
+                os.unlink(temporary, dir_fd=base)
+        finally:
+            os.close(base)
+
     def set_active(self, name):
         if not isinstance(name, str) or not MODEL_NAME.fullmatch(name):
             raise ValueError("Invalid model name")

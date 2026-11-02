@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from app.core.files import FileLock, LockBusyError
 from app.models.database import now
-from app.services.model_switch import StudioSwitchBarrier
+from app.services.model_switch import StudioSwitchBarrier, SwitchRecoveryRequired
 
 
 class RecoveryError(RuntimeError):
@@ -175,7 +175,16 @@ class GPUManager:
         self.lock.release()
 
     def _check_switch_barrier(self):
-        if self.switch_barrier and self.switch_barrier.read():
+        if not self.switch_barrier:
+            return
+        try:
+            state = self.switch_barrier.read()
+        except (OSError, ValueError, SwitchRecoveryRequired) as error:
+            raise SwitchRecoveryRequired(
+                "Model switch journal cannot be verified; inspect the journal and its "
+                "permissions before retrying GPU work"
+            ) from error
+        if state:
             raise LockBusyError("Model switch recovery required before GPU work")
 
     async def release(self):

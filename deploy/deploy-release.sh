@@ -10,6 +10,20 @@ home_dir=$(getent passwd "$SUDO_USER" | cut -d: -f6)
 archive="$home_dir/bc250-ai-studio-release.tar.gz"
 [[ -f "$archive" && ! -L "$archive" && -d "$app" && -d "$data" && -f /etc/bc250-ai-studio.env ]]
 command -v uv >/dev/null
+# This legacy deploy does not coordinate gate, the worker, or shared GPU state.
+# Refuse before stopping Studio if any part of the new installation exists.
+for path in /opt/bc250-model-control /etc/bc250-model-control \
+    /var/lib/bc250-model-control /var/lib/bc250-llm-gate /run/bc250-gpu \
+    /etc/systemd/system/bc250-model-worker.socket \
+    /etc/systemd/system/bc250-model-worker.service \
+    /etc/systemd/system/bc250-model-api.service \
+    /etc/systemd/system/bc250-ai-studio.service.d/studio.conf \
+    /etc/systemd/system/bc250-llm-gate.service.d/gate.conf; do
+    if [[ -e "$path" || -L "$path" ]]; then
+        echo "Model-control installation detected at $path; legacy deployment refused." >&2
+        exit 1
+    fi
+done
 systemctl is-active --quiet "$service"
 stage=$(mktemp -d /opt/bc250-ai-studio-stage.XXXXXXXX)
 trap 'rm -rf "$stage"' EXIT

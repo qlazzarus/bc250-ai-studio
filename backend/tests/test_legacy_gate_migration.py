@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -68,3 +69,50 @@ def test_legacy_credential_parsing_rejects_duplicates(tmp_path):
     path.write_text(path.read_text() + "GATE_API_KEY=another-long-gate-key-example\n")
     with pytest.raises(RuntimeError):
         migration.legacy_key(path)
+
+
+def test_status_is_read_only_and_does_not_print_key(monkeypatch, capsys):
+    monkeypatch.setattr(migration.os, 'geteuid', lambda: 0)
+    monkeypatch.setattr(sys, 'argv', ['migrate-legacy-gate.py', 'status'])
+    monkeypatch.setattr(migration, 'validate_root_path', lambda path, **kwargs: None)
+    monkeypatch.setattr(migration, 'legacy_key', lambda: 'secret-key-value')
+    calls = []
+    monkeypatch.setattr(migration, 'request', lambda key, method: (
+        calls.append((key, method)) or
+        {'paused': False, 'active_requests': 1, 'waiting_requests': 2}))
+    migration.main()
+    assert calls == [('secret-key-value', 'GET')]
+    assert 'secret-key-value' not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize('original', [False, True])
+def test_restore_pause_only_restores_the_captured_state(monkeypatch, original):
+    monkeypatch.setattr(migration, 'read_snapshot', lambda _: {'paused_before_maintenance': original})
+    calls = []
+    state = {'paused': True, 'active_requests': 0, 'waiting_requests': 0}
+
+    def request(key, method, payload=None):
+        calls.append((method, payload))
+        if payload is not None:
+            state['paused'] = payload['paused']
+        return dict(state)
+
+    monkeypatch.setattr(migration, 'request', request)
+    result = migration.restore_pause('secret')
+    assert result['paused'] is original
+    assert calls == ([('PUT', {'paused': True})] +
+                     ([] if original else [('PUT', {'paused': False})]) + [('GET', None)])
+
+
+def test_restore_pause_does_not_release_with_inflight_requests(monkeypatch):
+    monkeypatch.setattr(migration, 'read_snapshot', lambda _: {'paused_before_maintenance': False})
+    calls = []
+
+    def request(key, method, payload=None):
+        calls.append((method, payload))
+        return {'paused': True, 'active_requests': 1, 'waiting_requests': 0}
+
+    monkeypatch.setattr(migration, 'request', request)
+    with pytest.raises(RuntimeError):
+        migration.restore_pause('secret')
+    assert calls == [('PUT', {'paused': True})]

@@ -3,6 +3,7 @@ import asyncio
 import pytest
 from app.services.model_switch import (
     ModelSwitch,
+    SwitchAdmissionBlocked,
     SwitchFailed,
     SwitchJournal,
     SwitchOutcomeUnknown,
@@ -87,6 +88,40 @@ async def test_success_preserves_administrator_pause(setup):
     assert service.model == "new" and gate.holds == {"administrator"}
     assert journal.read() == {}
     assert gate.calls == ["pause", "drain", "release"]
+
+
+@pytest.mark.parametrize("blocked", ["journal", "model"])
+async def test_replacement_preflight_blocks_before_hold_or_journal(setup, monkeypatch, blocked):
+    switch, journal, gate, service = setup
+
+    if blocked == "journal":
+        monkeypatch.setattr(journal, "secure_precreated", True)
+        monkeypatch.setattr(journal, "read", lambda: {})
+        def fail_journal():
+            raise RuntimeError("journal metadata differs")
+        monkeypatch.setattr(journal, "validate_replacement", fail_journal)
+    else:
+        async def fail_model():
+            raise RuntimeError("model metadata differs")
+        service.validate_switch_preconditions = fail_model
+
+    with pytest.raises(SwitchAdmissionBlocked, match="metadata"):
+        await switch.switch("new")
+    assert journal.path.read_text() == "{}"
+    assert gate.calls == [] and service.calls == [] and service.model == "old"
+
+
+def test_secure_journal_preflight_rejects_changed_security_attributes(tmp_path, monkeypatch):
+    path = tmp_path / "switch.json"
+    path.write_text("{}")
+    journal = SwitchJournal(path, secure_precreated=True)
+    monkeypatch.setattr(journal, "read", lambda: {})
+    attributes = iter([{"security.selinux": b"existing"}, {"security.selinux": b"new"}])
+    monkeypatch.setattr("app.services.model_switch.protected_xattrs", lambda fd: next(attributes))
+    with pytest.raises(SwitchRecoveryRequired, match="ACL or SELinux"):
+        journal.validate_replacement()
+    assert path.read_text() == "{}"
+    assert not list(tmp_path.glob(".switch-*"))
 
 
 @pytest.mark.parametrize("failure", ["restart", "health"])

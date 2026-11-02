@@ -1,0 +1,39 @@
+# 검토·검증용 후보. 적용 전 실제 Caddyfile 및 다른 설정과 다시 비교해야 합니다.
+# 기존 Studio와 LLM Client의 API만 503으로 차단하고 Wiki는 그대로 둡니다.
+:80 {
+	encode zstd gzip
+
+	handle /llm/api/* {
+		header Retry-After 120
+		respond "서비스 점검 중입니다. 잠시 후 다시 시도해 주세요." 503
+	}
+
+	handle /llm {
+		redir /llm/ 308
+	}
+
+	handle_path /llm/* {
+		root * /opt/bc250-llm-client/frontend/dist
+		try_files {path} /index.html
+		file_server
+	}
+
+	handle /api/* {
+		header Retry-After 120
+		respond "서비스 점검 중입니다. 잠시 후 다시 시도해 주세요." 503
+	}
+
+	handle /wiki {
+		redir /wiki/ 308
+	}
+
+	handle_path /wiki/* {
+		reverse_proxy 127.0.0.1:8020
+	}
+
+	handle {
+		root * /opt/bc250-ai-studio/frontend/dist
+		try_files {path} /index.html
+		file_server
+	}
+}
