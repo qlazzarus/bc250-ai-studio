@@ -61,6 +61,12 @@ case $3 in
     guest_dir=bc250-check-new-switch-state-source
     guest_script=scripts/test-check-new-switch-state-vm.sh
     ;;
+  check-deployment-rollback-resume)
+    guest_dir="bc250-check-deployment-rollback-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-check-new-switch-state-vm.sh
+    guest_extra=' deployment'
+    resume=yes
+    ;;
   preserved-switch-state)
     guest_dir=bc250-preserved-switch-state-source
     guest_script=scripts/test-preserved-switch-state-vm.sh
@@ -120,6 +126,12 @@ case $3 in
     guest_extra=' failure-only'
     resume=yes
     ;;
+  install-studio-config-guard-resume)
+    guest_dir="bc250-install-studio-config-guard-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-install-studio-release-vm.sh
+    guest_extra=' config-mismatch-only'
+    resume=yes
+    ;;
   installed-studio-services-resume)
     guest_dir="bc250-installed-studio-services-${RANDOM}-${RANDOM}"
     guest_script=scripts/test-installed-studio-services-vm.sh
@@ -147,7 +159,7 @@ case $3 in
     guest_script=scripts/test-staged-configuration-adapter-vm.sh
     resume=yes
     ;;
-  caddy-linked-migration-resume|caddy-maintenance-adapter-resume|caddy-systemd-adapter-resume|caddy-systemd-linked-resume)
+  caddy-linked-migration-resume|caddy-maintenance-adapter-resume|caddy-systemd-adapter-resume|caddy-systemd-linked-resume|manual-rollback-linked-resume|manual-rollback-full-wiki-resume)
     host_caddy=$(readlink -e -- "$(command -v caddy)")
     [[ -f $host_caddy && -x $host_caddy && $(stat -c '%u' "$host_caddy") == 0 \
       && -z $(find "$host_caddy" -maxdepth 0 -perm /022 -print) ]] || exit 1
@@ -159,6 +171,8 @@ case $3 in
     if [[ $3 == caddy-maintenance-adapter-resume ]]; then guest_extra+=' adapter'; fi
     if [[ $3 == caddy-systemd-adapter-resume ]]; then guest_extra+=' adapter-systemd'; fi
     if [[ $3 == caddy-systemd-linked-resume ]]; then guest_extra+=' systemd-linked'; fi
+    if [[ $3 == manual-rollback-linked-resume ]]; then guest_extra+=' manual-linked'; fi
+    if [[ $3 == manual-rollback-full-wiki-resume ]]; then guest_extra+=' manual-wiki-linked'; fi
     resume=yes
     ;;
   migration-journal-resume)
@@ -201,6 +215,178 @@ case $3 in
     guest_script=scripts/test-pinned-coordinator-vm.sh
     resume=yes
     ;;
+  pinned-initial-install-resume)
+    guest_dir="bc250-pinned-initial-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-pinned-coordinator-vm.sh
+    guest_extra=' initial-install'
+    resume=yes
+    ;;
+  pinned-initial-preparation-resume)
+    guest_dir="bc250-pinned-preparation-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-pinned-coordinator-vm.sh
+    guest_extra=' initial-preparation'
+    resume=yes
+    ;;
+  pinned-preparation-chain-boot)
+    guest_dir="bc250-pinned-preparation-chain-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-pinned-coordinator-vm.sh
+    guest_extra=' preparation-chain'
+    ;;
+  pinned-preparation-chain-resume)
+    guest_dir="bc250-pinned-preparation-chain-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-pinned-coordinator-vm.sh
+    guest_extra=' preparation-chain'
+    resume=yes
+    ;;
+  pinned-record-release-resume)
+    guest_dir="bc250-pinned-record-release-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-pinned-coordinator-vm.sh
+    guest_extra=' record-release'
+    resume=yes
+    ;;
+  pinned-record-gate-resume)
+    guest_dir="bc250-pinned-record-gate-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-pinned-coordinator-vm.sh
+    guest_extra=' record-release-gate'
+    resume=yes
+    ;;
+  install-model-code-resume)
+    guest_dir="bc250-install-model-code-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-install-model-code-vm.sh
+    resume=yes
+    ;;
+  install-model-code-failure-resume)
+    guest_dir="bc250-install-model-failure-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-install-model-code-vm.sh
+    guest_extra=' failure-only'
+    resume=yes
+    ;;
+  initial-preparation-resume)
+    guest_dir="bc250-initial-preparation-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-initial-preparation-vm.sh
+    resume=yes
+    ;;
+  local-idle-composite-resume)
+    guest_dir="bc250-local-idle-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-observe-direct-llm-vm.sh
+    guest_extra=' composite'
+    resume=yes
+    ;;
+  observe-direct-llm-resume)
+    guest_dir="bc250-direct-observe-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-observe-direct-llm-vm.sh
+    resume=yes
+    ;;
+  observe-studio-idle-resume)
+    guest_dir="bc250-studio-observe-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-observe-studio-idle-vm.sh
+    resume=yes
+    ;;
+  inspect-stopped-studio-db-resume)
+    guest_dir="bc250-studio-db-observe-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-inspect-stopped-studio-db-vm.sh
+    resume=yes
+    ;;
+  legacy-backup-studio-db-resume)
+    guest_dir="bc250-legacy-backup-db-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-legacy-backup-studio-db-vm.sh
+    resume=yes
+    ;;
+  wiki-fence-resume)
+    guest_dir="bc250-wiki-fence-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-wiki-maintenance-fence-vm.sh
+    resume=yes
+    ;;
+  wiki-runtime-condition-resume)
+    guest_dir="bc250-wiki-condition-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-wiki-runtime-condition-vm.sh
+    resume=yes
+    ;;
+  wiki-condition-dbus-resume)
+    guest_dir="bc250-wiki-condition-dbus-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-wiki-condition-dbus-vm.sh
+    resume=yes
+    ;;
+  read-systemd-conditions-resume)
+    guest_dir="bc250-systemd-conditions-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-read-systemd-conditions-vm.sh
+    resume=yes
+    ;;
+  wiki-condition-fence-resume)
+    guest_dir="bc250-wiki-condition-fence-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-wiki-condition-fence-vm.sh
+    resume=yes
+    ;;
+  wiki-persistent-condition-resume)
+    guest_dir="bc250-wiki-persistent-condition-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-wiki-condition-fence-vm.sh
+    guest_extra=' persistent'
+    resume=yes
+    ;;
+  wiki-condition-reboot-prepare)
+    guest_dir="bc250-wiki-reboot-prepare-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-wiki-condition-reboot-vm.sh
+    guest_extra=' prepare'
+    resume=yes
+    ;;
+  wiki-condition-reboot-verify)
+    guest_dir="bc250-wiki-reboot-verify-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-wiki-condition-reboot-vm.sh
+    guest_extra=' verify'
+    resume=yes
+    ;;
+  manual-rollback-wiki-resume)
+    guest_dir="bc250-manual-rollback-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-manual-rollback-wiki-vm.sh
+    resume=yes
+    ;;
+  gate-confirm-uncertain-boot)
+    guest_dir="bc250-gate-confirm-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-gate-confirm-uncertain-vm.sh
+    ;;
+  deployment-hold-resume)
+    guest_dir="bc250-deployment-hold-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-deployment-hold-vm.sh
+    resume=yes
+    ;;
+  startup-lock-sequence-boot)
+    guest_dir="bc250-startup-lock-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-startup-lock-sequence-vm.sh
+    ;;
+  gpu-lock-handoff-boot)
+    guest_dir="bc250-gpu-handoff-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-gpu-lock-handoff-vm.sh
+    ;;
+  advisory-gpu-fence-boot)
+    guest_dir="bc250-gpu-fence-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-advisory-gpu-fence-vm.sh
+    ;;
+  nft-cgroup-isolated-resume)
+    guest_dir="bc250-nft-cgroup-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-nft-cgroup-isolated-vm.sh
+    resume=yes
+    ;;
+  initial-local-idle-boot)
+    guest_dir="bc250-initial-idle-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-coordinator-idle-chain-vm.sh
+    guest_extra=' initial'
+    ;;
+  coordinator-idle-backup-resume)
+    guest_dir="bc250-idle-backup-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-coordinator-idle-chain-vm.sh
+    guest_extra=' adapter'
+    resume=yes
+    ;;
+  coordinator-idle-chain-resume)
+    guest_dir="bc250-idle-chain-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-coordinator-idle-chain-vm.sh
+    resume=yes
+    ;;
+  coordinator-wiki-fence-resume)
+    guest_dir="bc250-coordinator-wiki-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-coordinator-wiki-fence-vm.sh
+    resume=yes
+    ;;
   initial-install-adapter-resume)
     guest_dir="bc250-initial-install-adapter-${RANDOM}-${RANDOM}"
     guest_script=scripts/test-initial-install-adapter-vm.sh
@@ -210,6 +396,12 @@ case $3 in
     guest_dir="bc250-initial-install-real-${RANDOM}-${RANDOM}"
     guest_script=scripts/test-initial-install-adapter-vm.sh
     guest_extra=' real-studio'
+    resume=yes
+    ;;
+  initial-install-real-both-resume)
+    guest_dir="bc250-initial-install-both-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-initial-install-adapter-vm.sh
+    guest_extra=' real-both'
     resume=yes
     ;;
   service-migration-rollback-resume)
@@ -364,7 +556,7 @@ ssh -n "${ssh_options[@]}" -p 22223 vmtest@127.0.0.1 \
   "set -e; cd \"\$HOME/$guest_dir\"; \
    printf '%s  %s\\n' '$expected' source.tar.gz | sha256sum -c -; \
    tar -xzf source.tar.gz; \
-   sudo bash '$guest_script' \"\$HOME/$guest_dir\""
+   sudo bash '$guest_script' \"\$HOME/$guest_dir\"$guest_extra"
 
 echo '시험이 통과해 VM을 정상 종료합니다.'
 ssh -n "${ssh_options[@]}" -p 22223 vmtest@127.0.0.1 \

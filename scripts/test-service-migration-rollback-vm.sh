@@ -33,11 +33,27 @@ chmod 0755 "$adapterdir"
 for name in backup-stopped.sh backup-archive.sh check-service-cgroup.py verify-backup.py \
   create-maintenance-caddy.py migrate-legacy-gate.py capture-caddy.py maintenance-probe.py \
   legacy-backup-sequence.py legacy-backup-adapter.py restore-legacy-files.py \
+  inspect-stopped-studio-db.py observe-llama-connections.py \
   preserve-new-adapter.py preserve-new-stopped.sh preserve-new-archive.sh \
-  check-preserved-switch-state.py check-new-switch-state.py; do
+  check-preserved-switch-state.py check-new-switch-state.py wiki-condition-fence.py \
+  wiki-maintenance-fence.py read-systemd-conditions.py verify-wiki-condition.py; do
   install -o root -g root -m 0644 "$source_dir/deploy/model-control/$name" "$adapterdir/$name"
 done
 restorecon -RF "$adapterdir"
+if [[ ${BC250_FIXTURE_REAL_WIKI:-} == 1 ]]; then
+  wiki_unit=bc250-manual-linked-wiki-fixture.service
+  wiki_file=/etc/systemd/system/$wiki_unit
+  wiki_dropin=/etc/systemd/system/$wiki_unit.d
+  wiki_marker=/var/lib/bc250-manual-linked-wiki-fixture
+  for path in "$wiki_file" "$wiki_dropin" "$wiki_marker"; do [[ ! -e $path && ! -L $path ]] || exit 1; done
+  [[ $(systemctl show "$wiki_unit" -p LoadState --value) == not-found ]] || exit 1
+  cat > "$wiki_file" <<'EOF'
+[Service]
+ExecStart=/usr/bin/sleep infinity
+KillMode=control-group
+EOF
+  restorecon -F "$wiki_file"
+fi
 trap 'echo "시험 중단. 시험 서비스와 기록을 보존합니다: $fixture $envdir $stateparent $adapterdir" >&2' ERR
 cp -a "$original/source" "$fixture/live"
 cp -a "$original/Caddyfile.original" "$fixture/Caddyfile.original"
@@ -73,6 +89,7 @@ fi
 restorecon -RF "$fixture" "$envdir" "$stateparent" "/run/systemd/system/${units[0]}" \
   "/run/systemd/system/${units[1]}" "/run/systemd/system/${units[2]}"
 systemctl daemon-reload
+if [[ ${BC250_FIXTURE_REAL_WIKI:-} == 1 ]]; then systemctl start "$wiki_unit"; fi
 python3 - "$source_dir" "$fixture" "$envdir" "$stateparent" "$adapterdir" "${units[@]}" <<'PY'
 import importlib.util
 import hashlib
@@ -163,6 +180,11 @@ spec.loader.exec_module(adapter_module)
 adapter_module.UNITS = (studio, client, gate)
 adapter_module.OLD_ENV = envdir / 'gate.env'
 adapter_module.PAUSE_RECORD = snapshot
+adapter_module.STUDIO_DATABASE = live / 'opt/ai-studio-data/database/studio.sqlite3'
+adapter_module.STUDIO_DATABASE.parent.mkdir(parents=True, exist_ok=True)
+with sqlite3.connect(adapter_module.STUDIO_DATABASE) as db:
+    db.execute('CREATE TABLE jobs (status TEXT)')
+    db.execute('CREATE TABLE system_state (key TEXT, value TEXT)')
 adapter = adapter_module.LegacyBackupAdapter(adapterdir, fixture, check_local_idle=lambda: True)
 adapter.migration.URL = 'http://127.0.0.1:18883/control'
 caddy_base = os.environ.get('BC250_FIXTURE_CADDY_BASE')
@@ -215,7 +237,9 @@ def preserve_new():
         shutil.copytree(gate_dir, gate_state, copy_function=shutil.copy2)
         settings.mkdir(mode=0o700)
         (settings / 'worker.env').write_text('MODEL_CONTROL_SWITCH_ENABLED=false\n')
-        evidence = Path(tempfile.mkdtemp(prefix='bc250-model-postfailure.', dir='/var/backups'))
+        # Match the production GNU mktemp naming contract; Python mkdtemp may include underscores.
+        evidence = Path(subprocess.check_output(
+            ['mktemp', '-d', '/var/backups/bc250-model-postfailure.XXXXXXXX'], text=True).strip())
         subprocess.run(['bash', '-c', 'source "$1"; bc250_preserve_new_archive "$2" "$3"',
                         'fixture', str(adapterdir / 'preserve-new-archive.sh'), str(live), str(evidence)],
                        check=True)
@@ -306,15 +330,83 @@ if caddy_base:
 else:
     stop_new = lambda: ctl('stop', studio, client, gate)
     require_stopped = stopped
-evidence = rollback.rollback_legacy(
-    check_maintenance=check_maintenance,
-    inspect_new=lambda: ready(new)['paused'],
-    stop_new=stop_new, require_stopped=require_stopped,
-    preserve_new=preserve_new, recovery_safe=recovery_safe,
-    verify_backup=lambda: verify_backup(backup), stage_backup=stage_backup,
-    restore_legacy=restore_legacy, start_legacy_gate=start_gate,
-    restore_pause=restore_pause, start_legacy_services=lambda: ctl('start', studio, client),
-    verify_legacy=lambda: client_key(old))
+if os.environ.get('BC250_FIXTURE_MANUAL_ROLLBACK') == '1':
+    if not caddy_base:
+        raise RuntimeError('시험 Caddy가 필요합니다.')
+    spec = importlib.util.spec_from_file_location('manual_rollback', source / 'deploy/model-control/legacy-rollback-manual.py')
+    manual = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(manual)
+    spec = importlib.util.spec_from_file_location('journal', source / 'deploy/model-control/migration-journal.py')
+    journal_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(journal_module)
+    record_dir = Path(tempfile.mkdtemp(prefix='bc250-manual-linked-record.', dir='/var/backups'))
+    journal = journal_module.MigrationJournal(record_dir)
+    class FixtureWiki:
+        blocked = True
+        def check(self):
+            return self.blocked
+        def release(self, *, can_release):
+            if not can_release():
+                raise RuntimeError('시험 복구 확인 실패')
+            self.blocked = False
+            return True
+    real_wiki = os.environ.get('BC250_FIXTURE_REAL_WIKI') == '1'
+    if real_wiki:
+        wiki_folder = record_dir / 'wiki'
+        wiki_folder.mkdir(mode=0o700)
+        spec = importlib.util.spec_from_file_location('linked_wiki', adapterdir / 'wiki-condition-fence.py')
+        wiki_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(wiki_module)
+        wiki_module.UNIT = 'bc250-manual-linked-wiki-fixture.service'
+        wiki_module.PERSISTENT_MARKER = Path('/var/lib/bc250-manual-linked-wiki-fixture')
+        wiki = wiki_module.WikiConditionFence(adapterdir, wiki_folder, persistent=True)
+        wiki.acquire()
+    else:
+        wiki = FixtureWiki()
+    def client_is_stopped():
+        return subprocess.check_output(['systemctl', 'show', client, '-p', 'ActiveState', '--value'], text=True).strip() == 'inactive'
+    def verify_legacy():
+        client_key(old)
+        return bool(ready(old)['paused'])
+    runner = manual.ManualRollback(record=journal, wiki_fence=wiki,
+        check_maintenance=check_maintenance, inspect_new=lambda: ready(new)['paused'],
+        stop_new=stop_new, require_stopped=require_stopped, preserve_new=preserve_new,
+        recovery_safe=recovery_safe, verify_backup=lambda: verify_backup(backup),
+        stage_backup=stage_backup, restore_legacy=restore_legacy, start_legacy_gate=start_gate,
+        restore_pause=restore_pause, start_legacy_studio=lambda: ctl('start', studio),
+        client_stopped=client_is_stopped, verify_legacy=verify_legacy,
+        restore_ingress=lambda: check_maintenance())
+    try:
+        runner.begin()
+        if runner.phase != 'await_client' or not client_is_stopped() or wiki.check() is not True or not check_maintenance():
+            raise RuntimeError('시험 수동 Client 대기 또는 유지보수 확인 실패')
+        print('기존 시험 gate·Studio 복원 후 Client 정지와 유지보수 유지 확인', flush=True)
+        ctl('start', client)  # Simulate the operator's manual restart.
+        runner.finish_after_client_restart()
+        if runner.phase != 'complete' or not check_maintenance():
+            raise RuntimeError('시험 수동 재시작 후 복구 확인 실패')
+        rows = [json.loads(line) for line in (record_dir / 'migration-events.jsonl').read_text().splitlines()]
+        evidence = next(Path(row['path']) for row in rows if row['event'] == 'rollback_evidence:path')
+        print('시험 Client 수동 재시작 후 기존 키·pause와 롤백 기록 확인', flush=True)
+        if real_wiki:
+            status = subprocess.check_output(['systemctl', 'show', wiki_module.UNIT, '-p', 'ActiveState', '--value'], text=True).strip()
+            if status != 'active':
+                raise RuntimeError('시험 Wiki의 이전 실행 상태가 복원되지 않았습니다.')
+            print('실제 시험 Wiki 영구 차단 유지 및 기존 실행 상태 복원 확인', flush=True)
+        print(('모델 health·로컬 유휴와 롤백 후보 내부의 유지보수 해제는 모의; 기록:' if real_wiki else
+               'Wiki 차단·모델 health·로컬 유휴와 유지보수 해제는 모의; 기록:'), record_dir, flush=True)
+    finally:
+        journal.close()
+else:
+    evidence = rollback.rollback_legacy(
+        check_maintenance=check_maintenance,
+        inspect_new=lambda: ready(new)['paused'],
+        stop_new=stop_new, require_stopped=require_stopped,
+        preserve_new=preserve_new, recovery_safe=recovery_safe,
+        verify_backup=lambda: verify_backup(backup), stage_backup=stage_backup,
+        restore_legacy=restore_legacy, start_legacy_gate=start_gate,
+        restore_pause=restore_pause, start_legacy_services=lambda: ctl('start', studio, client),
+        verify_legacy=lambda: client_key(old))
 if caddy_base:
     with tarfile.open(evidence / 'new-state.tar') as archive:
         assert archive.extractfile('opt/ai-studio-data/data.db').read() == b'changed data\n'
@@ -332,6 +424,10 @@ ctl('stop', studio, client, gate)
 stopped()
 print('시험 gate 보류와 변경된 데이터 보존:', fixture, stateparent, flush=True)
 PY
+if [[ ${BC250_FIXTURE_REAL_WIKI:-} == 1 ]]; then
+  systemctl stop "$wiki_unit"
+  rm -- "$wiki_file"
+fi
 rm -- "${units[@]/#/\/run\/systemd\/system\/}"
 if [[ -n ${BC250_FIXTURE_CADDY_BASE:-} ]]; then
   rm -- "/run/systemd/system/$worker_unit" "/run/systemd/system/$worker_socket"

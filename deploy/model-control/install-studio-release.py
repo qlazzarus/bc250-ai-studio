@@ -6,8 +6,8 @@ real maintenance/quiescence check. On failure it leaves both old and partial
 new files for inspection. The data directory and active model are never touched.
 """
 
+import hashlib
 import os
-import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -76,6 +76,25 @@ def sync_dir(path):
         os.close(fd)
 
 
+def require_same_model_config(source, current):
+    """Refuse an unreviewed replacement without disclosing either file."""
+    digests = []
+    for path in (source, current):
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        with os.fdopen(fd, 'rb') as file:
+            before = os.fstat(file.fileno())
+            if not stat.S_ISREG(before.st_mode) or before.st_size > 1024 * 1024:
+                raise ValueError('Studio 모델 설정 파일을 확인할 수 없습니다.')
+            digest = hashlib.file_digest(file, 'sha256').digest()
+            after = os.fstat(file.fileno())
+            if any(getattr(before, name) != getattr(after, name) for name in
+                   ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns')):
+                raise ValueError('검사 중 Studio 모델 설정이 변경됐습니다.')
+            digests.append(digest)
+    if digests[0] != digests[1]:
+        raise ValueError('운영 Studio 모델 설정이 릴리스와 다릅니다. 설치를 중단합니다.')
+
+
 def install(source, app, displaced, cache, *, check_ready, compare, offline=False):
     """Install a release in the final Studio path, creating its venv there.
 
@@ -119,6 +138,7 @@ def install(source, app, displaced, cache, *, check_ready, compare, offline=Fals
     for path in (app / 'config/models.yaml', app / 'frontend/dist'):
         if path.is_symlink() or not path.exists():
             raise ValueError('기존 모델 설정 또는 프런트엔드 경로가 올바르지 않습니다.')
+    require_same_model_config(source / 'config/models.yaml', app / 'config/models.yaml')
     uv = Path('/usr/bin/uv')
     trusted(uv, directory=False)
     if stat.S_IMODE(uv.stat().st_mode) != 0o755:
@@ -146,6 +166,7 @@ def install(source, app, displaced, cache, *, check_ready, compare, offline=Fals
     subprocess.run(['/usr/bin/sync', '-f', str(displaced)], check=True)
     if check_ready() is not True:
         raise ValueError('설치 직전 유휴 상태를 확인하지 못했습니다.')
+    require_same_model_config(source / 'config/models.yaml', app / 'config/models.yaml')
     for name in ITEMS:
         os.rename(app / name, old / name)
         if name != '.venv':

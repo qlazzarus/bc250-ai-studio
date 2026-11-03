@@ -98,6 +98,45 @@ class CoordinatorTest(unittest.TestCase):
         runner.prepare_and_start()
         self.assertEqual(runner.phase, 'await_client')
 
+    def test_wiki_fence_wraps_backup_install_and_client_boundary(self):
+        runner, events = self.fixture()
+        class Wiki:
+            def acquire(self):
+                events.append('wiki_acquire')
+                return True
+            def check(self):
+                events.append('wiki_check')
+                return True
+            def release(self, *, can_release):
+                self.assert_release = can_release()
+                events.append('wiki_release')
+                return self.assert_release
+        runner.wiki_fence = Wiki()
+        runner.prepare_and_start()
+        self.assertLess(events.index('transition_enter'), events.index('wiki_acquire'))
+        self.assertLess(events.index('wiki_acquire'), events.index('backup'))
+        self.assertNotIn('wiki_release', events)
+        runner.finish_after_client_restart()
+        self.assertLess(events.index('finish'), events.index('wiki_release'))
+        self.assertLess(events.index('wiki_release'), events.index('transition_restore'))
+        self.assertGreaterEqual(events.count('wiki_check'), 7)
+
+    def test_failed_install_never_releases_wiki(self):
+        runner, events = self.fixture('install')
+        class Wiki:
+            def acquire(self):
+                events.append('wiki_acquire')
+                return True
+            def check(self): return True
+            def release(self, **_):
+                events.append('wiki_release')
+                return True
+        runner.wiki_fence = Wiki()
+        with self.assertRaises(migration.MigrationError):
+            runner.prepare_and_start()
+        self.assertNotIn('wiki_release', events)
+        self.assertNotIn('transition_restore', events)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -16,6 +16,7 @@ trap 'echo "시험 중단. 시험 파일과 기록을 보존합니다: $release 
 for name in assemble-coordinator.py caddy-maintenance-adapter.py capture-caddy.py \
   caddy-file-swap.py caddy-transaction.py maintenance-probe.py create-maintenance-caddy.py \
   legacy-backup-adapter.py legacy-backup-sequence.py migrate-legacy-gate.py \
+  inspect-stopped-studio-db.py \
   backup-stopped.sh backup-archive.sh check-service-cgroup.py verify-backup.py \
   start-new-services.py staged-configuration-adapter.py migration-journal.py \
   coordinated-migration.py; do
@@ -57,7 +58,7 @@ def arguments(directory, verification):
     return dict(source=release, snapshot=snapshot, journal_dir=directory, commit=commit,
         artifact_sha256=artifact_hash, checker_sha256=digest, expected_client_user='vmtest',
         verify_release=verification, preflight=lambda: True, check_local_idle=lambda: True,
-        check_restored=lambda: True, install=lambda _: True,
+        check_caddy_transition=lambda: True, check_restored=lambda: True, install=lambda _: True,
         verify_new=lambda: True, verify_restored=lambda: True)
 try:
     assemble.assemble(**arguments(bad_record, lambda *_: False))

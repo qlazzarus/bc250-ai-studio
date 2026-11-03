@@ -8,7 +8,6 @@ Failures retain every moved-aside path; this code never starts services.
 
 import hashlib
 import os
-import shutil
 import stat
 import subprocess
 from pathlib import Path

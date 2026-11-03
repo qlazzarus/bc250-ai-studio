@@ -9,6 +9,7 @@ import asyncio
 import hmac
 import json
 import re
+import secrets
 from contextlib import asynccontextmanager
 
 import httpx
@@ -37,16 +38,23 @@ class Admission:
         self.condition = asyncio.Condition()
         self.state_path = state_path
         self.holds = set()
+        self.deployment_generation = None
         if state_path is not None:
             # Provisioning must create this file explicitly. Never interpret a
             # missing or malformed durable state as permission to admit traffic.
             state = json.loads(state_path.read_text())
-            if (not isinstance(state, dict) or set(state) != {"holds"}
+            if (not isinstance(state, dict) or set(state) not in ({"holds"}, {"holds", "deployment_generation"})
                     or not isinstance(state["holds"], list)
                     or any(not isinstance(x, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", x)
                            for x in state["holds"])):
                 raise RuntimeError("Invalid durable gate state")
             self.holds = set(state["holds"])
+            generation = state.get("deployment_generation")
+            if "deployment_generation" in state and (not isinstance(generation, str)
+                    or not re.fullmatch(r"[a-f0-9]{32}", generation)
+                    or "admin-deployment" not in self.holds):
+                raise RuntimeError("Invalid deployment hold generation")
+            self.deployment_generation = generation
         self.active = 0
         self.waiting = 0
 
@@ -54,9 +62,12 @@ class Admission:
     def paused(self):
         return bool(self.holds)
 
-    def persist(self, holds):
+    def persist(self, holds, *, generation=None):
         if self.state_path is not None:
-            atomic_json(self.state_path, {"holds": sorted(holds)})
+            state = {"holds": sorted(holds)}
+            if generation is not None:
+                state["deployment_generation"] = generation
+            atomic_json(self.state_path, state)
 
     async def enter(self):
         async with self.condition:
@@ -82,6 +93,8 @@ class Admission:
             }
             if include_holds:
                 state.update(protocol=2, durable=True, holds=sorted(self.holds))
+                if self.deployment_generation is not None:
+                    state["deployment_generation"] = self.deployment_generation
             return state
 
     async def set_paused(self, paused):
@@ -93,7 +106,7 @@ class Admission:
                 self.holds.add("legacy")
             else:
                 holds.discard("legacy")
-            self.persist(holds)
+            self.persist(holds, generation=self.deployment_generation)
             self.holds = holds
             if not self.paused:
                 self.condition.notify_all()
@@ -103,21 +116,38 @@ class Admission:
                 "active_requests": self.active,
             }
 
-    async def hold(self, hold_id, acquire):
+    async def hold(self, hold_id, acquire, *, exclusive=False, expected_generation=None):
         if self.state_path is None:
             raise RuntimeError("Durable gate state is not configured")
         async with self.condition:
             holds = self.holds.copy()
+            if exclusive and hold_id in holds:
+                raise HTTPException(409, "Hold already exists")
+            generation = self.deployment_generation
+            if hold_id == "admin-deployment" and not acquire and expected_generation is not None and generation is None:
+                raise HTTPException(412, "Deployment hold generation changed")
+            if hold_id == "admin-deployment" and not acquire and generation is not None:
+                if expected_generation is None or not hmac.compare_digest(expected_generation, generation):
+                    raise HTTPException(412, "Deployment hold generation changed")
+                generation = None
             if acquire:
+                if exclusive:
+                    generation = secrets.token_hex(16)
+                    self.deployment_generation = generation
                 holds.add(hold_id)
                 self.holds.add(hold_id)
             else:
                 holds.discard(hold_id)
-            self.persist(holds)
+            self.persist(holds, generation=generation)
             self.holds = holds
+            self.deployment_generation = generation
             if not self.paused:
                 self.condition.notify_all()
-            return {"paused": self.paused, "held": hold_id in self.holds}
+            result = {"paused": self.paused, "held": hold_id in self.holds}
+            if exclusive:
+                result["created"] = True
+                result["generation"] = generation
+            return result
 
 
 def create_gate_app(settings: GateSettings | None = None, transport=None):
@@ -177,7 +207,9 @@ def create_gate_app(settings: GateSettings | None = None, transport=None):
     @app.put("/control/holds/{hold_id}")
     @app.delete("/control/holds/{hold_id}")
     async def control_hold(hold_id: str, request: Request,
-                           authorization: str | None = Header(default=None)):
+                           authorization: str | None = Header(default=None),
+                           if_none_match: str | None = Header(default=None),
+                           if_match: str | None = Header(default=None)):
         role = control_auth(authorization)
         if hold_id == "legacy" or not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", hold_id):
             raise HTTPException(422, "Invalid hold ID")
@@ -189,7 +221,16 @@ def create_gate_app(settings: GateSettings | None = None, transport=None):
                 raise HTTPException(403, "Hold belongs to another controller")
         if settings.state_path is None:
             raise HTTPException(503, "Durable gate state is not configured")
-        return await app.state.admission.hold(hold_id, request.method == "PUT")
+        if if_none_match is not None and not (settings.owned_control and role == "admin"
+                and hold_id == "admin-deployment" and request.method == "PUT"
+                and if_none_match == "*"):
+            raise HTTPException(400, "Unsupported hold precondition")
+        if if_match is not None and not (settings.owned_control and role == "admin"
+                and hold_id == "admin-deployment" and request.method == "DELETE"
+                and re.fullmatch(r"[a-f0-9]{32}", if_match)):
+            raise HTTPException(400, "Unsupported hold precondition")
+        return await app.state.admission.hold(hold_id, request.method == "PUT",
+                                              exclusive=if_none_match == "*", expected_generation=if_match)
 
     @app.api_route(
         "/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]

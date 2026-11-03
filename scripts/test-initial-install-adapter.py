@@ -21,6 +21,7 @@ class InitialInstallTest(unittest.TestCase):
         adapter.release = Path('/opt/fixture')
         adapter.displaced = Path('/opt/displaced')
         adapter.cache = Path('/var/cache/fixture')
+        adapter.model_cache = Path('/var/cache/model-fixture')
         adapter.manifest_dir = Path('/var/backups/manifest')
         adapter.source = adapter.release / 'deploy/model-control'
         adapter.offline = True
@@ -29,12 +30,17 @@ class InitialInstallTest(unittest.TestCase):
         adapter.check_maintenance = lambda: maintenance
         adapter.check_local_idle = lambda: True
         adapter.migration = SimpleNamespace(create_state=lambda *_: events.append('gate'))
+        def model_code(*args, **kwargs):
+            self.assertEqual(args[2], adapter.model_cache)
+            self.assertTrue(kwargs['check_ready']())
+            events.append('model')
+        adapter.model_code = SimpleNamespace(install=model_code)
         def studio(*args, **kwargs):
             events.append('studio')
             self.assertTrue(kwargs['check_ready']())
             if studio_failure:
                 raise ValueError('fixture failure')
-        adapter.studio = SimpleNamespace(install=studio)
+        adapter.studio = SimpleNamespace(install=studio, require_same_model_config=lambda *_: None)
         adapter.units = SimpleNamespace(install=lambda *_: events.append('units'))
         adapter.compare = SimpleNamespace(_same=lambda *_: None)
         return adapter, events
@@ -45,7 +51,7 @@ class InitialInstallTest(unittest.TestCase):
              patch.object(module, 'GATE_DIR', Path(root) / 'gate'), \
              patch.object(module.subprocess, 'run') as commands:
             self.assertTrue(adapter('/var/backups/bc250-model-migration.Abc12345'))
-        self.assertEqual(events, ['gate', 'studio', 'units'])
+        self.assertEqual(events, ['model', 'gate', 'studio', 'units'])
         self.assertGreaterEqual(commands.call_count, 7)
 
     def test_maintenance_failure_prevents_mutation(self):
@@ -63,7 +69,32 @@ class InitialInstallTest(unittest.TestCase):
              patch.object(module.subprocess, 'run'):
             with self.assertRaises(ValueError):
                 adapter('/var/backups/bc250-model-migration.Abc12345')
-        self.assertEqual(events, ['gate', 'studio'])
+        self.assertEqual(events, ['model', 'gate', 'studio'])
+
+    def test_model_install_failure_prevents_gate_and_studio(self):
+        adapter, events = self.fixture()
+        def fail(*args, **kwargs):
+            events.append('model')
+            raise ValueError('fixture failure')
+        adapter.model_code = SimpleNamespace(install=fail)
+        with tempfile.TemporaryDirectory() as root, patch.object(module, 'trusted'), \
+             patch.object(module, 'GATE_DIR', Path(root) / 'gate'), \
+             patch.object(module.subprocess, 'run'):
+            with self.assertRaises(ValueError):
+                adapter('/var/backups/bc250-model-migration.Abc12345')
+        self.assertEqual(events, ['model'])
+
+    def test_different_model_config_prevents_new_code(self):
+        adapter, events = self.fixture()
+        def reject(*_):
+            raise ValueError('different configuration')
+        adapter.studio.require_same_model_config = reject
+        with tempfile.TemporaryDirectory() as root, patch.object(module, 'trusted'), \
+             patch.object(module, 'GATE_DIR', Path(root) / 'gate'), \
+             patch.object(module.subprocess, 'run'):
+            with self.assertRaises(ValueError):
+                adapter('/var/backups/bc250-model-migration.Abc12345')
+        self.assertEqual(events, [])
 
     def test_backup_verification_failure_prevents_mutation(self):
         adapter, events = self.fixture()

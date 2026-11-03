@@ -12,10 +12,15 @@ import re
 import stat
 from pathlib import Path
 
-PHASES = frozenset({'maintenance_enter', 'legacy_backup', 'install', 'new_start',
-                    'new_confirmation', 'maintenance_restore'})
+PHASES = frozenset({'initial_preparation', 'maintenance_enter', 'wiki_fence', 'legacy_backup', 'install', 'new_start',
+                    'new_confirmation', 'wiki_release', 'maintenance_restore', 'rollback_stop',
+                    'rollback_preserve', 'rollback_stage', 'rollback_restore', 'rollback_gate',
+                    'rollback_studio', 'rollback_confirmation', 'startup_tmpfiles', 'startup_lock',
+                    'startup_lock_transfer', 'deployment_hold', 'deployment_confirmation', 'rollback_wiki_release',
+                    'rollback_ingress_restore'})
 EVENTS = frozenset(f'{phase}:{state}' for phase in PHASES for state in ('begin', 'confirmed')) | {
-    'await_manual_client_restart', 'complete'}
+    'await_manual_client_restart', 'await_legacy_client_restart', 'complete', 'rollback_complete',
+    'startup_lock_transfer:released'}
 
 
 class MigrationJournal:
@@ -67,6 +72,25 @@ class MigrationJournal:
         if stat.S_IMODE(path.stat().st_mode) != 0o700:
             raise ValueError('백업 경로는 root 전용이어야 합니다.')
         self._append({'event': 'legacy_backup:path', 'path': str(path)})
+
+    def deployment_generation(self, generation):
+        if not isinstance(generation, str) or not re.fullmatch(r'[a-f0-9]{32}', generation):
+            raise ValueError('배포 보류 세대가 올바르지 않습니다.')
+        self._append({'event': 'deployment_hold:generation', 'generation': generation})
+
+    def rollback_path(self, kind, path):
+        patterns = {'evidence': r'/var/backups/bc250-model-postfailure\.[A-Za-z0-9]{8}',
+                    'stage': r'/var/backups/bc250-restore-stage\.[A-Za-z0-9]{8}'}
+        path = Path(path)
+        if kind not in patterns or not re.fullmatch(patterns[kind], str(path)):
+            raise ValueError('복구 기록 경로가 올바르지 않습니다.')
+        for item in (path, *path.parents):
+            info = item.lstat()
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+                raise ValueError('복구 기록 경로를 신뢰할 수 없습니다.')
+        if stat.S_IMODE(path.stat().st_mode) != 0o700:
+            raise ValueError('복구 기록 경로는 root 전용이어야 합니다.')
+        self._append({'event': 'rollback_' + kind + ':path', 'path': str(path)})
 
     def release(self, commit, artifact_sha256):
         """Record independently authenticated release identity before any action."""

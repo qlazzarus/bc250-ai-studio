@@ -3,7 +3,7 @@ set -Eeuo pipefail
 umask 077
 [[ $(id -u) == 0 && $(hostname) == bc250-fedora43-test \
   && $(systemd-detect-virt) == qemu && $(getenforce) == Enforcing \
-  && ( $# == 2 || ( $# == 3 && ( $3 == adapter || $3 == adapter-systemd || $3 == systemd-linked ) ) ) \
+  && ( $# == 2 || ( $# == 3 && ( $3 == adapter || $3 == adapter-systemd || $3 == systemd-linked || $3 == manual-linked || $3 == manual-wiki-linked ) ) ) \
   && $2 =~ ^[a-f0-9]{64}$ ]] || exit 1
 source_dir=$1
 digest=$2
@@ -22,7 +22,7 @@ install -o root -g root -m 0755 "$binary" "$fixture/caddy"
 [[ $(sha256sum "$fixture/caddy" | cut -d ' ' -f 1) == "$digest" ]] || exit 1
 restorecon -RF "$fixture"
 release="$source_dir/deploy/model-control"
-if [[ ${3:-linked} == adapter-systemd || ${3:-linked} == systemd-linked ]]; then
+if [[ ${3:-linked} == adapter-systemd || ${3:-linked} == systemd-linked || ${3:-linked} == manual-linked || ${3:-linked} == manual-wiki-linked ]]; then
   release=$fixture/release
   install -d -o root -g root -m 0755 "$release"
   for name in create-maintenance-caddy.py capture-caddy.py caddy-file-swap.py \
@@ -41,8 +41,11 @@ generator = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(generator)
 Path(sys.argv[2]).write_text('\n'.join(generator.EXPECTED) + '\n')
 PY
+mode=${3:-linked}
+if [[ $mode == manual-wiki-linked ]]; then export BC250_FIXTURE_REAL_WIKI=1; mode=manual-linked; fi
+if [[ $mode == manual-linked ]]; then export BC250_FIXTURE_MANUAL_ROLLBACK=1; mode=systemd-linked; fi
 BC250_FIXTURE_SOURCE_DIR="$source_dir" PATH="$fixture:/usr/sbin:/usr/bin:/sbin:/bin" \
   python3 "$source_dir/scripts/test-maintenance-lifecycle.py" \
   "$fixture/Caddyfile.original" "$release/create-maintenance-caddy.py" \
-  "$release/capture-caddy.py" "$release/caddy-file-swap.py" "${3:-linked}"
+  "$release/capture-caddy.py" "$release/caddy-file-swap.py" "$mode"
 echo "시험 Caddy 연결 시험 완료; 시험 파일 보관: $fixture"

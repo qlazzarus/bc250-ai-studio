@@ -17,6 +17,7 @@ UNITS = ('bc250-ai-studio.service', 'bc250-llm-client.service', 'bc250-llm-gate.
 LIVE_CADDY = Path('/etc/caddy/Caddyfile')
 OLD_ENV = Path('/etc/bc250-llm-gate.env')
 PAUSE_RECORD = Path('/var/lib/bc250-model-control/legacy-pause.json')
+STUDIO_DATABASE = Path('/opt/ai-studio-data/database/studio.sqlite3')
 
 
 def trusted(path, *, directory=False):
@@ -60,6 +61,8 @@ class LegacyBackupAdapter:
         self.capture = load('caddy_capture', self.source / 'capture-caddy.py')
         self.probe = load('maintenance_probe', self.source / 'maintenance-probe.py')
         self.sequence = load('legacy_backup_sequence', self.source / 'legacy-backup-sequence.py')
+        self.studio_db = load('stopped_studio_db', self.source / 'inspect-stopped-studio-db.py')
+        self.llama_connections = load('llama_connections', self.source / 'observe-llama-connections.py')
 
     def maintenance(self):
         self.capture.verify_snapshot(self.snapshot, LIVE_CADDY,
@@ -99,7 +102,25 @@ class LegacyBackupAdapter:
         subprocess.run(['/usr/bin/bash', '-c', 'source "$1"; shift; bc250_require_stopped "$@"',
                         'backup-check', str(script), *UNITS], check=True, timeout=60)
 
+    def require_stopped_with_clear_database(self):
+        if self.check_local_idle() is not True:
+            raise RuntimeError('DB 검사 전 로컬 유휴 상태가 확인되지 않았습니다.')
+        if self.llama_connections.check_host_llama() is not True:
+            raise RuntimeError('DB 검사 전 llama 연결 종료가 확인되지 않았습니다.')
+        def stopped():
+            self.require_stopped()
+            return True
+        self.studio_db.inspect(STUDIO_DATABASE, check_stopped=stopped)
+        if self.check_local_idle() is not True:
+            raise RuntimeError('DB 검사 후 로컬 유휴 상태가 변경됐습니다.')
+        if self.llama_connections.check_host_llama() is not True:
+            raise RuntimeError('DB 검사 후 llama 연결 종료가 확인되지 않았습니다.')
+
     def create_backup(self):
+        if self.check_local_idle() is not True:
+            raise RuntimeError('백업 생성 전 로컬 유휴 상태가 확인되지 않았습니다.')
+        if self.llama_connections.check_host_llama() is not True:
+            raise RuntimeError('백업 생성 전 llama 연결 종료가 확인되지 않았습니다.')
         original = self.snapshot / 'Caddyfile.original'
         print('정지된 기존 구성 백업을 시작합니다. 완료 전에는 다음 단계로 진행하지 않습니다.', flush=True)
         result = subprocess.run(['/usr/bin/bash', str(self.source / 'backup-stopped.sh'), str(original)],
@@ -113,15 +134,24 @@ class LegacyBackupAdapter:
                            result.stdout, flags=re.MULTILINE)
         if len(paths) != 1:
             raise RuntimeError('생성된 백업 경로를 확인하지 못했습니다.')
-        return Path(paths[0])
+        backup = Path(paths[0])
+        if self.check_local_idle() is not True:
+            raise RuntimeError('백업 생성 중 로컬 유휴 상태가 변경됐습니다. 백업을 보존하세요.')
+        if self.llama_connections.check_host_llama() is not True:
+            raise RuntimeError('백업 생성 중 llama 연결 상태가 변경됐습니다. 백업을 보존하세요.')
+        return backup
 
     def verify_backup(self, backup):
         subprocess.run(['/usr/bin/python3', str(self.source / 'verify-backup.py'), str(backup)],
                        check=True, timeout=7200)
+        if self.check_local_idle() is not True:
+            raise RuntimeError('백업 검증 중 로컬 유휴 상태가 변경됐습니다. 백업을 보존하세요.')
+        if self.llama_connections.check_host_llama() is not True:
+            raise RuntimeError('백업 검증 후 llama 연결 종료가 확인되지 않았습니다. 백업을 보존하세요.')
 
     def run(self):
         return self.sequence.backup_legacy(
             check_maintenance=self.maintenance, capture_pause=self.capture_pause,
             gate_status=self.gate_status, stop_services=self.stop,
-            require_stopped=self.require_stopped, create_backup=self.create_backup,
+            require_stopped=self.require_stopped_with_clear_database, create_backup=self.create_backup,
             verify_backup=self.verify_backup)

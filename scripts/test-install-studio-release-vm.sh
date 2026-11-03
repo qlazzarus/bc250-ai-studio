@@ -4,7 +4,7 @@ set -Eeuo pipefail
 umask 077
 [[ $(id -u) == 0 && $(hostname) == bc250-fedora43-test \
   && $(systemd-detect-virt) == qemu && $(getenforce) == Enforcing ]] || exit 1
-[[ ( $# == 1 || ( $# == 2 && $2 == failure-only ) ) && -f $1/deploy/model-control/install-studio-release.py \
+[[ ( $# == 1 || ( $# == 2 && ( $2 == failure-only || $2 == config-mismatch-only ) ) ) && -f $1/deploy/model-control/install-studio-release.py \
   && -f $1/frontend/dist/index.html && -f $1/config/models.yaml ]] || exit 1
 mode=${2:-full}
 cache_source=/home/vmtest/bc250-test-source/uv-cache
@@ -57,7 +57,7 @@ def setup(name):
     (app / 'config').chmod(0o755)
     (app / 'frontend').chmod(0o755)
     (app / 'backend/old.py').write_text('old backend')
-    (app / 'config/models.yaml').write_text('old models')
+    (app / 'config/models.yaml').write_bytes((release / 'config/models.yaml').read_bytes())
     (app / 'config/server-only.txt').write_text('preserve config')
     (app / 'frontend/dist/index.html').write_text('old frontend')
     (app / 'frontend/server-only.txt').write_text('preserve frontend')
@@ -65,6 +65,22 @@ def setup(name):
     (app / 'pyproject.toml').write_text('old project')
     (app / 'uv.lock').write_text('old lock')
     return app, saved
+
+if mode == 'config-mismatch-only':
+    app, saved = setup('config-mismatch')
+    (app / 'config/models.yaml').write_text('different fixture configuration')
+    try:
+        installer.install(release, app, saved, cache, check_ready=lambda: True, compare=compare, offline=True)
+    except ValueError as exc:
+        if '모델 설정이 릴리스와 다릅니다' not in str(exc):
+            raise
+    else:
+        raise SystemExit('서로 다른 시험 모델 설정이 허용됐습니다.')
+    assert not any(saved.iterdir())
+    assert (app / 'backend/old.py').read_text() == 'old backend'
+    assert (app / 'config/models.yaml').read_text() == 'different fixture configuration'
+    print('서로 다른 시험 Studio 모델 설정을 설치 전 거절하고 원본 보존 확인', flush=True)
+    raise SystemExit(0)
 
 if mode == 'full':
     app, saved = setup('success')

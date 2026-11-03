@@ -18,6 +18,7 @@ LIVE_ROOT = Path('/')
 STUDIO = Path('/opt/bc250-ai-studio')
 SNAPSHOT = Path('/var/lib/bc250-model-control/legacy-pause.json')
 GATE_DIR = Path('/var/lib/bc250-llm-gate')
+MODEL_CODE = Path('/opt/bc250-model-control')
 
 
 def trusted(path, *, directory=False, private=False):
@@ -46,7 +47,7 @@ def load(name, path):
 
 
 class InitialInstallAdapter:
-    def __init__(self, release, displaced, cache, manifest_dir, *, check_release,
+    def __init__(self, release, displaced, cache, manifest_dir, *, model_cache, check_release,
                  check_configuration, check_maintenance, check_local_idle, offline=False):
         if (os.geteuid() != 0 or type(offline) is not bool or not all(callable(x) for x in
                 (check_release, check_configuration, check_maintenance, check_local_idle))):
@@ -56,12 +57,17 @@ class InitialInstallAdapter:
         self.check_release, self.check_configuration = check_release, check_configuration
         self.check_maintenance, self.check_local_idle = check_maintenance, check_local_idle
         self.offline = offline
+        self.model_cache = Path(model_cache)
         trusted(self.release, directory=True)
-        for path in (self.displaced, self.cache, self.manifest_dir):
+        for path in (self.displaced, self.cache, self.model_cache, self.manifest_dir):
             trusted(path, directory=True, private=True)
+        if (self.cache.is_relative_to(self.model_cache) or self.model_cache.is_relative_to(self.cache)
+                or os.path.samefile(self.cache, self.model_cache)):
+            raise ValueError('Studio와 모델 제어의 캐시는 별도 디렉터리여야 합니다.')
         self.source = self.release / 'deploy/model-control'
         self.migration = load('initial_gate_migration', self.source / 'migrate-legacy-gate.py')
         self.studio = load('initial_studio_install', self.source / 'install-studio-release.py')
+        self.model_code = load('initial_model_code_install', self.source / 'install-model-code.py')
         self.units = load('initial_unit_install', self.source / 'install-units.py')
         self.compare = load('initial_restore_compare', self.source / 'restore-legacy-files.py')
         for name in ('backup-archive.sh', 'check-service-cgroup.py', 'verify-backup.py'):
@@ -87,6 +93,12 @@ class InitialInstallAdapter:
         backup = Path(backup)
         self.ready(backup)
         trusted(SNAPSHOT)
+        if GATE_DIR.exists() or GATE_DIR.is_symlink():
+            raise ValueError('새 gate 상태가 이미 존재합니다. 기존 상태를 보존하세요.')
+        self.studio.require_same_model_config(self.release / 'config/models.yaml', STUDIO / 'config/models.yaml')
+        self.model_code.install(self.release, MODEL_CODE, self.model_cache,
+                                check_ready=lambda: self.ready(backup), offline=self.offline)
+        self.ready(backup)
         if GATE_DIR.exists() or GATE_DIR.is_symlink():
             raise ValueError('새 gate 상태가 이미 존재합니다. 기존 상태를 보존하세요.')
         self.migration.create_state(SNAPSHOT, GATE_DIR)

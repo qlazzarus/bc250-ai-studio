@@ -27,6 +27,21 @@ jobs:
           uv sync --locked --extra dev
           uv run pytest -q
           uv run ruff check .
+      - name: Check deployment coordination candidates
+        run: |
+          set -euo pipefail
+          for test in \
+            scripts/test-assemble-phase-safety.py \
+            scripts/test-local-idle-composite.py \
+            scripts/test-initial-local-idle.py \
+            scripts/test-legacy-backup-idle.py \
+            scripts/test-legacy-rollback-manual.py \
+            scripts/test-coordinated-migration.py \
+            scripts/test-verify-initial-preparation.py \
+            scripts/test-pinned-preparation.py
+          do
+            python "$test"
+          done
       - name: Check and build frontend
         working-directory: frontend
         run: |

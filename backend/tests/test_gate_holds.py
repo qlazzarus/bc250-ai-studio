@@ -77,6 +77,46 @@ async def test_http_hold_contract_and_legacy_resume(tmp_path):
             }
 
 
+async def test_exclusive_deployment_hold_has_one_winner_and_preserves_existing_put(tmp_path):
+    path = tmp_path / "gate.json"
+    path.write_text('{"holds": []}')
+    settings = GateSettings(api_key="admin-key-12345678901234567890",
+                            studio_key="studio-key-12345678901234567890",
+                            switch_key="switch-key-12345678901234567890",
+                            state_path=path, owned_control=True)
+    app = create_gate_app(settings)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                                     base_url="http://test") as client:
+            url = "/control/holds/admin-deployment"
+            headers = {"Authorization": f"Bearer {settings.api_key}", "If-None-Match": "*"}
+            first, second = await asyncio.gather(client.put(url, headers=headers),
+                                                 client.put(url, headers=headers))
+            assert sorted([first.status_code, second.status_code]) == [200, 409]
+            winner = first if first.status_code == 200 else second
+            created = winner.json()
+            generation = created.pop("generation")
+            assert created == {"paused": True, "held": True, "created": True}
+            assert len(generation) == 32
+            legacy = await client.put(url, headers={"Authorization": f"Bearer {settings.api_key}"})
+            assert legacy.json() == {"paused": True, "held": True}
+            forbidden = await client.put(url, headers={"Authorization": f"Bearer {settings.studio_key}",
+                                                       "If-None-Match": "*"})
+            assert forbidden.status_code == 403
+            assert (await client.delete(url, headers={"Authorization": f"Bearer {settings.api_key}"})).status_code == 412
+            conditional = {"Authorization": f"Bearer {settings.api_key}", "If-Match": generation}
+            assert (await client.delete(url, headers=conditional)).status_code == 200
+            recreated = (await client.put(url, headers=headers)).json()
+            assert recreated["generation"] != generation
+            assert (await client.delete(url, headers=conditional)).status_code == 412
+            assert (await client.get('/control', headers=headers)).json()['deployment_generation'] == recreated['generation']
+    restarted = create_gate_app(settings)
+    async with restarted.router.lifespan_context(restarted):
+        status = await restarted.state.admission.status(include_holds=True)
+        assert status['deployment_generation'] == recreated['generation']
+        assert 'startup' in status['holds'] and 'admin-deployment' in status['holds']
+
+
 async def test_owned_control_separates_roles_and_restart_requires_confirmation(tmp_path):
     path = tmp_path / "owned-gate.json"
     path.write_text('{"holds": []}')

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Exercise Caddy maintenance entry and restoration on disposable ports."""
 
-import importlib.util
 import contextlib
+import importlib.util
 import os
 import shutil
 import socket

@@ -1,5 +1,5 @@
 import pytest
-from app.services.gate_admin import confirm_startup
+from app.services.gate_admin import confirm_startup, confirm_startup_with_deployment_hold
 
 
 class Lock:
@@ -30,7 +30,8 @@ class LLM:
         self.released = False
 
     async def gate(self, method):
-        return {"protocol": 2, "durable": True, "paused": bool(self.holds), "holds": self.holds}
+        return {"protocol": 2, "durable": True, "paused": bool(self.holds), "holds": self.holds,
+                "deployment_generation": "a" * 32}
 
     async def drain(self):
         pass
@@ -51,6 +52,182 @@ class Service:
 class Registry:
     def current_model(self):
         return "active"
+
+
+class DeploymentGate:
+    def __init__(self, holds=("startup",)):
+        self.holds = set(holds)
+
+    async def gate(self, method):
+        assert method == "GET"
+        return {"protocol": 2, "durable": True, "paused": bool(self.holds),
+                "holds": sorted(self.holds), "deployment_generation": "a" * 32}
+
+    async def acquire_deployment_hold(self):
+        if "admin-deployment" in self.holds:
+            raise RuntimeError("hold already exists")
+        self.holds.add("admin-deployment")
+        return "a" * 32
+
+
+class DeploymentRecord:
+    def __init__(self, events=None, fail=None):
+        self.events = events if events is not None else []
+        self.fail = fail
+
+    def __call__(self, event):
+        if event == self.fail:
+            raise OSError("record failed")
+        self.events.append(event)
+
+    def deployment_generation(self, generation):
+        assert generation == "a" * 32
+
+
+async def test_deployment_hold_preserves_pause_when_startup_response_is_lost():
+    gate = DeploymentGate()
+    attempts = []
+    events = []
+
+    async def confirm():
+        attempts.append(1)
+        gate.holds.remove("startup")
+        raise TimeoutError("response lost")
+
+    with pytest.raises(TimeoutError):
+        await confirm_startup_with_deployment_hold(gate, confirm, record=DeploymentRecord(events))
+    assert gate.holds == {"admin-deployment"}
+    assert len(attempts) == 1
+    assert events == ["deployment_hold:begin", "deployment_hold:confirmed", "deployment_confirmation:begin"]
+
+
+async def test_deployment_hold_remains_after_success_and_other_holds_are_preserved():
+    gate = DeploymentGate(("startup", "legacy"))
+
+    async def confirm():
+        gate.holds.remove("startup")
+
+    events = []
+    await confirm_startup_with_deployment_hold(gate, confirm, record=DeploymentRecord(events))
+    assert gate.holds == {"admin-deployment", "legacy"}
+    assert events[-1] == "deployment_confirmation:confirmed"
+
+
+async def test_existing_deployment_hold_is_not_adopted_or_released():
+    gate = DeploymentGate(("startup", "admin-deployment"))
+
+    async def confirm():
+        pytest.fail("confirmation must not run")
+
+    with pytest.raises(RuntimeError):
+        await confirm_startup_with_deployment_hold(gate, confirm, record=DeploymentRecord())
+    assert gate.holds == {"startup", "admin-deployment"}
+
+
+async def test_uncertain_hold_acquisition_does_not_confirm_startup():
+    class LostAcquire(DeploymentGate):
+        async def acquire_deployment_hold(self):
+            await super().acquire_deployment_hold()
+            raise TimeoutError("response lost")
+
+    gate = LostAcquire()
+
+    async def confirm():
+        pytest.fail("confirmation must not run")
+
+    with pytest.raises(TimeoutError):
+        await confirm_startup_with_deployment_hold(gate, confirm, record=DeploymentRecord())
+    assert gate.holds == {"startup", "admin-deployment"}
+
+
+async def test_deployment_record_failure_stops_before_confirmation():
+    gate = DeploymentGate()
+
+    async def confirm():
+        pytest.fail("confirmation must not run")
+
+    with pytest.raises(OSError):
+        await confirm_startup_with_deployment_hold(gate, confirm, record=DeploymentRecord(fail="deployment_hold:confirmed"))
+    assert gate.holds == {"startup", "admin-deployment"}
+
+
+async def test_deployment_hold_does_not_adopt_concurrent_acquisition():
+    class ConcurrentGate(DeploymentGate):
+        async def acquire_deployment_hold(self):
+            # Another actor acquires the same hold between the read and PUT.
+            self.holds.add("admin-deployment")
+            await super().acquire_deployment_hold()
+
+    gate = ConcurrentGate()
+    confirmations = []
+
+    async def confirm():
+        confirmations.append(True)
+        gate.holds.remove("startup")
+
+    with pytest.raises(RuntimeError, match="already exists"):
+        await confirm_startup_with_deployment_hold(gate, confirm, record=DeploymentRecord())
+    assert not confirmations, "a concurrently acquired hold must not be adopted"
+
+
+async def test_deployment_release_checks_health_and_preserves_existing_pause():
+    class GuardedLLM(LLM):
+        async def release_deployment_hold(self, generation):
+            assert generation == "a" * 32
+            self.holds.remove("admin-deployment")
+
+    gate = GuardedLLM()
+    gate.holds = ["admin-deployment", "legacy"]
+    lock = Lock()
+    await confirm_startup(lock, Journal(), Client(), gate, Service(), Registry(),
+                          lambda: None, release_id="admin-deployment", check_deployment_ownership=lambda: True,
+                          deployment_generation="a" * 32)
+    assert gate.holds == ["legacy"] and not lock.held
+
+
+async def test_deployment_release_rejects_existing_startup_hold():
+    gate = LLM()
+    gate.holds = ["startup", "admin-deployment"]
+    with pytest.raises(RuntimeError, match="unresolved hold"):
+        await confirm_startup(Lock(), Journal(), Client(), gate, Service(), Registry(),
+                              lambda: None, release_id="admin-deployment", check_deployment_ownership=lambda: True,
+                              deployment_generation="a" * 32)
+    assert gate.holds == ["startup", "admin-deployment"]
+
+
+async def test_deployment_release_rejects_hold_changes_during_health_check():
+    gate = LLM()
+    gate.holds = ["admin-deployment"]
+
+    class ChangingService(Service):
+        async def healthy(self, model):
+            gate.holds.append("admin-external")
+
+    with pytest.raises(RuntimeError, match="holds changed"):
+        await confirm_startup(Lock(), Journal(), Client(), gate, ChangingService(), Registry(),
+                              lambda: None, release_id="admin-deployment", check_deployment_ownership=lambda: True,
+                              deployment_generation="a" * 32)
+    assert gate.holds == ["admin-deployment", "admin-external"]
+
+
+async def test_deployment_release_requires_ownership_check():
+    gate = LLM()
+    gate.holds = ["admin-deployment"]
+    with pytest.raises(ValueError, match="ownership check"):
+        await confirm_startup(Lock(), Journal(), Client(), gate, Service(), Registry(),
+                              lambda: None, release_id="admin-deployment")
+    assert gate.holds == ["admin-deployment"]
+
+
+async def test_deployment_release_stops_if_ownership_is_lost_during_health_check():
+    gate = LLM()
+    gate.holds = ["admin-deployment"]
+    checks = iter([True, False])
+    with pytest.raises(RuntimeError, match="ownership changed"):
+        await confirm_startup(Lock(), Journal(), Client(), gate, Service(), Registry(),
+                              lambda: None, release_id="admin-deployment",
+                              check_deployment_ownership=lambda: next(checks), deployment_generation="a" * 32)
+    assert gate.holds == ["admin-deployment"]
 
 
 async def test_startup_release_checks_all_barriers_while_holding_gpu_lock():

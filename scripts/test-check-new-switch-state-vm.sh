@@ -4,10 +4,10 @@ set -Eeuo pipefail
 umask 077
 [[ $(id -u) == 0 && $(hostname) == bc250-fedora43-test \
   && $(systemd-detect-virt) == qemu && $(getenforce) == Enforcing ]] || exit 1
-[[ $# == 1 && -f $1/deploy/model-control/check-new-switch-state.py ]] || exit 1
+[[ ( $# == 1 || ( $# == 2 && $2 == deployment ) ) && -f $1/deploy/model-control/check-new-switch-state.py ]] || exit 1
 fixture=$(mktemp -d /var/backups/bc250-switch-state-check.XXXXXXXX)
 trap 'echo "시험 실패. 시험 파일을 보존합니다: $fixture" >&2' ERR
-python3 - "$1/deploy/model-control/check-new-switch-state.py" "$fixture" <<'PY'
+python3 - "$1/deploy/model-control/check-new-switch-state.py" "$fixture" "${2:-full}" <<'PY'
 import importlib.util
 import shutil
 import sqlite3
@@ -27,6 +27,19 @@ db.execute('create table switch_operations (state text not null)')
 db.execute("insert into switch_operations values ('succeeded')")
 db.commit(); db.close()
 assert module.check(state, gate)
+if sys.argv[3] == 'deployment':
+    for value in ('{"holds":["admin-deployment"]}',
+                  '{"holds":["startup"],"deployment_generation":"fixture"}'):
+        target = gate / 'holds.json'
+        target.write_text(value)
+        try:
+            module.check(state, gate)
+        except ValueError:
+            pass
+        else:
+            raise SystemExit('배포 보류 또는 알 수 없는 상태 형식을 잘못 허용했습니다.')
+    print('배포 보류 및 알 수 없는 gate 상태 형식의 롤백 전 거절 확인', flush=True)
+    raise SystemExit(0)
 for target, value in ((state / 'switch.json', '{"phase":"switching"}'),
                       (gate / 'holds.json', '{"holds":["switch-fixture"]}')):
     original = target.read_text()
