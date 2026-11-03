@@ -206,7 +206,7 @@ if mode == 'adapter':
         wiki.release(can_release=lambda: True)
     finally:
         journal.close()
-print('Caddy·직접 호출자 지속 차단·GPU·백업 파일·설치·Client는 모의입니다.', flush=True)
+print('Caddy·직접 호출자 지속 차단·llama TCP 연결 검사·GPU·백업 파일·설치·Client는 모의입니다.', flush=True)
 PY
 systemctl stop "$wiki" "$llama" "$studio"
 rm -- "/etc/systemd/system/$wiki" "/etc/systemd/system/$llama" "/etc/systemd/system/$studio"

@@ -35,6 +35,7 @@ jobs:
             scripts/test-local-idle-composite.py \
             scripts/test-initial-local-idle.py \
             scripts/test-legacy-backup-idle.py \
+            scripts/test-observe-llama-connections.py \
             scripts/test-legacy-rollback-manual.py \
             scripts/test-coordinated-migration.py \
             scripts/test-verify-initial-preparation.py \

@@ -47,6 +47,7 @@ REQUIRED = frozenset({'COMMIT', 'pyproject.toml', 'uv.lock', 'backend/app/main.p
                       'deploy/model-control/local-idle-composite.py',
                       'deploy/model-control/initial-local-idle.py',
                       'deploy/model-control/observe-direct-llm.py',
+                      'deploy/model-control/observe-llama-connections.py',
                       'deploy/model-control/observe-studio-idle.py',
                       'deploy/model-control/restore-legacy-files.py',
                       'deploy/model-control/verify-backup.py',

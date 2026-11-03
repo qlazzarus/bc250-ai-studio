@@ -361,6 +361,16 @@ case $3 in
     guest_dir="bc250-gpu-fence-${RANDOM}-${RANDOM}"
     guest_script=scripts/test-advisory-gpu-fence-vm.sh
     ;;
+  nft-systemd-restart-resume)
+    guest_dir="bc250-nft-systemd-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-nft-systemd-restart-vm.sh
+    resume=yes
+    ;;
+  llama-connection-backup-resume)
+    guest_dir="bc250-llama-connection-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-llama-connection-backup-vm.sh
+    resume=yes
+    ;;
   nft-cgroup-isolated-resume)
     guest_dir="bc250-nft-cgroup-${RANDOM}-${RANDOM}"
     guest_script=scripts/test-nft-cgroup-isolated-vm.sh
