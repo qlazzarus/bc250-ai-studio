@@ -84,12 +84,19 @@ def coordinated_studio_is_ready():
 
 
 def coordinated_participants_are_ready(expected_client_user=None):
+    gate_identity = None
+    if expected_client_user is not None:
+        from app.services.gate_process_identity import observe
+
+        gate_identity = observe(client_user=expected_client_user)
     coordinated_studio_is_ready()
     if expected_client_user is not None:
         # Import lazily because the client check reuses the service helpers above.
         from app.services.client_gate_check import verify_client_gate
 
         verify_client_gate(expected_client_user)
+        if observe(client_user=expected_client_user) != gate_identity:
+            raise RuntimeError("Gate process identity changed during verification")
 
 
 async def confirm_startup(lock, journal, client, llm, service, registry, check_studio,

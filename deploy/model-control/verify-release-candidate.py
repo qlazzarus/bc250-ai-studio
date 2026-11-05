@@ -16,6 +16,7 @@ from pathlib import PurePosixPath
 ROOTS = frozenset({'COMMIT', 'pyproject.toml', 'uv.lock', 'backend', 'config',
                    'frontend', 'deploy', 'systemd', 'docs', 'scripts'})
 REQUIRED = frozenset({'COMMIT', 'pyproject.toml', 'uv.lock', 'backend/app/main.py',
+                      'backend/app/services/gate_process_identity.py',
                       'frontend/dist/index.html', 'deploy/model-control/prepare-code.sh',
                       'deploy/model-control/verify-release-candidate.py',
                       'deploy/model-control/verify-staged-release.py',
@@ -47,6 +48,7 @@ REQUIRED = frozenset({'COMMIT', 'pyproject.toml', 'uv.lock', 'backend/app/main.p
                       'deploy/model-control/local-idle-composite.py',
                       'deploy/model-control/initial-local-idle.py',
                       'deploy/model-control/observe-direct-llm.py',
+                      'deploy/model-control/observe-llama-listener.py',
                       'deploy/model-control/observe-llama-connections.py',
                       'deploy/model-control/observe-studio-idle.py',
                       'deploy/model-control/restore-legacy-files.py',

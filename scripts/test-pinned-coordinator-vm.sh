@@ -204,6 +204,7 @@ if mode in ('initial-preparation', 'preparation-chain'):
             idle = idle_module.InitialLocalIdle(target / 'deploy/model-control', check_wiki=wiki.check,
                 check_other_callers=lambda: True, check_gpu=lambda: True, llama_key=lambda: '')
             idle.observer.observe = lambda _guard, *, llama_key: llama_key == ''
+            idle.listener.listener_identity = lambda: ('fixture',)
             created.append((wiki, idle))
             return idle
         factory_options = dict(options, journal_dir=factory_deployment, wiki_record_dir=factory_wiki_record,

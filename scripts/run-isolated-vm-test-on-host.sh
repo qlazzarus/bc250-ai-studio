@@ -366,6 +366,77 @@ case $3 in
     guest_script=scripts/test-nft-systemd-restart-vm.sh
     resume=yes
     ;;
+  nft-atomic-refresh-resume)
+    guest_dir="bc250-nft-atomic-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-nft-atomic-refresh-vm.sh
+    resume=yes
+    ;;
+  nft-socket-transfer-resume)
+    guest_dir="bc250-nft-transfer-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-nft-socket-transfer-vm.sh
+    resume=yes
+    ;;
+  nft-pidfd-access-resume)
+    guest_dir="bc250-nft-pidfd-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-nft-pidfd-access-vm.sh
+    resume=yes
+    ;;
+  nft-pidfd-separate-uid-resume)
+    guest_dir="bc250-nft-pidfd-separate-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-nft-pidfd-access-vm.sh
+    guest_extra=' separate-uid'
+    resume=yes
+    ;;
+  llama-listener-resume)
+    guest_dir="bc250-llama-listener-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-llama-listener-vm.sh
+    resume=yes
+    ;;
+  gate-identity-resume)
+    guest_dir="bc250-gate-identity-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-gate-identity-vm.sh
+    resume=yes
+    ;;
+  gate-start-identity-resume)
+    guest_dir="bc250-gate-start-identity-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-gate-start-identity-vm.sh
+    resume=yes
+    ;;
+  gate-real-start-identity-resume)
+    guest_dir="bc250-gate-real-start-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-gate-real-start-identity-vm.sh
+    resume=yes
+    ;;
+  studio-db-permissions-resume)
+    guest_dir="bc250-studio-db-permissions-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-studio-db-permissions-vm.sh
+    resume=yes
+    ;;
+  studio-db-bind-readonly-resume)
+    guest_dir="bc250-studio-db-bind-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-studio-db-bind-readonly-vm.sh
+    resume=yes
+    ;;
+  studio-db-condition-bind-resume)
+    guest_dir="bc250-studio-db-condition-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-studio-db-condition-bind-vm.sh
+    resume=yes
+    ;;
+  db-process-references-resume)
+    guest_dir="bc250-db-reference-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-db-process-references-vm.sh
+    resume=yes
+    ;;
+  db-mapping-references-resume)
+    guest_dir="bc250-db-mapping-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-db-mapping-references-vm.sh
+    resume=yes
+    ;;
+  db-known-processes-resume)
+    guest_dir="bc250-db-known-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-db-known-processes-vm.sh
+    resume=yes
+    ;;
   llama-connection-backup-resume)
     guest_dir="bc250-llama-connection-${RANDOM}-${RANDOM}"
     guest_script=scripts/test-llama-connection-backup-vm.sh
@@ -380,6 +451,12 @@ case $3 in
     guest_dir="bc250-initial-idle-${RANDOM}-${RANDOM}"
     guest_script=scripts/test-coordinator-idle-chain-vm.sh
     guest_extra=' initial'
+    ;;
+  initial-listener-idle-resume)
+    guest_dir="bc250-initial-listener-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-coordinator-idle-chain-vm.sh
+    guest_extra=' initial'
+    resume=yes
     ;;
   coordinator-idle-backup-resume)
     guest_dir="bc250-idle-backup-${RANDOM}-${RANDOM}"

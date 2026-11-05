@@ -259,10 +259,11 @@ async def test_startup_release_keeps_hold_when_model_health_fails():
 
 
 async def test_startup_release_preserves_hold_if_client_credential_check_fails(monkeypatch):
-    from app.services import client_gate_check, gate_admin
+    from app.services import client_gate_check, gate_admin, gate_process_identity
 
     lock, llm = Lock(), LLM()
     calls = []
+    monkeypatch.setattr(gate_process_identity, "observe", lambda **_: (1, 'start', 2, 3))
     monkeypatch.setattr(gate_admin, "coordinated_studio_is_ready", lambda: calls.append("studio"))
     def fail_client(user):
         assert lock.held
@@ -279,9 +280,10 @@ async def test_startup_release_preserves_hold_if_client_credential_check_fails(m
 
 
 async def test_startup_release_verifies_client_while_holding_lock(monkeypatch):
-    from app.services import client_gate_check, gate_admin
+    from app.services import client_gate_check, gate_admin, gate_process_identity
 
     lock, llm = Lock(), LLM()
+    monkeypatch.setattr(gate_process_identity, "observe", lambda **_: (1, 'start', 2, 3))
     monkeypatch.setattr(gate_admin, "coordinated_studio_is_ready", lambda: None)
     def verify_client(user):
         assert lock.held and user == "yeppyshiba"
@@ -291,6 +293,22 @@ async def test_startup_release_verifies_client_while_holding_lock(monkeypatch):
         lambda: gate_admin.coordinated_participants_are_ready("yeppyshiba"),
     )
     assert llm.released and not lock.held
+
+
+async def test_startup_release_rejects_changed_gate_process(monkeypatch):
+    from app.services import client_gate_check, gate_admin, gate_process_identity
+
+    lock, llm = Lock(), LLM()
+    identities = iter(((1, 'old', 2, 3), (1, 'new', 2, 3)))
+    monkeypatch.setattr(gate_process_identity, "observe", lambda **_: next(identities))
+    monkeypatch.setattr(gate_admin, "coordinated_studio_is_ready", lambda: None)
+    monkeypatch.setattr(client_gate_check, "verify_client_gate", lambda _: None)
+    with pytest.raises(RuntimeError, match="Gate process identity changed"):
+        await confirm_startup(
+            lock, Journal(), Client(), llm, Service(), Registry(),
+            lambda: gate_admin.coordinated_participants_are_ready("yeppyshiba"),
+        )
+    assert not llm.released and not lock.held
 
 
 def test_startup_confirmation_checks_both_running_service_configurations(monkeypatch):

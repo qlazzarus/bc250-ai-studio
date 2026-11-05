@@ -15,7 +15,7 @@ for path in "/etc/systemd/system/$wiki" "/etc/systemd/system/$wiki.d" "/etc/syst
 for unit in "$wiki" "$llama" "$studio"; do [[ $(systemctl show "$unit" -p LoadState --value) == not-found ]] || exit 1; done
 [[ -z $(ss -H -ltn 'sport = :18885') ]] || exit 1
 trap 'echo "시험 중단. 시험 unit 및 기록 보존: $fixture $records $backup /etc/systemd/system/$wiki /etc/systemd/system/$llama $marker" >&2' ERR
-for name in coordinated-migration.py migration-journal.py wiki-condition-fence.py wiki-maintenance-fence.py read-systemd-conditions.py verify-wiki-condition.py check-service-cgroup.py backup-archive.sh observe-direct-llm.py local-idle-composite.py initial-local-idle.py legacy-backup-adapter.py legacy-backup-sequence.py inspect-stopped-studio-db.py; do
+for name in coordinated-migration.py migration-journal.py wiki-condition-fence.py wiki-maintenance-fence.py read-systemd-conditions.py verify-wiki-condition.py check-service-cgroup.py backup-archive.sh observe-direct-llm.py observe-llama-listener.py local-idle-composite.py initial-local-idle.py legacy-backup-adapter.py legacy-backup-sequence.py inspect-stopped-studio-db.py; do
   install -o root -g root -m 0644 "$source_dir/deploy/model-control/$name" "$fixture/$name"
 done
 cat > "$fixture/llama.py" <<'PY'
@@ -111,6 +111,8 @@ def setup(name, lose_during_db=False):
             llama_key=lambda: '')
         idle.observer.WIKI, idle.observer.LLAMA = wiki_unit, llama_unit
         idle.observer.SLOTS_URL = observe.SLOTS_URL
+        listener_identity = idle.listener.listener_identity
+        idle.listener.listener_identity = lambda: listener_identity(18885, llama_unit)
     else:
         idle = composite.LocalIdleComposite(check_wiki_fence=wiki.check,
             check_other_callers_fenced=lambda: callers_fenced[0],
@@ -187,6 +189,36 @@ try:
     if mode == 'adapter':
         print('시험 Studio 정지와 DB 검사까지 실제 백업 어댑터 연결 확인', flush=True)
 finally: journal.close()
+if mode == 'initial':
+    subprocess.run(['/usr/bin/systemctl', 'stop', wiki_unit], check=True)
+    idle = initial_idle.InitialLocalIdle(fixture, check_wiki=lambda: True,
+        check_other_callers=lambda: True, check_gpu=lambda: True, llama_key=lambda: '')
+    idle.observer.WIKI, idle.observer.LLAMA = wiki_unit, llama_unit
+    idle.observer.SLOTS_URL = observe.SLOTS_URL
+    identity = idle.listener.listener_identity
+    idle.listener.listener_identity = lambda: identity(18885, llama_unit)
+    original_observe = idle.observer.observe
+    def observe_then_restart(*args, **kwargs):
+        result = original_observe(*args, **kwargs)
+        subprocess.run(['/usr/bin/systemctl', 'restart', llama_unit], check=True, timeout=60)
+        for _ in range(60):
+            try:
+                identity(18885, llama_unit)
+                break
+            except (OSError, ValueError):
+                time.sleep(.5)
+        else:
+            raise RuntimeError('재시작한 시험 llama 수신 대기 시간 초과')
+        return result
+    idle.observer.observe = observe_then_restart
+    try:
+        idle()
+    except ValueError as error:
+        if '관찰 중 서비스 또는 수신 소켓이 변경' not in str(error):
+            raise
+        print('슬롯 관찰 중 시험 llama 재시작 시 유휴 검사 거절 확인', flush=True)
+    else:
+        raise RuntimeError('시험 llama 재시작을 거절하지 못했습니다.')
 if mode == 'adapter':
     subprocess.run(['/usr/bin/systemctl', 'start', studio_unit], check=True)
     runner, wiki, journal, calls, folder = setup('fence-loss', lose_during_db=True)

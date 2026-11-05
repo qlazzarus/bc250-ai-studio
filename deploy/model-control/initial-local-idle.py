@@ -35,9 +35,10 @@ class InitialLocalIdle:
         self.source = Path(source)
         trusted(self.source, directory=True)
         self.observer_path = self.source / 'observe-direct-llm.py'
+        self.listener_path = self.source / 'observe-llama-listener.py'
         self.guard = self.source / 'backup-archive.sh'
         self.cgroup = self.source / 'check-service-cgroup.py'
-        for path in (self.observer_path, self.guard, self.cgroup):
+        for path in (self.observer_path, self.listener_path, self.guard, self.cgroup):
             trusted(path)
         spec = importlib.util.spec_from_file_location('initial_idle_observer', self.observer_path)
         self.observer = importlib.util.module_from_spec(spec)
@@ -45,20 +46,26 @@ class InitialLocalIdle:
         try:
             sys.dont_write_bytecode = True
             spec.loader.exec_module(self.observer)
+            listener_spec = importlib.util.spec_from_file_location('initial_idle_listener', self.listener_path)
+            self.listener = importlib.util.module_from_spec(listener_spec)
+            listener_spec.loader.exec_module(self.listener)
         finally:
             sys.dont_write_bytecode = previous
         self.wiki, self.callers, self.gpu, self.key = check_wiki, check_other_callers, check_gpu, llama_key
 
     def __call__(self):
-        for path in (self.observer_path, self.guard, self.cgroup):
+        for path in (self.observer_path, self.listener_path, self.guard, self.cgroup):
             trusted(path)
         if self.wiki() is not True or self.callers() is not True:
             raise ValueError('직접 호출 차단이 확인되지 않았습니다.')
         key = self.key()
         if not isinstance(key, str):
             raise ValueError('llama 인증 정보를 확인하지 못했습니다.')
+        before = self.listener.listener_identity()
         if self.observer.observe(self.guard, llama_key=key) is not True:
             raise ValueError('llama 상태가 확인되지 않았습니다.')
+        if self.listener.listener_identity() != before:
+            raise ValueError('llama 관찰 중 서비스 또는 수신 소켓이 변경됐습니다.')
         if self.gpu() is not True or self.wiki() is not True or self.callers() is not True:
             raise ValueError('GPU 유휴 또는 직접 호출 차단이 확인되지 않았습니다.')
         return True

@@ -25,11 +25,14 @@ class InitialIdleTest(unittest.TestCase):
             calls.append('llama')
             self.assertEqual(llama_key, 'fixture-key')
             return True
+        def listener_identity():
+            calls.append('listener')
+            return ('pid', 'start', 'namespace', 'socket')
         with patch.object(module.os, 'geteuid', return_value=0), \
              patch.object(module, 'trusted'), \
              patch.object(module.importlib.util, 'spec_from_file_location') as fake_spec, \
              patch.object(module.importlib.util, 'module_from_spec',
-                          return_value=SimpleNamespace(observe=observe)):
+                          return_value=SimpleNamespace(observe=observe, listener_identity=listener_identity)):
             fake_spec.return_value.loader.exec_module.return_value = None
             runner = module.InitialLocalIdle('/fixture', check_wiki=check('wiki'),
                 check_other_callers=check('callers'), check_gpu=check('gpu'),
@@ -40,7 +43,7 @@ class InitialIdleTest(unittest.TestCase):
         runner, calls, _ = self.fixture()
         with patch.object(module, 'trusted'):
             self.assertTrue(runner())
-        self.assertEqual(calls, ['wiki', 'callers', 'llama', 'gpu', 'wiki', 'callers'])
+        self.assertEqual(calls, ['wiki', 'callers', 'listener', 'llama', 'listener', 'gpu', 'wiki', 'callers'])
 
     def test_direct_caller_and_gpu_fail_closed(self):
         for name in ('wiki', 'callers', 'gpu'):
@@ -54,6 +57,14 @@ class InitialIdleTest(unittest.TestCase):
         runner.observer.observe = lambda *_args, **_kwargs: False
         with patch.object(module, 'trusted'), self.assertRaises(ValueError):
             runner()
+
+    def test_listener_change_blocks_before_gpu_check(self):
+        runner, calls, _ = self.fixture()
+        tokens = iter(('old', 'new'))
+        runner.listener.listener_identity = lambda: next(tokens)
+        with patch.object(module, 'trusted'), self.assertRaises(ValueError):
+            runner()
+        self.assertNotIn('gpu', calls)
 
 
 if __name__ == '__main__':
