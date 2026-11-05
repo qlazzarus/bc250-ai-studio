@@ -45,7 +45,7 @@ calls = []
 startup.command = lambda *args, **kwargs: calls.append(args)
 runner = startup.NewServiceStart(release / 'backup-archive.sh',
     check_maintenance=lambda: True, check_release=lambda: True,
-    check_local_idle=lambda: True, check_configuration=check, expected_client_user='vmtest')
+    check_local_idle=lambda: True, check_running=lambda: True, check_configuration=check, expected_client_user='vmtest')
 env = prepare.DIRECTORY / 'worker.env'
 env.write_text('MODEL_CONTROL_SWITCH_ENABLED=true\n')
 try:

@@ -44,7 +44,7 @@ def setup(name, succeed):
     folder.mkdir(mode=0o700)
     journal = journal_module.MigrationJournal(folder)
     # Gate and other fences are explicitly simulated in this fixture.
-    gates = {'held': True}
+    gates = {'startup': True, 'deployment': True}
     held = fence.AdvisoryGPUFence(lock, group_id=0)
     prepare = lambda: subprocess.run(['/usr/bin/systemd-tmpfiles', '--create', str(config)], check=True) is not None
     guard = handoff.GPULockHandoff(fence=held, old_generation_gone=lambda: True,
@@ -54,8 +54,9 @@ def setup(name, succeed):
         result = subprocess.run(['/usr/bin/python3', '-c', probe, str(lock)], check=False)
         if result.returncode != 0: raise RuntimeError('시작 확인이 시험 잠금을 획득하지 못했습니다.')
         return succeed
-    runner = sequence.StartupLockSequence(record=journal, check_pre_handoff=lambda: gates['held'],
-        prepare_tmpfiles=prepare, handoff=guard, check_before_confirm=lambda: gates['held'], confirm_startup=confirm)
+    runner = sequence.StartupLockSequence(record=journal, check_pre_handoff=lambda: gates['startup'],
+        prepare_tmpfiles=prepare, handoff=guard, check_before_confirm=lambda: gates['startup'],
+        check_deployment_hold=lambda: gates['deployment'], confirm_startup=confirm)
     return runner, held, journal, folder, gates
 
 runner, held, journal, folder, gates = setup('success', True)
@@ -75,10 +76,24 @@ try:
     except sequence.StartupLockError: pass
     else: raise RuntimeError('시험 시작 확인 실패를 허용했습니다.')
     rows = [json.loads(line)['event'] for line in (folder / 'migration-events.jsonl').read_text().splitlines()]
-    if rows[-1] != 'startup_lock_transfer:released' or not gates['held'] or held.fd is not None:
+    if rows[-1] != 'startup_lock_transfer:released' or not gates['startup'] or held.fd is not None:
         raise RuntimeError('시험 인계 후 실패 기록 또는 상태 오류')
     print('시험 인계 후 확인 실패 시 미완료 기록과 모의 startup 보류 유지 확인', flush=True)
 finally: journal.close()
+runner, held, journal, folder, gates = setup('lost-deployment', True)
+try:
+    runner.begin()
+    gates['deployment'] = False
+    try: runner.confirm_after_client_restart()
+    except sequence.StartupLockError: pass
+    else: raise RuntimeError('시험 배포 보류 상실을 허용했습니다.')
+    rows = [json.loads(line)['event'] for line in (folder / 'migration-events.jsonl').read_text().splitlines()]
+    if rows[-1] != 'startup_lock:confirmed' or held.fd is None or not held.check():
+        raise RuntimeError('시험 보류 상실 후 잠금 또는 기록이 다릅니다.')
+    print('모의 배포 보류 상실 시 시작 확인 전 중단과 시험 잠금 유지 확인', flush=True)
+finally:
+    if held.fd is not None: held.release()
+    journal.close()
 print('Studio·gate·Client·GPU 안전·직접 호출 차단과 실제 시작 확인은 모의입니다.', flush=True)
 PY
 echo "시험 파일 보관: $fixture $tools $records"

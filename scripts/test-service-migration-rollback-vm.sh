@@ -185,7 +185,7 @@ adapter_module.STUDIO_DATABASE.parent.mkdir(parents=True, exist_ok=True)
 with sqlite3.connect(adapter_module.STUDIO_DATABASE) as db:
     db.execute('CREATE TABLE jobs (status TEXT)')
     db.execute('CREATE TABLE system_state (key TEXT, value TEXT)')
-adapter = adapter_module.LegacyBackupAdapter(adapterdir, fixture, check_local_idle=lambda: True)
+adapter = adapter_module.LegacyBackupAdapter(adapterdir, fixture, check_local_idle=lambda: True, check_database_fence=lambda: True)
 adapter.migration.URL = 'http://127.0.0.1:18883/control'
 caddy_base = os.environ.get('BC250_FIXTURE_CADDY_BASE')
 if caddy_base:

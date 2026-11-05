@@ -102,6 +102,7 @@ guard = handoff.GPULockHandoff(fence=held, old_generation_gone=lambda: True,
     other_callers_blocked=lambda: True, gpu_safe=lambda: True, prepare_new_lock=lambda: lock.is_file())
 runner = sequence.StartupLockSequence(record=journal, check_pre_handoff=startup_held,
     prepare_tmpfiles=lambda: True, handoff=guard, check_before_confirm=startup_held,
+    check_deployment_hold=lambda: 'admin-fixture' in request('GET')['holds'],
     confirm_startup=confirm_then_lose_response)
 try:
     runner.begin()

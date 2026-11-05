@@ -34,6 +34,11 @@ jobs:
           set -euo pipefail
           for test in \
             scripts/test-assemble-phase-safety.py \
+            scripts/test-startup-phase-checks.py \
+            scripts/test-startup-lock-sequence.py \
+            scripts/test-deployment-hold-check.py \
+            scripts/test-generation-bound-startup.py \
+            scripts/test-generation-release-required.py \
             scripts/test-local-idle-composite.py \
             scripts/test-initial-local-idle.py \
             scripts/test-legacy-backup-idle.py \

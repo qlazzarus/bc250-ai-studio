@@ -64,7 +64,24 @@ class NoBytecodeRunner:
             return self.runner.finish_after_client_restart()
 
 
-def authenticated_checker(*, root, archive, bootstrap_checker, bootstrap_sha256, commit, artifact_sha256):
+class ProvenanceBoundCheck:
+    """Require caller-supplied provenance and staged-tree checks on every use."""
+    def __init__(self, checker, verify_provenance):
+        if not callable(checker) or not callable(verify_provenance):
+            raise ValueError('릴리스와 출처 검사기가 필요합니다.')
+        self.checker = checker
+        self.verify_provenance = verify_provenance
+
+    def __call__(self, commit, artifact_sha256):
+        if self.verify_provenance(commit, artifact_sha256) is not True:
+            raise ValueError('릴리스 출처 확인이 실패했습니다.')
+        if self.checker(commit, artifact_sha256) is not True:
+            raise ValueError('스테이징 릴리스 검증이 실패했습니다.')
+        return True
+
+
+def authenticated_checker(*, root, archive, bootstrap_checker, bootstrap_sha256, commit, artifact_sha256,
+                          verify_provenance):
     if (os.geteuid() != 0 or not re.fullmatch(r'[0-9a-f]{64}', bootstrap_sha256)):
         raise ValueError('root와 독립적으로 신뢰한 검사기 해시가 필요합니다.')
     root, bootstrap = Path(root), Path(bootstrap_checker)
@@ -80,17 +97,19 @@ def authenticated_checker(*, root, archive, bootstrap_checker, bootstrap_sha256,
         if any(getattr(before, name) != getattr(after, name) for name in attributes):
             raise ValueError('부트스트랩 검사기 로딩 중 파일이 변경됐습니다.')
         checker = checker_module.StagedReleaseCheck(archive, root, commit, artifact_sha256)
-        checker(commit, artifact_sha256)
-        return checker
+        bound = ProvenanceBoundCheck(checker, verify_provenance)
+        bound(commit, artifact_sha256)
+        return bound
 
 
 def prepare_initial(*, root, archive, bootstrap_checker, bootstrap_sha256, journal_dir,
-                    commit, artifact_sha256):
+                    commit, artifact_sha256, verify_provenance):
     """Record and prepare first-install settings against the authenticated tree."""
     root = Path(root)
     with no_bytecode():
         checker = authenticated_checker(root=root, archive=archive, bootstrap_checker=bootstrap_checker,
-            bootstrap_sha256=bootstrap_sha256, commit=commit, artifact_sha256=artifact_sha256)
+            bootstrap_sha256=bootstrap_sha256, commit=commit, artifact_sha256=artifact_sha256,
+            verify_provenance=verify_provenance)
         source = root / 'deploy/model-control'
         prepare_module = load('authenticated_initial_preparation', source / 'prepare-initial-settings.py')
         journal_module = load('initial_preparation_journal', source / 'migration-journal.py')
@@ -106,13 +125,15 @@ def prepare_initial(*, root, archive, bootstrap_checker, bootstrap_sha256, journ
 
 
 def assemble(*, root, archive, bootstrap_checker, bootstrap_sha256, snapshot, journal_dir,
-             commit, artifact_sha256, expected_client_user, preflight, check_local_idle,
+             commit, artifact_sha256, expected_client_user, preflight, check_local_idle, check_running,
+             check_database_fence, studio_generation,
              check_caddy_transition, check_restored, install, verify_new, verify_restored, initial_install_paths=None,
-             preparation_record=None, wiki_record_dir=None, initial_idle_factory=None):
+             preparation_record=None, wiki_record_dir=None, initial_idle_factory=None, verify_provenance=None):
     root = Path(root)
     with no_bytecode():
         checker = authenticated_checker(root=root, archive=archive, bootstrap_checker=bootstrap_checker,
-            bootstrap_sha256=bootstrap_sha256, commit=commit, artifact_sha256=artifact_sha256)
+            bootstrap_sha256=bootstrap_sha256, commit=commit, artifact_sha256=artifact_sha256,
+            verify_provenance=verify_provenance)
         source = root / 'deploy/model-control'
         if initial_install_paths is not None:
             if preparation_record is None:
@@ -130,7 +151,9 @@ def assemble(*, root, archive, bootstrap_checker, bootstrap_sha256, snapshot, jo
             source=source, snapshot=snapshot, journal_dir=journal_dir, commit=commit,
             artifact_sha256=artifact_sha256, checker_sha256=settings_sha256,
             expected_client_user=expected_client_user, verify_release=checker,
-            preflight=preflight, check_local_idle=check_local_idle,
+            preflight=preflight, check_local_idle=check_local_idle, check_running=check_running,
+            check_database_fence=check_database_fence,
+            studio_generation=studio_generation,
             check_caddy_transition=check_caddy_transition, check_restored=check_restored,
             install=install, verify_new=verify_new, verify_restored=verify_restored,
             initial_install_paths=initial_install_paths, wiki_record_dir=wiki_record_dir,

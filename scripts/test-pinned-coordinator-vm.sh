@@ -21,6 +21,7 @@ restorecon -RF "$tools" "$fixture" "$records"
 python3 - "$source_dir" "$tools" "$fixture" "$records" "$snapshot" "$mode" <<'PY'
 import hashlib
 import importlib.util
+from types import SimpleNamespace
 import io
 import json
 import secrets
@@ -136,7 +137,19 @@ if mode in ('record-release', 'record-release-gate'):
 if mode in ('initial-preparation', 'preparation-chain'):
     def preparation_args(directory, bootstrap_digest):
         return dict(root=target, archive=archive_path, bootstrap_checker=bootstrap,
-            bootstrap_sha256=bootstrap_digest, journal_dir=directory, commit=commit, artifact_sha256=digest)
+            bootstrap_sha256=bootstrap_digest, journal_dir=directory, commit=commit, artifact_sha256=digest, verify_provenance=lambda *_: True)
+    provenance_record = records / 'bad-provenance'
+    provenance_record.mkdir(mode=0o700)
+    try:
+        pinned.prepare_initial(**dict(preparation_args(provenance_record, bootstrap_hash),
+                                      verify_provenance=lambda *_: False))
+    except ValueError:
+        pass
+    else:
+        raise SystemExit('시험 출처 검사 실패가 허용됐습니다.')
+    if (provenance_record / 'migration-events.jsonl').exists() or (fixture / 'state').exists():
+        raise SystemExit('시험 출처 거절 전에 기록 또는 상태가 생성됐습니다.')
+    print('모의 출처 검사 실패 시 준비 기록·상태 생성 전 거절 확인', flush=True)
     wrong = ('0' if bootstrap_hash[0] != '0' else '1') + bootstrap_hash[1:]
     try:
         pinned.prepare_initial(**preparation_args(bad_record, wrong))
@@ -167,8 +180,9 @@ if mode in ('initial-preparation', 'preparation-chain'):
         wiki_blocked = [False]
         options = dict(root=target, archive=archive_path, bootstrap_checker=bootstrap,
             bootstrap_sha256=bootstrap_hash, snapshot=snapshot, journal_dir=deployment,
-            commit=commit, artifact_sha256=digest, expected_client_user='vmtest',
-            preflight=lambda: True, check_local_idle=lambda: wiki_blocked[0], check_caddy_transition=lambda: True, check_restored=lambda: True,
+            commit=commit, artifact_sha256=digest, verify_provenance=lambda *_: True, expected_client_user='vmtest',
+            preflight=lambda: True, check_local_idle=lambda: wiki_blocked[0], check_running=lambda: True, check_database_fence=lambda: True, studio_generation=SimpleNamespace(
+            mark_stopped=lambda: True, bind_replacement=lambda: True, check=lambda: True), check_caddy_transition=lambda: True, check_restored=lambda: True,
             install=None, initial_install_paths=paths, wiki_record_dir=wiki_record,
             verify_new=lambda: True, verify_restored=lambda: True)
         try:
@@ -179,8 +193,21 @@ if mode in ('initial-preparation', 'preparation-chain'):
             raise SystemExit('미완료 시험 준비 기록이 허용됐습니다.')
         if (deployment / 'migration-events.jsonl').exists():
             raise SystemExit('준비 기록 거절 전에 배포 기록이 생성됐습니다.')
+        missing_fence = dict(options, check_database_fence=None)
+        try:
+            pinned.assemble(**missing_fence, preparation_record=good_record)
+        except ValueError:
+            pass
+        else:
+            raise SystemExit('DB 쓰기 차단 검사기 없이 고정 시험 조립이 허용됐습니다.')
+        if (deployment / 'migration-events.jsonl').exists():
+            raise SystemExit('DB 차단 검사기 거절 전에 배포 기록이 생성됐습니다.')
+        print('고정 릴리스 조립에서 DB 차단 검사기 누락 거절 확인', flush=True)
         runner, journal = pinned.assemble(**options, preparation_record=good_record)
         try:
+            if runner.runner.backup.check_database_fence is not options['check_database_fence']:
+                raise SystemExit('시험 DB 차단 검사기가 고정 조립을 통해 전달되지 않았습니다.')
+            print('고정 릴리스 조립에서 모의 DB 차단 검사기 전달 확인', flush=True)
             if runner.phase != 'new' or runner.runner.preflight() is not True:
                 raise SystemExit('Wiki 차단 전 시험 사전 검증에 실패했습니다.')
             runner.runner.wiki_fence.check = lambda: wiki_blocked[0]
@@ -228,8 +255,9 @@ if mode in ('initial-preparation', 'preparation-chain'):
 def args(directory, bootstrap_digest):
     return dict(root=target, archive=archive_path, bootstrap_checker=bootstrap,
         bootstrap_sha256=bootstrap_digest, snapshot=snapshot, journal_dir=directory,
-        commit=commit, artifact_sha256=digest, expected_client_user='vmtest',
-        preflight=lambda: True, check_local_idle=lambda: True, check_caddy_transition=lambda: True, check_restored=lambda: True,
+        commit=commit, artifact_sha256=digest, verify_provenance=lambda *_: True, expected_client_user='vmtest',
+        preflight=lambda: True, check_local_idle=lambda: True, check_running=lambda: True, check_database_fence=lambda: True, studio_generation=SimpleNamespace(
+            mark_stopped=lambda: True, bind_replacement=lambda: True, check=lambda: True), check_caddy_transition=lambda: True, check_restored=lambda: True,
         install=lambda _: True, verify_new=lambda: True, verify_restored=lambda: True)
 if mode == 'initial-install':
     paths = {}

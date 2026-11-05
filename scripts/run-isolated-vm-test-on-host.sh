@@ -200,6 +200,116 @@ case $3 in
     guest_script=scripts/test-assemble-coordinator-vm.sh
     resume=yes
     ;;
+  generation-release-required-resume)
+    guest_dir="bc250-generation-release-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-generation-release-required-vm.sh
+    resume=yes
+    ;;
+  studio-candidate-bound-startup-resume)
+    guest_dir="bc250-studio-bound-startup-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-studio-candidate-bound-startup-vm.sh
+    resume=yes
+    ;;
+  startup-phase-checks-resume)
+    guest_dir="bc250-startup-phase-checks-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-startup-phase-checks-vm.sh
+    resume=yes
+    ;;
+  studio-candidate-generation-resume)
+    guest_dir="bc250-studio-candidate-generation-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-studio-candidate-generation-vm.sh
+    resume=yes
+    ;;
+  studio-observed-generation-resume)
+    guest_dir="bc250-studio-observed-generation-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-studio-observed-generation-vm.sh
+    resume=yes
+    ;;
+  studio-process-observer-resume)
+    guest_dir="bc250-studio-process-observer-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-studio-process-observer-vm.sh
+    resume=yes
+    ;;
+  studio-generation-boundary-resume)
+    guest_dir="bc250-studio-generation-boundary-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-studio-generation-boundary-vm.sh
+    resume=yes
+    ;;
+  studio-generation-service-resume)
+    guest_dir="bc250-studio-generation-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-studio-generation-service-vm.sh
+    resume=yes
+    ;;
+  old-studio-process-watch-resume)
+    guest_dir="bc250-old-studio-watch-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-old-studio-process-watch-vm.sh
+    resume=yes
+    ;;
+  intake-ssh-stream-stage-resume)
+    guest_dir="bc250-intake-ssh-stream-stage-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-intake-ssh-stream-stage-vm.sh
+    resume=yes
+    ;;
+  intake-ssh-stream-resume)
+    guest_dir="bc250-intake-ssh-stream-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-intake-ssh-stream-vm.sh
+    resume=yes
+    ;;
+  intake-ssh-receive-resume)
+    guest_dir="bc250-intake-ssh-receive-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-intake-ssh-receive-vm.sh
+    resume=yes
+    ;;
+  intake-ssh-boundary-resume)
+    guest_dir="bc250-intake-ssh-boundary-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-intake-ssh-boundary-vm.sh
+    resume=yes
+    ;;
+  intake-sudo-boundary-resume)
+    guest_dir="bc250-intake-sudo-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-intake-sudo-boundary-vm.sh
+    resume=yes
+    ;;
+  intake-ssh-linked-resume)
+    guest_dir="bc250-intake-ssh-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-intake-ssh-linked-vm.sh
+    resume=yes
+    ;;
+  intake-stage-linked-resume)
+    guest_dir="bc250-intake-stage-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-intake-stage-linked-vm.sh
+    resume=yes
+    ;;
+  intake-artifact-resume)
+    guest_dir="bc250-intake-artifact-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-intake-authenticated-artifact-vm.sh
+    resume=yes
+    ;;
+  trusted-offline-coordinator-resume)
+    guest_dir="bc250-trusted-coordinator-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-trusted-offline-coordinator-vm.sh
+    resume=yes
+    ;;
+  trusted-offline-check-resume)
+    guest_dir="bc250-trusted-offline-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-trusted-offline-check-vm.sh
+    resume=yes
+    ;;
+  offline-bound-stage-resume)
+    guest_dir="bc250-offline-bound-stage-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-offline-bound-stage-vm.sh
+    resume=yes
+    ;;
+  offline-attestation-resume)
+    guest_dir="bc250-offline-attestation-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-offline-attestation-vm.sh
+    resume=yes
+    ;;
+  attested-stage-resume)
+    guest_dir="bc250-attested-stage-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-attested-stage-vm.sh
+    resume=yes
+    ;;
   staged-release-resume)
     guest_dir="bc250-staged-release-${RANDOM}-${RANDOM}"
     guest_script=scripts/test-staged-release-vm.sh
@@ -349,6 +459,11 @@ case $3 in
     guest_script=scripts/test-deployment-hold-vm.sh
     resume=yes
     ;;
+  startup-lock-sequence-resume)
+    guest_dir="bc250-startup-lock-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-startup-lock-sequence-vm.sh
+    resume=yes
+    ;;
   startup-lock-sequence-boot)
     guest_dir="bc250-startup-lock-${RANDOM}-${RANDOM}"
     guest_script=scripts/test-startup-lock-sequence-vm.sh
@@ -405,6 +520,44 @@ case $3 in
   gate-real-start-identity-resume)
     guest_dir="bc250-gate-real-start-${RANDOM}-${RANDOM}"
     guest_script=scripts/test-gate-real-start-identity-vm.sh
+    resume=yes
+    ;;
+  db-restart-generation-race-resume)
+    guest_dir="bc250-db-restart-race-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-db-restart-generation-race-vm.sh
+    resume=yes
+    ;;
+  db-services-reboot-prepare-resume)
+    guest_dir="bc250-db-reboot-prepare-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-db-services-reboot-vm.sh
+    guest_extra=' prepare'
+    resume=yes
+    ;;
+  db-services-reboot-verify-resume)
+    guest_dir="bc250-db-reboot-verify-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-db-services-reboot-vm.sh
+    guest_extra=' verify'
+    resume=yes
+    ;;
+  db-service-stop-reexec-resume)
+    guest_dir="bc250-db-stop-reexec-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-db-service-restart-fence-vm.sh
+    guest_extra=' reexec'
+    resume=yes
+    ;;
+  db-service-restart-fence-resume)
+    guest_dir="bc250-db-restart-fence-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-db-service-restart-fence-vm.sh
+    resume=yes
+    ;;
+  db-sqlite-writer-lock-resume)
+    guest_dir="bc250-sqlite-lock-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-db-sqlite-writer-lock-vm.sh
+    resume=yes
+    ;;
+  db-directory-ownership-resume)
+    guest_dir="bc250-db-owner-${RANDOM}-${RANDOM}"
+    guest_script=scripts/test-db-directory-ownership-vm.sh
     resume=yes
     ;;
   studio-db-permissions-resume)
@@ -512,7 +665,7 @@ case $3 in
     resume=yes
     ;;
   current-studio-code-resume)
-    guest_dir=bc250-current-studio-code-source
+    guest_dir="bc250-current-studio-code-${RANDOM}-${RANDOM}"
     guest_script=scripts/test-current-studio-code-vm.sh
     resume=yes
     ;;
@@ -586,6 +739,17 @@ if [[ $resume == yes ]]; then
     "mkdir -m 700 \"\$HOME/$guest_dir\""
   scp "${ssh_options[@]}" -P 22223 "$archive" \
     "vmtest@127.0.0.1:$guest_dir/source.tar.gz" </dev/null
+  if [[ $3 == intake-ssh-linked-resume ]]; then
+    transfer_dir=$(mktemp -d "$HOME/bc250-intake-ssh.XXXXXXXX")
+    tar -xOzf "$archive" attested-candidate.tar.gz > "$transfer_dir/candidate.tar.gz"
+    printf '%s  %s\n' 'f86034fca0fee64df141d2b80a9532a9785ee04bb3af86ecc78d90e48359b7d8' \
+      "$transfer_dir/candidate.tar.gz" | sha256sum -c -
+    ssh -n "${ssh_options[@]}" -p 22223 vmtest@127.0.0.1 \
+      "mkdir -m 700 \"\$HOME/$guest_dir/upload\""
+    scp "${ssh_options[@]}" -P 22223 "$transfer_dir/candidate.tar.gz" \
+      "vmtest@127.0.0.1:$guest_dir/upload/candidate.tar.gz" </dev/null
+    echo "별도 시험 SSH 후보 전송 완료; 호스트 시험 파일 보관: $transfer_dir"
+  fi
   ssh -n "${ssh_options[@]}" -p 22223 vmtest@127.0.0.1 \
     "set -e; cd \"\$HOME/$guest_dir\"; \
      printf '%s  %s\\n' '$expected' source.tar.gz | sha256sum -c -; \

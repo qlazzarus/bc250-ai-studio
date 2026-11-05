@@ -112,6 +112,26 @@ fd = os.open(sys.argv[1], os.O_RDWR)
 os.close(fd)
 print('시험 소유자 계정이 파일 권한을 되돌리고 다시 열 수 있음 확인', flush=True)
 PY
+# Use a separate disposable file: never replace the SQLite fixture itself.
+install -o root -g root -m 0400 /dev/null "$fixture/owner-probe"
+restorecon -F "$fixture/owner-probe"
+runuser -u ai-studio -- python3 - "$fixture/owner-probe" <<'PY'
+import os
+import sys
+path = sys.argv[1]
+try:
+    os.chmod(path, 0o600)
+except PermissionError:
+    print('root 소유 시험 파일의 소유자 권한 복원 거절 확인', flush=True)
+else:
+    raise SystemExit('시험 계정이 root 소유 파일 권한을 변경했습니다.')
+try:
+    os.unlink(path)
+except PermissionError:
+    print('쓰기 가능한 시험 상위 디렉터리에서 파일 삭제 거절 관찰', flush=True)
+else:
+    print('쓰기 가능한 시험 상위 디렉터리에서 root 소유 파일 삭제 가능 확인', flush=True)
+PY
 if ! systemctl stop "$unit" 2>/dev/null; then
   [[ $(systemctl show "$unit" -p LoadState --value) == not-found ]] || {
     echo '시험 서비스 정지 상태를 확인하지 못했습니다.' >&2; false;

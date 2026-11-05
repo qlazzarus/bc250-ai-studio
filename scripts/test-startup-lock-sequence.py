@@ -28,12 +28,13 @@ class Handoff:
 
 
 class StartupTest(unittest.TestCase):
-    def fixture(self, confirm):
+    def fixture(self, confirm, deployment=None):
         events = []
         handoff = Handoff()
+        deployment = deployment if deployment is not None else {'held': True}
         runner = module.StartupLockSequence(record=events.append, check_pre_handoff=lambda: True,
             prepare_tmpfiles=lambda: True, handoff=handoff, check_before_confirm=lambda: True,
-            confirm_startup=lambda: confirm(handoff))
+            check_deployment_hold=lambda: deployment['held'], confirm_startup=lambda: confirm(handoff))
         return runner, handoff, events
 
     def test_confirmation_runs_after_lock_is_released(self):
@@ -71,6 +72,49 @@ class StartupTest(unittest.TestCase):
         with self.assertRaises(module.StartupLockError):
             runner.confirm_after_client_restart()
         self.assertEqual(gate['attempts'], 1)
+
+    def test_missing_deployment_hold_keeps_lock_and_skips_confirmation(self):
+        hold = {'held': True}
+        attempts = []
+        runner, handoff, events = self.fixture(lambda _: attempts.append(True) or True, hold)
+        runner.begin()
+        hold['held'] = False
+        with self.assertRaises(module.StartupLockError):
+            runner.confirm_after_client_restart()
+        self.assertTrue(handoff.held)
+        self.assertEqual(attempts, [])
+        self.assertEqual(events[-1], 'startup_lock:confirmed')
+
+    def test_hold_loss_during_acquire_preserves_lock_without_confirmation(self):
+        hold = {'held': True}
+        runner, handoff, events = self.fixture(lambda _: True, hold)
+        acquire = handoff.acquire
+        def lose_hold():
+            result = acquire()
+            hold['held'] = False
+            return result
+        handoff.acquire = lose_hold
+        with self.assertRaises(module.StartupLockError):
+            runner.begin()
+        self.assertTrue(handoff.held)
+        self.assertEqual(events[-1], 'startup_lock:begin')
+
+    def test_hold_loss_after_release_stops_before_confirmation(self):
+        hold = {'held': True}
+        attempts = []
+        runner, handoff, events = self.fixture(lambda _: attempts.append(True) or True, hold)
+        release = handoff.release
+        def lose_hold(*, can_release):
+            result = release(can_release=can_release)
+            hold['held'] = False
+            return result
+        handoff.release = lose_hold
+        runner.begin()
+        with self.assertRaises(module.StartupLockError):
+            runner.confirm_after_client_restart()
+        self.assertFalse(handoff.held)
+        self.assertEqual(attempts, [])
+        self.assertEqual(events[-1], 'startup_lock_transfer:released')
 
 
 if __name__ == '__main__':

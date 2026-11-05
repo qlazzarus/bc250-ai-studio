@@ -43,6 +43,7 @@ import json
 import shutil
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -245,6 +246,43 @@ async def main():
             or status.get('deployment_generation') != generation):
         raise RuntimeError('시험 gate 재시작 후 보류가 보존되지 않았습니다.')
     print('시험 gate 재시작 후 배포 보류 보존과 startup 보류 재생성 확인', flush=True)
+    def load_fixture(name, filename):
+        fixture_spec = importlib.util.spec_from_file_location(name, Path(sys.argv[4]) / 'deploy/model-control' / filename)
+        fixture_module = importlib.util.module_from_spec(fixture_spec)
+        fixture_spec.loader.exec_module(fixture_module)
+        return fixture_module
+    lock_module = load_fixture('fixture_gpu_fence', 'advisory-gpu-fence.py')
+    handoff_module = load_fixture('fixture_gpu_handoff', 'gpu-lock-handoff.py')
+    sequence_module = load_fixture('fixture_start_sequence', 'startup-lock-sequence.py')
+    hold_module = load_fixture('fixture_deployment_check', 'deployment-hold-check.py')
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    def authenticated_status():
+        req = urllib.request.Request(settings.admission_url,
+            headers={'Authorization': 'Bearer ' + settings.admission_key})
+        with opener.open(req, timeout=10) as response:
+            raw = response.read(65537)
+        if len(raw) > 65536:
+            raise RuntimeError('시험 gate 응답 크기 오류')
+        return json.loads(raw)
+    # Ownership and other safety barriers remain simulated, not proven by generation.
+    hold_check = hold_module.DeploymentHoldCheck(generation=generation, fetch_status=authenticated_status,
+        matches_record=lambda state: record_inspector.matches_recorded_generation(Path(sys.argv[3]), state),
+        check_ownership=lambda _: True)
+    lock_path = Path(sys.argv[2]) / 'startup-sequence.lock'
+    lock_path.touch(mode=0o600, exist_ok=False)
+    real_lock = lock_module.AdvisoryGPUFence(lock_path, group_id=0)
+    handoff = handoff_module.GPULockHandoff(fence=real_lock, old_generation_gone=lambda: True,
+        other_callers_blocked=lambda: True, gpu_safe=lambda: True, prepare_new_lock=lambda: lock_path.is_file())
+    lock_records = Path(sys.argv[3]) / 'startup-lock'
+    lock_records.mkdir(mode=0o700)
+    lock_journal = journal_module.MigrationJournal(lock_records)
+    lock_confirm = []
+    sequence = sequence_module.StartupLockSequence(record=lock_journal, check_pre_handoff=lambda: True,
+        prepare_tmpfiles=lambda: True, handoff=handoff, check_before_confirm=lambda: True,
+        check_deployment_hold=hold_check, confirm_startup=lambda: lock_confirm.append(True) or True)
+    if not sequence.begin() or not real_lock.check():
+        raise RuntimeError('시험 gate 보류와 잠금 연결 실패')
+    print('인증된 시험 gate·기록의 배포 보류 세대로 시험 잠금 획득 확인', flush=True)
     await mutate_fixture_hold('PUT', 'admin-fixture')
     await mutate_fixture_hold('PUT', 'startup')
     lock = Lock()
@@ -275,6 +313,17 @@ async def main():
             Path(sys.argv[3]), release_commit, release_digest, release_checker, status):
         raise RuntimeError('이전 시험 기록을 재생성 gate 세대에 결합했습니다.')
     print('시험 보류 재생성 시 이전 기록의 세대 불일치 확인', flush=True)
+    try:
+        sequence.confirm_after_client_restart()
+    except sequence_module.StartupLockError:
+        pass
+    else:
+        raise RuntimeError('바뀐 시험 gate 보류의 잠금 인계가 허용됐습니다.')
+    if lock_confirm or real_lock.fd is None or not real_lock.check():
+        raise RuntimeError('세대 불일치 후 시험 잠금 또는 확인 상태 오류')
+    real_lock.release()
+    lock_journal.close()
+    print('시험 gate 보류 세대 변경 시 확인 전 중단과 시험 잠금 유지 확인', flush=True)
     await gate.release_deployment_hold(replacement)
 
 try:

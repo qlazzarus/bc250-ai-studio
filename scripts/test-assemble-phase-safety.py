@@ -25,6 +25,14 @@ class TestAssemblyPhases(unittest.TestCase):
         def caddy_check():
             calls.append('caddy')
             return True
+        def running():
+            calls.append('running')
+            if state.get('drop_during_running'):
+                state['fenced'] = False
+            return True
+        def generation_check():
+            calls.append('generation')
+            return state.get('generation_ok', True)
         class Caddy:
             def __init__(self, source, snapshot, *, check_local_idle, check_restored):
                 self.check = check_local_idle
@@ -32,11 +40,12 @@ class TestAssemblyPhases(unittest.TestCase):
                 if not self.check():
                     raise ValueError('transition blocked')
         class Backup:
-            def __init__(self, source, snapshot, *, check_local_idle):
+            def __init__(self, source, snapshot, *, check_local_idle, check_database_fence):
                 self.check = check_local_idle
+                self.database_fence = check_database_fence
             def maintenance(self): return True
         class Startup:
-            def __init__(self, *args, **kwargs): pass
+            def __init__(self, *args, **kwargs): self.running = kwargs['check_running']
         class Fence:
             def __init__(self, *args, **kwargs): pass
             def check(self):
@@ -69,7 +78,10 @@ class TestAssemblyPhases(unittest.TestCase):
             runner, _ = module.assemble(source='/tmp/source', snapshot='/tmp/snapshot', journal_dir='/tmp/journal',
                 commit='a' * 40, artifact_sha256='b' * 64, checker_sha256='c' * 64,
                 expected_client_user='fixture', verify_release=lambda *_: True,
-                preflight=lambda: True, check_local_idle=None if use_factory else idle,
+                preflight=lambda: True, check_local_idle=None if use_factory else idle, check_running=running,
+                check_database_fence=lambda: True,
+                studio_generation=SimpleNamespace(mark_stopped=lambda: True,
+                    bind_replacement=lambda: True, check=generation_check),
                 initial_idle_factory=idle_factory if use_factory else None, check_caddy_transition=caddy_check,
                 check_restored=lambda: True, install=None if initial else lambda _: True,
                 verify_new=lambda: True, verify_restored=lambda: True,
@@ -88,6 +100,16 @@ class TestAssemblyPhases(unittest.TestCase):
             self.assertEqual(calls[-3:], ['wiki', 'idle', 'wiki'])
             state['drop_during_idle'] = True
             self.assertFalse(runner.backup_adapter.check())
+            state['fenced'] = True
+            self.assertTrue(runner.startup.startup.running())
+            self.assertEqual(calls[-5:], ['generation', 'wiki', 'running', 'wiki', 'generation'])
+            state['drop_during_running'] = True
+            self.assertFalse(runner.startup.startup.running())
+            state['fenced'] = True
+            state['generation_ok'] = False
+            calls.clear()
+            self.assertFalse(runner.startup.startup.running())
+            self.assertEqual(calls, ['generation'])
         else:
             self.assertFalse(runner.preflight())
             self.assertEqual(calls, ['idle'])

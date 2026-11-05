@@ -28,6 +28,7 @@ backup = load('backup', 'legacy-backup-adapter.py')
 connections = load('connections', 'observe-llama-connections.py')
 adapter = backup.LegacyBackupAdapter.__new__(backup.LegacyBackupAdapter)
 adapter.check_local_idle = lambda: True
+adapter.check_database_fence = lambda: True  # fixture only
 adapter.require_stopped = lambda: None
 adapter.llama_connections = connections
 calls = []

@@ -134,6 +134,7 @@ def setup(name, lose_during_db=False):
             adapter.studio_db = SimpleNamespace(inspect=inspect_then_lose)
         adapter.maintenance = lambda: True
         adapter.check_local_idle = idle
+        adapter.check_database_fence = lambda: True  # fixture only
         state = {'paused': True, 'active_requests': 0, 'waiting_requests': 0}
         def capture_pause():
             idle()

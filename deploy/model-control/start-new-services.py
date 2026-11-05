@@ -146,33 +146,34 @@ except Exception:
 
 class NewServiceStart:
     def __init__(self, guard_script, *, check_maintenance, check_release, check_local_idle,
-                 check_configuration, expected_client_user):
+                 check_running, check_configuration, expected_client_user):
         if (os.geteuid() != 0 or not all(callable(x) for x in
-                (check_maintenance, check_release, check_local_idle, check_configuration))
+                (check_maintenance, check_release, check_local_idle, check_running, check_configuration))
                 or not re.fullmatch(r'[a-z_][a-z0-9_-]{0,31}', expected_client_user)):
             raise ValueError('root와 필수 검증 조건이 필요합니다.')
         self.guard_script = Path(guard_script)
         self.check_maintenance = check_maintenance
         self.check_release = check_release
         self.check_local_idle = check_local_idle
+        self.check_running = check_running
         self.check_configuration = check_configuration
         self.client_user = expected_client_user
 
-    def preconditions(self):
+    def preconditions(self, safety_check):
         trusted_file(self.guard_script)
         trusted_file(self.guard_script.with_name('check-service-cgroup.py'))
         if (self.check_maintenance() is not True or self.check_release() is not True
-                or self.check_local_idle() is not True or self.check_configuration() is not True):
-            raise StartupError('유지보수·릴리스·로컬 유휴 또는 신규 설정이 확인되지 않았습니다.')
+                or safety_check() is not True or self.check_configuration() is not True):
+            raise StartupError('유지보수·릴리스·단계별 안전 또는 신규 설정이 확인되지 않았습니다.')
 
     def start(self):
         """Start new services and stop for the operator's Client restart."""
-        self.preconditions()
+        self.preconditions(self.check_local_idle)
         command(['/usr/bin/systemctl', 'daemon-reload'])
         command(['/usr/bin/bash', '-c', 'source "$1"; shift; bc250_require_stopped "$@"',
                  'startup-check', str(self.guard_script), *SERVICE_UNITS])
         socket_stopped()
-        self.preconditions()
+        self.preconditions(self.check_local_idle)
         trusted_file(TMPFILES)
         command(['/usr/bin/systemd-tmpfiles', '--create', str(TMPFILES)])
         for unit in ('bc250-llm-gate.service', SOCKET, 'bc250-ai-studio.service', 'bc250-model-api.service'):
@@ -181,7 +182,7 @@ class NewServiceStart:
 
     def finish(self):
         """Verify the manually restarted Client and release only startup hold."""
-        self.preconditions()
+        self.preconditions(self.check_running)
         command([str(PYTHON), '-I', '-m', 'app.services.client_gate_check',
                  '--expected-user', self.client_user])
         trusted_file(API_KEY)
@@ -189,13 +190,13 @@ class NewServiceStart:
         api_ready()
         worker_disabled()
         wait_for_coordination(self.client_user)
-        self.preconditions()
+        self.preconditions(self.check_running)
         if any(path.exists() or path.is_symlink() for path in ENABLE_LINKS):
             raise StartupError('새 서비스 enablement 경로가 이미 존재합니다.')
         command(['/usr/bin/systemctl', 'enable', SOCKET, 'bc250-model-api.service'])
         for unit in (SOCKET, 'bc250-model-api.service'):
             command(['/usr/bin/systemctl', 'is-enabled', '--quiet', unit])
-        self.preconditions()
+        self.preconditions(self.check_running)
         # This verifies gate/Studio/Client, pending state and current model
         # health under the GPU lock; only the startup hold is released.
         command([str(PYTHON), '-I', '-m', 'app.services.gate_admin', 'confirm-startup',

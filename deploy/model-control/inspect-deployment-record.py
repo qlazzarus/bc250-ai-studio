@@ -49,7 +49,8 @@ def classify(rows):
     return phases[tuple(relevant)]
 
 
-def read_record_snapshot(directory):
+def read_record_rows(directory):
+    """Read a protected, stable record; callers must separately classify it."""
     directory = Path(directory)
     if os.geteuid() != 0 or not directory.is_absolute() or '..' in directory.parts:
         raise ValueError('root와 정규화된 절대 경로가 필요합니다')
@@ -79,20 +80,26 @@ def read_record_snapshot(directory):
                 current_after.st_dev, current_after.st_ino) != (info.st_dev, info.st_ino):
             raise ValueError('기록을 읽는 중 변경됐습니다')
         rows = parse_rows(data)
-        status = classify(rows)
-        generations = [row['generation'] for row in rows if row.get('event') == 'deployment_hold:generation']
-        releases = [row for row in rows if row.get('event') == 'release']
-        if len(releases) > 1 or (releases and rows[0] is not releases[0]):
-            raise ValueError('릴리스 기록 순서 오류')
-        release = releases[0] if releases else None
-        if release is not None and (not isinstance(release.get('commit'), str)
-                or not re.fullmatch(r'[a-f0-9]{40}', release['commit'])
-                or not isinstance(release.get('sha256'), str)
-                or not re.fullmatch(r'[a-f0-9]{64}', release['sha256'])):
-            raise ValueError('릴리스 기록 형식 오류')
-        return status, generations[0] if generations else None, release
+        classify(rows)  # Validate row structure and any deployment hold events.
+        return rows
     finally:
         os.close(fd)
+
+
+def read_record_snapshot(directory):
+    rows = read_record_rows(directory)
+    status = classify(rows)
+    generations = [row['generation'] for row in rows if row.get('event') == 'deployment_hold:generation']
+    releases = [row for row in rows if row.get('event') == 'release']
+    if len(releases) > 1 or (releases and rows[0] is not releases[0]):
+        raise ValueError('릴리스 기록 순서 오류')
+    release = releases[0] if releases else None
+    if release is not None and (not isinstance(release.get('commit'), str)
+            or not re.fullmatch(r'[a-f0-9]{40}', release['commit'])
+            or not isinstance(release.get('sha256'), str)
+            or not re.fullmatch(r'[a-f0-9]{64}', release['sha256'])):
+        raise ValueError('릴리스 기록 형식 오류')
+    return status, generations[0] if generations else None, release
 
 
 def read_record(directory):

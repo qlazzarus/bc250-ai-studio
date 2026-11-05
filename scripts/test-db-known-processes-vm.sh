@@ -78,12 +78,13 @@ pid2=$(systemctl show "$other" -p MainPID --value)
 [[ $pid1 =~ ^[0-9]+$ && $pid1 -gt 1 && $pid2 =~ ^[0-9]+$ && $pid2 -gt 1 && $pid1 != "$pid2" ]] || exit 1
 mount --bind "$data" "$data"
 mount -o remount,bind,ro "$data"
-python3 - "$1/deploy/model-control/observe-db-process-references.py" "$pid1" "$pid2" "$data" "$control" "$other" <<'PY'
+python3 - "$1/deploy/model-control/observe-db-process-references.py" "$pid1" "$pid2" "$data" "$control" "$other" "$1/deploy/model-control/legacy-backup-adapter.py" <<'PY'
 import importlib.util
 import subprocess
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 spec = importlib.util.spec_from_file_location('db_references', sys.argv[1])
 module = importlib.util.module_from_spec(spec)
@@ -91,9 +92,33 @@ spec.loader.exec_module(module)
 holder, other = int(sys.argv[2]), int(sys.argv[3])
 data, control = Path(sys.argv[4]), Path(sys.argv[5])
 database, unit = data / 'database/studio.sqlite3', sys.argv[6]
+backup_spec = importlib.util.spec_from_file_location('fixture_backup', sys.argv[7])
+backup = importlib.util.module_from_spec(backup_spec)
+backup_spec.loader.exec_module(backup)
+backup.STUDIO_DATABASE = database
+adapter = backup.LegacyBackupAdapter.__new__(backup.LegacyBackupAdapter)
+adapter.check_local_idle = lambda: True
+adapter.llama_connections = SimpleNamespace(check_host_llama=lambda: True)
+adapter.require_stopped = lambda: None
+adapter.check_database_fence = lambda: not any(module.observe_known_processes([holder, other], data, database).values())
+inspections = []
+def inspect(_, *, check_stopped):
+    if check_stopped() is not True:
+        raise RuntimeError('시험 정지 확인 실패')
+    inspections.append('checked')
+adapter.studio_db = SimpleNamespace(inspect=inspect)
 result = module.observe_known_processes([holder, other], data, database)
 assert 'fd' in result[holder] and not result[other], result
 print('시험 프로세스 두 개 중 DB 디렉터리 FD 보유 프로세스 감지 확인', flush=True)
+try:
+    adapter.require_stopped_with_clear_database()
+except RuntimeError as error:
+    if 'DB 검사 전' not in str(error): raise
+else:
+    raise SystemExit('시험 기존 DB 참조가 있을 때 검사 경계가 허용됐습니다.')
+if inspections:
+    raise SystemExit('시험 기존 참조 확인 전에 DB 검사가 시작됐습니다.')
+print('지정된 시험 프로세스의 DB 참조가 있으면 DB 검사 전 거절 확인', flush=True)
 (control / 'close').touch()
 for _ in range(120):
     if (control / 'closed').exists(): break
@@ -103,6 +128,10 @@ else:
 result = module.observe_known_processes([holder, other], data, database)
 assert not result[holder] and not result[other], result
 print('두 시험 프로세스의 DB 참조가 없는 순간 상태 확인', flush=True)
+adapter.require_stopped_with_clear_database()
+if inspections != ['checked']:
+    raise SystemExit('시험 DB 검사 연결 결과가 다릅니다.')
+print('지정된 시험 프로세스의 참조가 없을 때 모의 DB 검사 연결 확인', flush=True)
 subprocess.run(['/usr/bin/systemctl', 'stop', unit], check=True, timeout=60)
 for _ in range(60):
     if not (module.PROC / str(other)).exists(): break
@@ -115,6 +144,12 @@ except (OSError, ValueError):
     print('목록의 시험 프로세스가 사라지면 안전 판정 대신 오류 확인', flush=True)
 else:
     raise SystemExit('사라진 시험 프로세스를 잘못 허용했습니다.')
+try:
+    adapter.require_stopped_with_clear_database()
+except (OSError, ValueError):
+    print('지정된 시험 프로세스가 사라지면 DB 검사 경계에서 오류 확인', flush=True)
+else:
+    raise SystemExit('사라진 시험 프로세스가 검사 경계에서 허용됐습니다.')
 (control / 'stop').touch()
 PY
 if ! systemctl stop "$holder" 2>/dev/null; then
@@ -125,4 +160,4 @@ fi
 umount "$data"
 trap - ERR
 echo "시험 서비스와 마운트 정리 완료; 시험 자료 보관: $records $data $control $code"
-echo '명시한 두 PID만 검사했습니다. 다른 프로세스 열거·새 참조 생성·지속 차단은 보장하지 않습니다.'
+echo '명시한 두 PID만 검사했고 DB 검사는 모의입니다. 다른 프로세스 열거·새 참조 생성·지속 차단은 보장하지 않습니다.'

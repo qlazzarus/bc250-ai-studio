@@ -17,10 +17,11 @@ PHASES = frozenset({'initial_preparation', 'maintenance_enter', 'wiki_fence', 'l
                     'rollback_preserve', 'rollback_stage', 'rollback_restore', 'rollback_gate',
                     'rollback_studio', 'rollback_confirmation', 'startup_tmpfiles', 'startup_lock',
                     'startup_lock_transfer', 'deployment_hold', 'deployment_confirmation', 'rollback_wiki_release',
-                    'rollback_ingress_restore'})
+                    'rollback_ingress_restore', 'service_restart_disable', 'service_start_block',
+                    'service_stop_fence'})
 EVENTS = frozenset(f'{phase}:{state}' for phase in PHASES for state in ('begin', 'confirmed')) | {
     'await_manual_client_restart', 'await_legacy_client_restart', 'complete', 'rollback_complete',
-    'startup_lock_transfer:released'}
+    'startup_lock_transfer:released', 'service_stop_fence:lost'}
 
 
 class MigrationJournal:

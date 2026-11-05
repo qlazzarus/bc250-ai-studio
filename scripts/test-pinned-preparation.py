@@ -29,7 +29,7 @@ class PreparationTest(unittest.TestCase):
             return SimpleNamespace(prepare=prepare) if name == 'authenticated_initial_preparation' else SimpleNamespace(MigrationJournal=Journal)
         args = dict(root='/opt/test', archive='/tmp/test', bootstrap_checker='/tmp/check',
                     bootstrap_sha256='a' * 64, journal_dir='/tmp/record',
-                    commit='b' * 40, artifact_sha256='c' * 64)
+                    commit='b' * 40, artifact_sha256='c' * 64, verify_provenance=lambda *_: True)
         with patch.object(module, 'authenticated_checker', return_value=lambda *_: True), patch.object(module, 'load', side_effect=load):
             if fail:
                 with self.assertRaises(ValueError):
@@ -37,6 +37,20 @@ class PreparationTest(unittest.TestCase):
             else:
                 self.assertTrue(module.prepare_initial(**args))
         return events
+
+    def test_provenance_is_required_and_rechecked(self):
+        events = []
+        allowed = [True]
+        checker = module.ProvenanceBoundCheck(
+            lambda *_: events.append('tree') or True,
+            lambda *_: events.append('provenance') or allowed[0])
+        self.assertTrue(checker('b' * 40, 'c' * 64))
+        allowed[0] = False
+        with self.assertRaises(ValueError):
+            checker('b' * 40, 'c' * 64)
+        self.assertEqual(events, ['provenance', 'tree', 'provenance'])
+        with self.assertRaises(ValueError):
+            module.ProvenanceBoundCheck(lambda *_: True, None)
 
     def test_success(self):
         self.assertEqual(self.exercise(False), ['open', 'release', 'initial_preparation:begin', 'prepare',

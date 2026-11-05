@@ -103,7 +103,7 @@ def check_configuration():
     verify.main()
     return True
 runner = startup.NewServiceStart(entry / 'backup-archive.sh', check_maintenance=lambda: True,
-    check_release=lambda: True, check_local_idle=lambda: True,
+    check_release=lambda: True, check_local_idle=lambda: True, check_running=lambda: True,
     check_configuration=check_configuration, expected_client_user='vmtest')
 worker_env = verify.DIRECTORY / 'worker.env'
 worker_env.write_text('MODEL_CONTROL_SWITCH_ENABLED=true\n')

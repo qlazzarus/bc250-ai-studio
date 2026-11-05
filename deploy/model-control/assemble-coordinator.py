@@ -35,13 +35,56 @@ def load(name, path):
     return module
 
 
+class GenerationBoundStartup:
+    """Keep one in-memory generation guard across installation and startup.
+
+    The caller must create the guard against the old process before backup and
+    supply independent real replacement, GPU and direct-caller checks.
+    """
+    def __init__(self, generation, install, startup):
+        self.generation, self.install_candidate, self.startup = generation, install, startup
+        self.phase = 'old'
+
+    def install(self, backup):
+        if self.phase != 'old':
+            raise ValueError('기존 세대 설치 단계를 다시 시작할 수 없습니다.')
+        self.phase = 'failed'
+        if self.generation.mark_stopped() is not True or self.install_candidate(backup) is not True:
+            raise ValueError('기존 세대 정지 또는 설치 확인 실패')
+        self.phase = 'installed'
+        return True
+
+    def start(self):
+        if self.phase != 'installed':
+            raise ValueError('설치가 확인되지 않았습니다.')
+        self.phase = 'failed'
+        self.startup.start()
+        if self.generation.bind_replacement() is not True:
+            raise ValueError('신규 Studio 세대 확인 실패')
+        self.phase = 'started'
+
+    def finish(self):
+        if self.phase != 'started':
+            raise ValueError('신규 Studio 세대가 확인되지 않았습니다.')
+        self.phase = 'failed'
+        if self.generation.check() is not True:
+            raise ValueError('신규 Studio 세대가 변경됐습니다.')
+        self.startup.finish()
+        if self.generation.check() is not True:
+            raise ValueError('시작 확인 중 Studio 세대가 변경됐습니다.')
+        self.phase = 'complete'
+
+
 def assemble(*, source, snapshot, journal_dir, commit, artifact_sha256, checker_sha256,
-             expected_client_user, verify_release, preflight, check_local_idle,
+             expected_client_user, verify_release, preflight, check_local_idle, check_running, check_database_fence,
+             studio_generation,
              check_caddy_transition, check_restored, install, verify_new, verify_restored, initial_install_paths=None,
              wiki_record_dir=None, initial_idle_factory=None):
-    callbacks = (verify_release, preflight, check_caddy_transition, check_restored,
+    callbacks = (verify_release, preflight, check_running, check_database_fence, check_caddy_transition, check_restored,
                  verify_new, verify_restored)
     if (os.geteuid() != 0 or not all(callable(item) for item in callbacks)
+            or not all(callable(getattr(studio_generation, name, None))
+                       for name in ('mark_stopped', 'bind_replacement', 'check'))
             or (initial_idle_factory is None and not callable(check_local_idle))
             or (initial_idle_factory is not None and (not callable(initial_idle_factory)
                 or check_local_idle is not None or initial_install_paths is None))
@@ -71,6 +114,7 @@ def assemble(*, source, snapshot, journal_dir, commit, artifact_sha256, checker_
         check_local_idle=check_caddy_transition, check_restored=check_restored)
     wiki_fence = None
     effective_idle = check_local_idle
+    effective_running = check_running
     if initial_install_paths is not None:
         wiki_module = load('initial_wiki_fence', source / 'wiki-condition-fence.py')
         wiki_fence = wiki_module.WikiConditionFence(source, wiki_record_dir, persistent=True)
@@ -82,7 +126,11 @@ def assemble(*, source, snapshot, journal_dir, commit, artifact_sha256, checker_
             # The same fence used by the coordinator must surround each observation.
             return (wiki_fence.check() is True and check_local_idle() is True
                     and wiki_fence.check() is True)
-    backup = backup_module.LegacyBackupAdapter(source, snapshot, check_local_idle=effective_idle)
+        def effective_running():
+            return (wiki_fence.check() is True and check_running() is True
+                    and wiki_fence.check() is True)
+    backup = backup_module.LegacyBackupAdapter(source, snapshot, check_local_idle=effective_idle,
+                                                check_database_fence=check_database_fence)
     if initial_install_paths is not None:
         initial_module = load('initial_install_adapter', source / 'initial-install-adapter.py')
         install = initial_module.InitialInstallAdapter(
@@ -90,10 +138,14 @@ def assemble(*, source, snapshot, journal_dir, commit, artifact_sha256, checker_
             check_release=lambda: verify_release(commit, artifact_sha256),
             check_configuration=config, check_maintenance=backup.maintenance,
             check_local_idle=effective_idle)
+    def running_with_generation():
+        return (studio_generation.check() is True and effective_running() is True
+                and studio_generation.check() is True)
     startup = startup_module.NewServiceStart(source / 'backup-archive.sh',
         check_maintenance=backup.maintenance, check_release=lambda: verify_release(commit, artifact_sha256),
-        check_local_idle=effective_idle, check_configuration=config,
+        check_local_idle=effective_idle, check_running=running_with_generation, check_configuration=config,
         expected_client_user=expected_client_user)
+    bound_startup = GenerationBoundStartup(studio_generation, install, startup)
     def all_preflight():
         # Wiki can still be running here; post-fence idle checks happen in backup and install.
         return (verify_release(commit, artifact_sha256) is True and preflight() is True
@@ -104,7 +156,7 @@ def assemble(*, source, snapshot, journal_dir, commit, artifact_sha256, checker_
         journal.release(commit, artifact_sha256)
         runner = coordinator_module.CoordinatedMigration(
             record=journal, preflight=all_preflight, transition=caddy.transition,
-            transition_args={}, backup_adapter=backup, install=install, startup=startup,
+            transition_args={}, backup_adapter=backup, install=bound_startup.install, startup=bound_startup,
             verify_new=verify_new, verify_restored=verify_restored, wiki_fence=wiki_fence)
     except BaseException:
         journal.close()

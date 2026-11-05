@@ -16,7 +16,7 @@ trap 'echo "시험 중단. 시험 파일과 기록을 보존합니다: $release 
 for name in assemble-coordinator.py caddy-maintenance-adapter.py capture-caddy.py \
   caddy-file-swap.py caddy-transaction.py maintenance-probe.py create-maintenance-caddy.py \
   legacy-backup-adapter.py legacy-backup-sequence.py migrate-legacy-gate.py \
-  inspect-stopped-studio-db.py \
+  inspect-stopped-studio-db.py observe-llama-connections.py \
   backup-stopped.sh backup-archive.sh check-service-cgroup.py verify-backup.py \
   start-new-services.py staged-configuration-adapter.py migration-journal.py \
   coordinated-migration.py; do
@@ -27,6 +27,7 @@ restorecon -RF "$release" "$fixture" "$records"
 python3 - "$source_dir" "$release" "$fixture" "$records" "$snapshot" <<'PY'
 import hashlib
 import importlib.util
+from types import SimpleNamespace
 import json
 import subprocess
 import sys
@@ -57,9 +58,21 @@ good_record.mkdir(mode=0o700)
 def arguments(directory, verification):
     return dict(source=release, snapshot=snapshot, journal_dir=directory, commit=commit,
         artifact_sha256=artifact_hash, checker_sha256=digest, expected_client_user='vmtest',
-        verify_release=verification, preflight=lambda: True, check_local_idle=lambda: True,
+        verify_release=verification, preflight=lambda: True, check_local_idle=lambda: True, check_running=lambda: True, check_database_fence=lambda: True, studio_generation=SimpleNamespace(
+            mark_stopped=lambda: True, bind_replacement=lambda: True, check=lambda: True),
         check_caddy_transition=lambda: True, check_restored=lambda: True, install=lambda _: True,
         verify_new=lambda: True, verify_restored=lambda: True)
+missing_fence = arguments(bad_record, lambda *_: True)
+missing_fence['check_database_fence'] = None
+try:
+    assemble.assemble(**missing_fence)
+except ValueError:
+    pass
+else:
+    raise SystemExit('DB 쓰기 차단 검사기 없이 시험 조립이 허용됐습니다.')
+if (bad_record / 'migration-events.jsonl').exists():
+    raise SystemExit('DB 쓰기 차단 검사기 거절 전에 기록이 생성됐습니다.')
+print('DB 쓰기 차단 검사기 누락 시 배포 기록 생성 전 거절 확인', flush=True)
 try:
     assemble.assemble(**arguments(bad_record, lambda *_: False))
 except ValueError:
@@ -69,8 +82,12 @@ else:
 if (bad_record / 'migration-events.jsonl').exists():
     raise SystemExit('릴리스 거절 전에 기록이 생성됐습니다.')
 print('시험 릴리스 출처 거절 시 배포 기록 생성 전 중단 확인', flush=True)
-runner, journal = assemble.assemble(**arguments(good_record, lambda c, h: c == commit and h == artifact_hash))
+valid_args = arguments(good_record, lambda c, h: c == commit and h == artifact_hash)
+runner, journal = assemble.assemble(**valid_args)
 try:
+    if runner.backup.check_database_fence is not valid_args['check_database_fence']:
+        raise SystemExit('시험 DB 쓰기 차단 검사기가 백업 어댑터에 전달되지 않았습니다.')
+    print('모의 DB 쓰기 차단 검사기를 실제 백업 어댑터에 전달 확인', flush=True)
     if runner.preflight() is not True:
         raise SystemExit('시험 설정 사전 검증에 실패했습니다.')
     rows = [json.loads(line) for line in (good_record / 'migration-events.jsonl').read_text().splitlines()]

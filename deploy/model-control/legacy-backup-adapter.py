@@ -44,12 +44,15 @@ def load(name, path):
 
 
 class LegacyBackupAdapter:
-    def __init__(self, source, snapshot, *, check_local_idle):
-        if os.geteuid() != 0 or not callable(check_local_idle):
-            raise ValueError('root와 직접 호출·GPU 유휴 검사기가 필요합니다.')
+    def __init__(self, source, snapshot, *, check_local_idle, check_database_fence):
+        if os.geteuid() != 0 or not callable(check_local_idle) or not callable(check_database_fence):
+            raise ValueError('root와 직접 호출·GPU 유휴 및 지속 DB 쓰기 차단 검사기가 필요합니다.')
         self.source = Path(source)
         self.snapshot = Path(snapshot)
         self.check_local_idle = check_local_idle
+        # The caller must establish and maintain exclusion, including existing
+        # references. A process/FD snapshot alone is not this fence.
+        self.check_database_fence = check_database_fence
         trusted(self.source, directory=True)
         trusted(self.snapshot, directory=True)
         if self.snapshot.stat().st_mode & 0o077:
@@ -105,12 +108,18 @@ class LegacyBackupAdapter:
     def require_stopped_with_clear_database(self):
         if self.check_local_idle() is not True:
             raise RuntimeError('DB 검사 전 로컬 유휴 상태가 확인되지 않았습니다.')
+        if self.check_database_fence() is not True:
+            raise RuntimeError('DB 검사 전 지속 쓰기 차단이 확인되지 않았습니다.')
         if self.llama_connections.check_host_llama() is not True:
             raise RuntimeError('DB 검사 전 llama 연결 종료가 확인되지 않았습니다.')
         def stopped():
             self.require_stopped()
+            if self.check_database_fence() is not True:
+                raise RuntimeError('DB 검사 중 지속 쓰기 차단이 확인되지 않았습니다.')
             return True
         self.studio_db.inspect(STUDIO_DATABASE, check_stopped=stopped)
+        if self.check_database_fence() is not True:
+            raise RuntimeError('DB 검사 중 지속 쓰기 차단이 상실됐습니다.')
         if self.check_local_idle() is not True:
             raise RuntimeError('DB 검사 후 로컬 유휴 상태가 변경됐습니다.')
         if self.llama_connections.check_host_llama() is not True:
@@ -119,6 +128,8 @@ class LegacyBackupAdapter:
     def create_backup(self):
         if self.check_local_idle() is not True:
             raise RuntimeError('백업 생성 전 로컬 유휴 상태가 확인되지 않았습니다.')
+        if self.check_database_fence() is not True:
+            raise RuntimeError('백업 생성 전 지속 DB 쓰기 차단이 확인되지 않았습니다.')
         if self.llama_connections.check_host_llama() is not True:
             raise RuntimeError('백업 생성 전 llama 연결 종료가 확인되지 않았습니다.')
         original = self.snapshot / 'Caddyfile.original'
@@ -135,6 +146,8 @@ class LegacyBackupAdapter:
         if len(paths) != 1:
             raise RuntimeError('생성된 백업 경로를 확인하지 못했습니다.')
         backup = Path(paths[0])
+        if self.check_database_fence() is not True:
+            raise RuntimeError('백업 생성 중 DB 쓰기 차단이 상실됐습니다. 백업을 보존하세요.')
         if self.check_local_idle() is not True:
             raise RuntimeError('백업 생성 중 로컬 유휴 상태가 변경됐습니다. 백업을 보존하세요.')
         if self.llama_connections.check_host_llama() is not True:
@@ -142,8 +155,12 @@ class LegacyBackupAdapter:
         return backup
 
     def verify_backup(self, backup):
+        if self.check_database_fence() is not True:
+            raise RuntimeError('백업 검증 전 DB 쓰기 차단이 확인되지 않았습니다.')
         subprocess.run(['/usr/bin/python3', str(self.source / 'verify-backup.py'), str(backup)],
                        check=True, timeout=7200)
+        if self.check_database_fence() is not True:
+            raise RuntimeError('백업 검증 중 DB 쓰기 차단이 상실됐습니다. 백업을 보존하세요.')
         if self.check_local_idle() is not True:
             raise RuntimeError('백업 검증 중 로컬 유휴 상태가 변경됐습니다. 백업을 보존하세요.')
         if self.llama_connections.check_host_llama() is not True:
