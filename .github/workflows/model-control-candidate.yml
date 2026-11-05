@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 jobs:
   package:
@@ -64,6 +66,10 @@ jobs:
           python "$GITHUB_WORKSPACE/deploy/model-control/verify-release-candidate.py" \
             "$RUNNER_TEMP/bc250-model-control-candidate.tar.gz" \
             "$(cut -d ' ' -f1 bc250-model-control-candidate.sha256)" "$GITHUB_SHA"
+      - name: Attest candidate provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ runner.temp }}/bc250-model-control-candidate.tar.gz
       - name: Upload candidate and checksum
         uses: actions/upload-artifact@v4
         with:
