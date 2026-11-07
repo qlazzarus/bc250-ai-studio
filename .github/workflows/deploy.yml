@@ -1,8 +1,8 @@
 name: Deploy BC-250 AI Studio
 
-# Manual recovery first. Restore push after a verified production deployment.
-
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

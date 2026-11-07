@@ -1,6 +1,6 @@
 # AI Studio GitHub Actions 배포
 
-현재 이 저장소의 `.github/workflows/deploy.yml`은 **수동 실행 후보**다. 기존 자동 push 배포는 운영 수동 검증 후 복원한다. 모델 전환은 별도 llm-client 작업이며 Studio 배포의 선행 조건이 아니다.
+2026-11-07 커밋 `434167a`의 수동 Studio 배포가 성공했고 Studio·gate·Client·llama 상태와 gate 파일 일치를 확인했다. `.github/workflows/deploy.yml`은 main push 및 수동 실행을 지원한다. 모델 전환은 별도 llm-client 작업이며 Studio 배포의 선행 조건이 아니다.
 
 ## 현재 범위와 보호
 
@@ -22,6 +22,6 @@
 
 검증된 변경을 GitHub 기본 브랜치에 반영한 후 `Deploy BC-250 AI Studio`를 수동 실행한다. 배포 후 Studio 서비스 및 인증 응답, gate와 Client 상태를 확인한다. 실제 GPU 이미지 생성은 별도 사용 상황을 확인한 후 진행한다.
 
-수동 배포가 검증되기 전에는 push 자동 트리거를 켜지 않는다. 원격 반영·서버 설치가 되지 않은 로컬 파일은 운영 배포가 활성화됐다는 뜻이 아니다. 모델 제어 후보 workflow는 `deploy/model-control/model-control-candidate.workflow.yml`에 연구 자료로 보존되며 Actions 활성 경로가 아니다.
+수동 검증의 배포 백업은 `/var/backups/bc250-ai-studio.HRzeOwTA`, 이전 서버 배포 스크립트 백업은 `/var/backups/bc250-studio-deploy.pmIRTzen`이다. 원격 반영되지 않은 로컬 파일은 운영 배포가 활성화됐다는 뜻이 아니다. 모델 제어 후보 workflow는 `deploy/model-control/model-control-candidate.workflow.yml`에 연구 자료로 보존되며 Actions 활성 경로가 아니다.
 
 실제 서버에 오류가 있으면 Studio 재시작을 반복하기 전에 배포 출력의 백업 경로와 현재 서비스·gate 상태를 확인하고, 대응하는 코드·데이터 백업과 환경을 함께 복원한다. 미완료 모델 전환 journal이나 새 구성 경로를 임의 삭제해 보호 검사를 우회하지 않는다.

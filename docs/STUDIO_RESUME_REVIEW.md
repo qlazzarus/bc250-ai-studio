@@ -47,7 +47,7 @@ Git의 `f2a59f7` 시점에 기존 Studio workflow와 배포 스크립트가 있�
 | S1 현재 배포 상태 확인 | 서버 조회 및 원격 main 확인, GitHub 실행 이력 미확인 | GitHub workflow/진행 중 배포, 서버 배포 스크립트, 실제 unit/drop-in, 신규 구성 사용 여부를 읽기 전용 확인 |
 | S2 Studio 코드 경계 분리 | 로컬 구현 및 검증 완료 | 필요한 barrier/잠금/복구 기능 보존. Client 인계 후에도 Studio 시작·이미지 동작이 전환 실행부 설치 없이 가능 |
 | S3 Studio 배포 후보 복구 | 로컬 후보 검증 및 서버 스크립트 설치 완료 | 실제 운영 구성에 맞는 아티팩트와 수동 workflow·서버 스크립트 변경안. gate 공유 코드/venv 영향 및 복구 절차 포함 |
-| S4 필요한 검증·원격 반영 | 로컬 검증 완료, GitHub 반영·수동 배포 대기 | Studio 관련 backend 테스트·frontend lint/build, 패키지/배포 검사 및 필요한 gate 호환 확인. 최종 검증된 workflow 반영 후 수동 배포 확인, 자동 트리거 복원 |
+| S4 필요한 검증·원격 반영 | 수동 배포 성공, 자동 push 트리거 복원 중 | Studio 관련 backend 테스트·frontend lint/build, 패키지/배포 검사 및 필요한 gate 호환 확인. 최종 검증된 workflow 반영 후 수동 배포 확인, 자동 트리거 복원 |
 | S5 마무리 | Client 인계 보존, 운영 확인 대기 | Client 인계 경로 확보, 중복 작업자 설치 없음, 불필요한 후보 workflow/시험 작업의 활성 경로 제외, Studio 배포 가이드와 README 갱신 |
 
 Client M1/M2 설계는 S 작업 전체 완료를 기다릴 필요가 없다. 실제 코드 이관 시 S0 보존과 S2 의존 분리를 함께 확인한다. Studio를 계속 쓸 수 있게 마무리하는 S 작업은 과거 T1~T6 통합 배포 연구의 재개가 아니다.
@@ -64,3 +64,5 @@ Client M1/M2 설계는 S 작업 전체 완료를 기다릴 필요가 없다. 실
 - Studio 검증은 129개 통과, backend Ruff, frontend lint/build 및 shell 문법 검사 통과. macOS에서 Linux 전용 후보의 전체 회귀가 실패했으며 최종 전체 통과는 주장하지 않는다.
 - 서버 사용자 홈에 SHA-256 `971b58e56b2385fb5e10873ebc3369e2e3cf6d9a47e10f22aa75f9bee51852d7`인 배포 스크립트 후보를 전달하고 확인했다. root 설치를 운영자가 완료했고 해시·root:root 0755를 확인했다. 이전 파일은 `/var/backups/bc250-studio-deploy.pmIRTzen`에 보존했다. 새 릴리스나 서비스를 아직 실행하지 않았다.
 - Client `docs/handoff/imagegen-20261107`과 `imagegen-closeout-20261107`에 변경 전 및 분리 후 스냅샷을 검증해 보존했다. GitHub 현재 main은 `7e595b1`이며 변경은 아직 반영하지 않았다.
+
+- 2026-11-07 운영 검증: GitHub Actions 실행 `42335504458`에서 커밋 `434167a`의 수동 배포가 성공했다. Studio/gate/Client/llama active, Studio 인증 401·Client health 200·gate health 200 및 기존 gate 파일 해시를 확인했다. 배포 백업 `/var/backups/bc250-ai-studio.HRzeOwTA`. 실제 이미지 생성은 실행하지 않았다.
