@@ -3,8 +3,8 @@ import json
 
 import httpx
 import pytest
-from app.core.config import GateSettings
-from app.gate import Admission, create_gate_app
+from app.core.studio_config import GateSettings
+from app.gate_candidate import Admission, create_gate_app
 
 
 async def test_owned_holds_survive_restart_and_legacy_resume(tmp_path):
@@ -49,7 +49,7 @@ async def test_hold_write_failure_keeps_current_process_paused(tmp_path, monkeyp
     def fail(*args):
         raise OSError("disk failure")
 
-    monkeypatch.setattr("app.gate.atomic_json", fail)
+    monkeypatch.setattr("app.gate_candidate.atomic_json", fail)
     with pytest.raises(OSError):
         await gate.hold("studio-1", True)
     assert (await gate.status())["paused"]
@@ -172,7 +172,7 @@ async def test_gate_restart_remains_paused_after_hold_persist_failure(tmp_path, 
         def fail(*args):
             raise OSError("simulated disk error")
         with monkeypatch.context() as context:
-            context.setattr("app.gate.atomic_json", fail)
+            context.setattr("app.gate_candidate.atomic_json", fail)
             with pytest.raises(OSError):
                 await app.state.admission.hold("studio-" + "a" * 32, True)
             assert (await app.state.admission.status())["paused"]

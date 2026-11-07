@@ -1,7 +1,7 @@
 import asyncio
 
 import pytest
-from app.core.files import FileLock, LockBusyError
+from app.core.studio_files import FileLock, LockBusyError
 from app.engines.fake import FakeEngine
 from app.main import create_app
 from app.models.database import Database

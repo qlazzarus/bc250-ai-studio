@@ -8,9 +8,9 @@ from fastapi.openapi.docs import get_swagger_ui_html
 from starlette.responses import JSONResponse
 
 from app.api.routes import authenticate, router
-from app.core.config import Settings
-from app.core.files import FileLock
 from app.core.middleware import BodyLimit
+from app.core.studio_config import Settings
+from app.core.studio_files import FileLock
 from app.engines.fake import FakeEngine
 from app.engines.sdcpp import SdCppEngine
 from app.models.database import Database

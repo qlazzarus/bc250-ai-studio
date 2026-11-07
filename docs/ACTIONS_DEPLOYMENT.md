@@ -1,50 +1,27 @@
-# GitHub Actions 배포
+# AI Studio GitHub Actions 배포
 
-운영 서버 SSH는 접속 위치에 따라 주소와 포트를 함께 선택합니다. 집 내부 네트워크에서는 `yeppyshiba@192.168.0.57`의 포트 `22`, 집 외부에서는 `yeppyshiba@yeppyshiba.iptime.org`의 포트 `2222`를 사용합니다. 두 주소 각각의 SSH 호스트 키를 신뢰할 수 있는 경로로 확인합니다. GitHub 호스팅 Actions runner는 집 외부에 있으므로 운영 연결을 구현할 때 외부 주소와 검증된 호스트 키를 사용합니다. 시험 VM 연결 `127.0.0.1:22223`은 운영 서버 안에서만 사용합니다.
+현재 이 저장소의 `.github/workflows/deploy.yml`은 **수동 실행 후보**다. 기존 자동 push 배포는 운영 수동 검증 후 복원한다. 모델 전환은 별도 llm-client 작업이며 Studio 배포의 선행 조건이 아니다.
 
-기존 Studio 전용 배포 워크플로는 수동 실행하더라도 checkout이나 SSH 전에 실패하도록 비활성화했습니다. 이 보호는 변경사항이 GitHub에 반영된 이후 해당 워크플로 버전에 적용됩니다. 기존 서버 스크립트의 보호 장치도 유지해야 합니다. 조율된 운영 배포 워크플로는 아직 없으며 [수동 배포 초안](./LLM_MODEL_SWITCH_DEPLOYMENT_DRAFT.md)의 검증이 필요합니다.
-저장소의 기존 배포 스크립트에는 새 구성 경로를 감지하면 Studio를 중지하기 전에 거절하는 방어 장치가 있습니다. 서버에 이미 설치된 스크립트에는 자동으로 반영되지 않으며, 이 검사도 조율된 이전이나 배포 절차를 대신하지 않습니다.
+## 현재 범위와 보호
 
-별도의 `Build model-control candidate` 수동 워크플로는 백엔드 시험·프런트엔드 빌드 후 Studio, gate, 작업자, 배포 구성과 커밋 ID를 포함한 압축 파일 및 SHA-256을 GitHub Actions 아티팩트로 만듭니다. 운영 서버에 연결하거나 서비스를 변경하지 않습니다. 이 워크플로와 변경 사항은 저장소에 반영된 뒤 해당 커밋에서만 실행할 수 있으며, 생성된 아티팩트는 운영 배포 승인이나 검증된 이전·롤백 절차를 뜻하지 않습니다. 기존 Studio 전용 배포 워크플로는 새 구성에 사용하지 않습니다.
+- Studio 테스트·lint·프런트엔드 빌드 후 Git에 기록된 소스와 빌드 결과를 패키징한다. **커밋되지 않은 변경은 포함되지 않는다.**
+- GitHub `production` 환경의 SSH Secrets와 검증된 호스트 키를 사용하며, root 소유 서버 배포 스크립트가 저장소의 검증된 스크립트와 해시가 다르면 업로드 전에 중단한다.
+- 서버에서 모델 제어 구성 경로가 감지되거나, 같은 설치 경로를 쓰는 gate의 구현·설정·의존성 파일이 릴리스와 다르면 Studio 중지 전에 거절한다. 동일한 공유 가상환경을 쓰는 경우 `uv sync`를 건너뛰어 실행 중 gate의 패키지를 교체하지 않는다. 대신 설치된 환경의 필수 import를 사전 확인한다.
+- 서버 스크립트는 Studio를 중지한 후 앱·데이터·환경 파일을 root 전용 백업에 보존하고 설치한다. 실패 시 자동 롤백하지 않는다. DB 마이그레이션이 있을 수 있으므로 코드와 데이터 백업을 같은 세대로 복원한다. gate와 llama-server는 재시작하지 않는다.
+- 이 경로는 시스템 전체 gate 업그레이드나 모델 제어 이전용이 아니다. gate 파일이나 의존성을 바꿔야 하면 호환성과 별도 이전·복구 절차를 준비한다.
 
-[릴리스 후보 검사기](../deploy/model-control/verify-release-candidate.py)는 지정된 SHA-256과 커밋, 필수 파일 및 아카이브 경로·파일 형식을 읽기 전용으로 검사합니다. 후보 워크플로에도 이 검사를 추가했습니다. 해시와 커밋은 별도로 신뢰한 Actions 실행에서 확인해야 합니다. 같은 아티팩트에 동봉된 해시만으로 출처가 인증되지는 않으며, 이 검사만으로 파일 추출·root 실행에 필요한 경로 신뢰성이나 통합 배포가 보장되지는 않습니다. 수정된 워크플로와 검사기는 커밋되어 GitHub에 반영된 후에만 Actions에서 사용됩니다.
-### 권장하는 출처 검증 위치
+## 실행 전 확인
 
-운영 Fedora에 `gh`를 설치할 필요는 없습니다. 현재 운영 서버에 gh RPM과 `/usr/bin/gh`가 없음을 확인했습니다. 권장안은 GitHub Actions 실행 환경에서 서명·저장소·워크플로·커밋·실행 정보를 검증하고, SSH 호스트 키를 검증한 연결로 후보와 그 식별 정보를 운영 서버에 전달하는 것입니다. 서버는 별도로 신뢰한 root 소유 검사기와 설정으로 전달된 후보 해시·구성을 검증해야 합니다.
+1. Studio 이미지 작업이 유휴이고 기존 gate·Client가 정상인지 확인한다. Studio 정지 시 이미지 작업은 중단될 수 있다.
+2. 서버의 설치 경로와 drop-in, 모델 제어 구성 유무, 스크립트 소유권과 해시를 확인한다. `scripts/inspect-studio-resume.sh`는 해당 정보를 비밀값 없이 조회한다.
+3. `STUDIO_TEST_PYTHON=.venv/bin/python bash scripts/test-studio.sh`, `.venv/bin/ruff check backend`, 프런트엔드 `npm run lint && npm run build`, `bash -n deploy/deploy-release.sh`를 확인한다. 후보 모델 제어·VM 연구 테스트는 별도로 보존하며 이 Studio 배포 검증의 완료로 주장하지 않는다.
+4. 서버 root 소유 `/usr/local/sbin/bc250-ai-studio-deploy`를 검증된 후보와 일치시켜야 한다. 기존 파일을 백업하고 해시를 검증한 뒤 운영자가 설치한다. 임의 경로 파일이나 원격 업로드물을 확인 없이 root로 실행하지 않는다.
+5. GitHub 저장소의 `production` 환경에 `BC250_SSH_HOST`, `BC250_SSH_PORT`, `BC250_SSH_USER`, `BC250_SSH_PRIVATE_KEY`, `BC250_SSH_KNOWN_HOSTS`가 설정되어야 한다. 저장소의 SSH 키는 Studio 배포에 한정된 서버 sudo 권한이 필요하다.
 
-권장안은 아직 구현·검증되지 않았습니다. 검증 결과만 믿을 경우 Actions 실행 환경·자격 증명·전달 경로가 신뢰 경계가 되므로, 검증한 후보가 실제 서버에서 확인한 후보와 같은지, 실행 기록·전달 중단·재진입과 기존 Studio 전용 배포 차단을 포함해 격리 환경에서 확인해야 합니다. 서버에서 독립적으로 서명을 검증하려면 신뢰할 수 있는 검증 도구와 루트를 별도로 마련해야 하지만, 이 대안을 선택한 것은 아닙니다.
+## 수동 검증과 이후 자동화
 
-아래는 비활성화 전 기존 워크플로의 설정 기록이며 현재 배포 지침이 아닙니다. 기존 `bc250-llm-client`와 같은 GitHub `production` 환경과 다음 Secrets를 사용했습니다.
-해당 저장소의 Secrets는 자동 공유되지 않으므로 이 저장소 또는 조직에서 설정해야 합니다.
+검증된 변경을 GitHub 기본 브랜치에 반영한 후 `Deploy BC-250 AI Studio`를 수동 실행한다. 배포 후 Studio 서비스 및 인증 응답, gate와 Client 상태를 확인한다. 실제 GPU 이미지 생성은 별도 사용 상황을 확인한 후 진행한다.
 
-- `BC250_SSH_HOST`, `BC250_SSH_PORT`, `BC250_SSH_USER`
-- `BC250_SSH_PRIVATE_KEY`, `BC250_SSH_KNOWN_HOSTS` (서버의 검증된 host key)
+수동 배포가 검증되기 전에는 push 자동 트리거를 켜지 않는다. 원격 반영·서버 설치가 되지 않은 로컬 파일은 운영 배포가 활성화됐다는 뜻이 아니다. 모델 제어 후보 workflow는 `deploy/model-control/model-control-candidate.workflow.yml`에 연구 자료로 보존되며 Actions 활성 경로가 아니다.
 
-서버의 기존 설치가 `/opt/bc250-ai-studio`, 데이터가 `/opt/ai-studio-data`, 서비스가
-`bc250-ai-studio.service`인 경우에만 제공된 스크립트를 사용합니다. 서버에 Python 3,
-`uv`, curl과 충분한 백업 공간이 필요합니다. 서버에 배포 스크립트를 root 소유로 설치하고,
-배포 계정에 이 명령만 암호 없이 실행하는 sudo 권한을 부여해야 합니다. 배포 계정은
-애플리케이션 코드를 root로 설치할 수 있으므로 신뢰할 수 있어야 합니다. 서버에 맞는
-권한과 경로를 확인한 뒤 관리자가 다음을 수행합니다.
-
-```sh
-sudo install -o root -g root -m 0755 deploy/deploy-release.sh /usr/local/sbin/bc250-ai-studio-deploy
-sudo visudo -f /etc/sudoers.d/bc250-ai-studio-deploy
-```
-
-sudoers에는 실제 계정명으로 다음 한 줄을 추가합니다.
-
-```text
-DEPLOY_USER ALL=(root) NOPASSWD: /usr/local/sbin/bc250-ai-studio-deploy
-```
-
-스크립트는 업로드한 압축 파일을 배포 계정의 홈에서 읽습니다. 실행 중인 이미지의 경계까지
-정상 종료를 기다리지만 배치 작업은 중단 상태가 될 수 있고 systemd의 `TimeoutStopSec`이
-적용됩니다. 서비스 중지 후 코드, 데이터, 환경 파일 전체를 `/var/backups`에 백업하며,
-새 코드 설치와 DB 마이그레이션 후 401 응답으로 서비스 및 인증 경로를 확인합니다.
-환경 파일과 데이터는 덮어쓰지 않습니다. 실패 시 자동 롤백하지 않습니다. 마이그레이션이
-있을 수 있으므로 백업된 코드와 데이터의 호환 쌍을 함께 복구해야 합니다. 백업 용량과
-보관 주기는 운영자가 관리합니다. 기존 LLM 및 gate 서비스는 변경하지 않습니다.
-
-이 스크립트 자체를 변경한 경우 관리자가 서버에 다시 설치해야 합니다. 실제 서버의 경로,
-권한, 기존 서비스 및 Secrets를 확인하기 전까지 자동 배포 성공을 가정하지 마세요.
+실제 서버에 오류가 있으면 Studio 재시작을 반복하기 전에 배포 출력의 백업 경로와 현재 서비스·gate 상태를 확인하고, 대응하는 코드·데이터 백업과 환경을 함께 복원한다. 미완료 모델 전환 journal이나 새 구성 경로를 임의 삭제해 보호 검사를 우회하지 않는다.

@@ -13,7 +13,7 @@ import stat
 import struct
 from pathlib import Path
 
-from app.core.files import FileLock, protected_xattrs
+from app.core.studio_files import FileLock, protected_xattrs
 
 MODEL_NAME = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
 MAX_REQUEST = 4096

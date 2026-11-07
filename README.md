@@ -50,6 +50,8 @@ API 기본 주소: `http://127.0.0.1:8090`. 데이터 기본 위치:
 
 ## 문서
 
+- [AI Studio 개발·배포 재개 및 LLM 작업 분리 검토](docs/STUDIO_RESUME_REVIEW.md) — 현재 배포는 비활성이며 복구 작업은 아직 실행하지 않았습니다.
+- [LLM 모델 전환: Client 통합 계획과 기존 자료 안내](docs/LLM_MODEL_SWITCH.md) — UI/API의 구현 주체는 `bc250-llm-client`입니다.
 - [설계 및 로컬 환경 확인](docs/ARCHITECTURE.md)
 - [API 계약](docs/API.md)
 - [모델 레지스트리](docs/MODELS.md)

@@ -5,7 +5,7 @@ import sys
 from types import SimpleNamespace
 
 import pytest
-from app.core.files import FileLock, LockBusyError
+from app.core.studio_files import FileLock, LockBusyError
 from app.main import create_app
 from app.models.database import Database
 from app.services.gpu import GPUManager

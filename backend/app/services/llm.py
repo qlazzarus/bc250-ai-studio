@@ -4,7 +4,7 @@ import time
 
 import httpx
 
-from app.core.files import LockBusyError
+from app.core.studio_files import LockBusyError
 
 
 class BusyError(RuntimeError):

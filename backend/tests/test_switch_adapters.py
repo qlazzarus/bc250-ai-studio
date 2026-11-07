@@ -2,9 +2,9 @@ import asyncio
 
 import httpx
 import pytest
-from app.core.config import GateSettings
-from app.core.files import FileLock
-from app.gate import create_gate_app
+from app.core.studio_config import GateSettings
+from app.core.studio_files import FileLock
+from app.gate_candidate import create_gate_app
 from app.services.llm import SystemdLLM
 from app.services.switch_adapters import AsyncGPULock, SwitchGate
 
@@ -63,7 +63,7 @@ async def test_cancelling_a_waiter_never_releases_existing_owner(tmp_path):
             await task
         assert image.handle is not None
         probe = FileLock(path)
-        from app.core.files import LockBusyError
+        from app.core.studio_files import LockBusyError
 
         with pytest.raises(LockBusyError):
             probe.acquire()

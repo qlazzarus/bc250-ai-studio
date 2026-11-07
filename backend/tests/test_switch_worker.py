@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 import pytest
-from app.core.files import FileLock, LockBusyError
+from app.core.studio_files import FileLock, LockBusyError
 from app.services.model_switch import ModelSwitch, SwitchJournal
 from app.services.switch_adapters import AsyncGPULock
 from app.services.switch_operations import OperationConflict, SwitchOperations

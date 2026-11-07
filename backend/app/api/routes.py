@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, R
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import func, select
 
-from app.core.files import safe_path
+from app.core.studio_files import safe_path
 from app.models.database import (
     Asset,
     Job,

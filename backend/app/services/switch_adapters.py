@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from app.core.files import FileLock, LockBusyError
+from app.core.studio_files import FileLock, LockBusyError
 from app.services.model_switch import SwitchAdmissionBlocked
 
 

@@ -32,6 +32,28 @@ install -m 0600 "$archive" "$stage/release.tar.gz"
 tar -xzf "$stage/release.tar.gz" -C "$stage"
 [[ -f "$stage/pyproject.toml" && -f "$stage/uv.lock" && -f "$stage/backend/app/main.py" && -f "$stage/frontend/dist/index.html" && -f "$stage/config/models.yaml" ]]
 
+# A separately running gate may still use this checkout and virtualenv. Never
+# silently replace its implementation/dependencies during a Studio-only release.
+# This covers the current gate's local import closure, including package init.
+gate_runtime=$(systemctl show bc250-llm-gate.service -p ExecStart -p WorkingDirectory)
+shared_gate_runtime=false
+if [[ "$gate_runtime" == *"$app"* ]]; then
+    shared_gate_runtime=true
+    for item in pyproject.toml uv.lock backend/app/__init__.py \
+        backend/app/gate.py backend/app/core/__init__.py \
+        backend/app/core/config.py backend/app/core/files.py; do
+        if ! cmp -s "$app/$item" "$stage/$item"; then
+            echo "Shared gate runtime would change: $item; Studio-only deployment refused before stop." >&2
+            echo 'Review a compatible gate update or separate its runtime before deploying this release.' >&2
+            exit 1
+        fi
+    done
+    # Do not let uv replace packages or entry points underneath the running gate.
+    # The lock and project files match, and the existing runtime must import the
+    # dependencies required by the Studio and gate release before we stop Studio.
+    "$app/.venv/bin/python" -c 'import alembic, fastapi, httpx, PIL, pydantic_settings, sqlalchemy, uvicorn, yaml'
+fi
+
 # systemd shutdown waits for the current image boundary and GPU/LLM recovery.
 # A batch can be marked interrupted; TimeoutStopSec in the installed unit still applies.
 systemctl stop "$service"
@@ -49,7 +71,9 @@ for item in backend config/models.yaml frontend/dist pyproject.toml uv.lock; do
     cp -a "$stage/$item" "$app/$item"
 done
 cd "$app"
-UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy uv sync --locked --no-dev --python /usr/bin/python3
+if [[ "$shared_gate_runtime" != true ]]; then
+    UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy uv sync --locked --no-dev --python /usr/bin/python3
+fi
 chmod -R a+rX "$app/.venv"
 systemctl start "$service"
 for attempt in {1..30}; do

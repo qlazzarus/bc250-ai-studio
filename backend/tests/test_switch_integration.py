@@ -7,9 +7,9 @@ from pathlib import Path
 
 import httpx
 import pytest
-from app.core.config import GateSettings
-from app.core.files import FileLock
-from app.gate import create_gate_app
+from app.core.studio_config import GateSettings
+from app.core.studio_files import FileLock
+from app.gate_candidate import create_gate_app
 from app.services.llm import SystemdLLM
 from app.services.model_control import ActiveModelWriter, ModelRegistry
 from app.services.model_switch import (

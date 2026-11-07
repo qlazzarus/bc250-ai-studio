@@ -5,7 +5,7 @@ import tempfile
 import httpx
 import pytest
 from app.api.remote_model_management import create_remote_model_management_app
-from app.core.files import FileLock
+from app.core.studio_files import FileLock
 from app.services.model_control_bridge import ModelControlBridge, ModelControlClient
 from app.services.model_switch import ModelSwitch, SwitchJournal
 from app.services.switch_operations import SwitchOperations

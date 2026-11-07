@@ -5,7 +5,7 @@ import sys
 from types import SimpleNamespace
 
 import pytest
-from app.core.files import FileLock, LockBusyError
+from app.core.studio_files import FileLock, LockBusyError
 
 
 def info(mode, uid=0, nlink=1):

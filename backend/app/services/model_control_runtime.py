@@ -12,7 +12,7 @@ from types import SimpleNamespace
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.core.files import FileLock
+from app.core.studio_files import FileLock
 from app.services.llm import SystemdLLM
 from app.services.model_control import ActiveModelWriter, ModelRegistry
 from app.services.model_control_bridge import MAX_MESSAGE, ModelControlBridge

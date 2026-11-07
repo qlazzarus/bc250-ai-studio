@@ -1,9 +1,9 @@
 import asyncio
 from uuid import uuid4
 
-from app.core.files import FileLock, LockBusyError
+from app.core.studio_files import FileLock, LockBusyError
 from app.models.database import now
-from app.services.model_switch import StudioSwitchBarrier, SwitchRecoveryRequired
+from app.services.switch_barrier import StudioSwitchBarrier, SwitchRecoveryRequired
 
 
 class RecoveryError(RuntimeError):

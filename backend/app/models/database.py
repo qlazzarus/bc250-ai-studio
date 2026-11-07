@@ -142,7 +142,7 @@ class Database:
         from alembic import command
         from alembic.config import Config
 
-        from app.core.config import ROOT
+        from app.core.studio_config import ROOT
 
         config = Config()
         config.set_main_option("script_location", str(ROOT / "backend/alembic"))

@@ -1,7 +1,7 @@
 import time
 
 import pytest
-from app.core.config import Settings
+from app.core.studio_config import Settings
 from app.main import create_app
 from fastapi.testclient import TestClient
 

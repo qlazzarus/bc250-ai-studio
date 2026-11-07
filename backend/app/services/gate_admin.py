@@ -10,7 +10,7 @@ import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
 
-from app.core.files import FileLock
+from app.core.studio_files import FileLock
 from app.services.llm import SystemdLLM
 from app.services.model_control import ActiveModelWriter, ModelRegistry
 from app.services.model_control_bridge import ModelControlClient

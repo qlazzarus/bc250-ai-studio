@@ -1,17 +1,76 @@
-name: Deploy BC-250 AI Studio (disabled)
+name: Deploy BC-250 AI Studio
 
-# The old Studio-only deployment is incompatible with model-control migration.
-# Keep the dispatch visible, but fail before checkout, credentials, or SSH.
+# Manual recovery first. Restore push after a verified production deployment.
+
 on:
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
+
+concurrency:
+  group: bc250-ai-studio-deployment
+  cancel-in-progress: false
 
 jobs:
-  disabled:
+  deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: production
     steps:
-      - name: Refuse legacy deployment
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Test backend
         run: |
-          echo 'Studio-only deployment is disabled until coordinated deployment is validated.' >&2
-          exit 1
+          python -m pip install 'uv==0.9.13'
+          uv sync --locked --extra dev
+          uv run bash scripts/test-studio.sh
+          uv run ruff check backend
+      - name: Check and build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+      - name: Package release
+        run: |
+          set -euo pipefail
+          bash -n deploy/deploy-release.sh
+          stage=$(mktemp -d)
+          git archive HEAD pyproject.toml uv.lock backend config | tar -x -C "$stage"
+          mkdir -p "$stage/frontend/dist"
+          cp -R frontend/dist/. "$stage/frontend/dist/"
+          tar -czf /tmp/bc250-ai-studio-release.tar.gz -C "$stage" pyproject.toml uv.lock backend config frontend/dist
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.BC250_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.BC250_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          : "${SSH_PRIVATE_KEY:?}" "${SSH_KNOWN_HOSTS:?}"
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/bc250_deploy
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy and check service
+        env:
+          SSH_HOST: ${{ secrets.BC250_SSH_HOST }}
+          SSH_USER: ${{ secrets.BC250_SSH_USER }}
+          SSH_PORT: ${{ secrets.BC250_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          : "${SSH_HOST:?}" "${SSH_USER:?}" "${SSH_PORT:?}"
+          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9.-]+$ && "$SSH_USER" =~ ^[a-zA-Z0-9_-]+$ && "$SSH_PORT" =~ ^[0-9]+$ ]]
+          # Refuse an outdated server installer before uploading or stopping Studio.
+          expected=$(sha256sum deploy/deploy-release.sh | cut -d ' ' -f1)
+          installed=$(ssh -i ~/.ssh/bc250_deploy -o StrictHostKeyChecking=yes -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'sha256sum /usr/local/sbin/bc250-ai-studio-deploy' | cut -d ' ' -f1)
+          [[ "$installed" == "$expected" ]] || { echo 'Install the reviewed deploy/deploy-release.sh on the server first.' >&2; exit 1; }
+          scp -i ~/.ssh/bc250_deploy -o StrictHostKeyChecking=yes -P "$SSH_PORT" /tmp/bc250-ai-studio-release.tar.gz "$SSH_USER@$SSH_HOST:bc250-ai-studio-release.tar.gz"
+          ssh -i ~/.ssh/bc250_deploy -o StrictHostKeyChecking=yes -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'sudo -n /usr/local/sbin/bc250-ai-studio-deploy'

@@ -4,7 +4,7 @@ from io import BytesIO
 
 import pytest
 import yaml
-from app.core.files import safe_path
+from app.core.studio_files import safe_path
 from app.engines.fake import FakeEngine
 from app.main import create_app
 from app.models.database import Asset, Database, Job, emit

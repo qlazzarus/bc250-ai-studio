@@ -3,7 +3,7 @@ import copy
 
 from sqlalchemy import select
 
-from app.core.files import LockBusyError, atomic_json, safe_path
+from app.core.studio_files import LockBusyError, atomic_json, safe_path
 from app.models.database import Asset, Job, emit, now, uid
 from app.services.llm import BusyError
 

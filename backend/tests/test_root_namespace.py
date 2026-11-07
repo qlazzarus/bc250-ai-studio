@@ -10,7 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from app.core.files import FileLock, LockBusyError
+from app.core.studio_files import FileLock, LockBusyError
 from app.services.model_control import ActiveModelWriter, ModelRegistry
 from app.services.model_switch import StudioSwitchBarrier, SwitchJournal
 

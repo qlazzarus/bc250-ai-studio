@@ -1,8 +1,8 @@
 import json
 
 import pytest
-from app.core.files import LockBusyError
-from app.gate import Admission
+from app.core.studio_files import LockBusyError
+from app.gate_candidate import Admission
 from app.models.database import Database
 from app.services.gpu import GPUManager, RecoveryError
 from app.services.llm import FakeLLM

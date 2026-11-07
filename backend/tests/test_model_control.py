@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from app.core.files import FileLock
+from app.core.studio_files import FileLock
 from app.services.model_control import (
     MAX_REQUEST,
     ActiveModelWriter,
