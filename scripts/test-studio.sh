@@ -14,5 +14,6 @@ exec "$python_bin" -m pytest -q \
   backend/tests/test_llm_adapter.py \
   backend/tests/test_secure_gpu_lock.py \
   backend/tests/test_coordination_capability.py \
+  backend/tests/test_model_switch_recovery_endpoint.py \
   backend/tests/test_studio_independence.py \
   backend/tests/test_studio_deploy.py "$@"

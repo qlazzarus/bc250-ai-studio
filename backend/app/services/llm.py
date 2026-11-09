@@ -140,7 +140,10 @@ class SystemdLLM:
     async def ensure_image_admission(self):
         status = await self.gate("GET")
         holds = status.get("holds")
-        if (status.get("protocol") != 2 or status.get("durable") is not True
+        if (type(status.get("protocol")) is not int or status["protocol"] != 3
+                or status.get("durable") is not True
+                or "recovery_exclusive_hold" not in status
+                or status["recovery_exclusive_hold"] is not None
                 or not isinstance(holds, list) or any(not isinstance(x, str) for x in holds)):
             raise RuntimeError("Owned durable admission control is unavailable")
         if any(hold == "startup" or hold.startswith(("studio-", "switch-")) for hold in holds):
@@ -151,7 +154,10 @@ class SystemdLLM:
         async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
             response = await client.get(self.s.admission_url.rstrip("/") + "/identity", headers=headers)
             response.raise_for_status()
-            return response.json() == {"role": "studio", "protocol": 2}
+            value = response.json()
+            return (isinstance(value, dict) and value.keys() == {"role", "protocol"}
+                    and value["role"] == "studio" and type(value["protocol"]) is int
+                    and value["protocol"] == 3)
 
     async def resume_owned(self, hold_id):
         await self._owned_hold(hold_id, False)
