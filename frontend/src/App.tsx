@@ -281,6 +281,7 @@ function ImageViewer({ api, initialAssets, initialPage, initialId, archived, clo
   const [navigationError, setNavigationError] = useState("");
   const [loadingPage, setLoadingPage] = useState(false);
   const [atEnd, setAtEnd] = useState(false);
+  const touchStart = useRef<{ x: number; y: number; id: number } | null>(null);
   const loadingRef = useRef(false);
   const mountedRef = useRef(true);
   const index = assets.findIndex((asset) => asset.asset_id === viewedId);
@@ -341,7 +342,24 @@ function ImageViewer({ api, initialAssets, initialPage, initialId, archived, clo
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [close, navigate]);
-  return <div className="modal-backdrop image-backdrop" onMouseDown={close}><div className="image-viewer" role="dialog" aria-modal="true" aria-label="이미지 보기" onMouseDown={(event) => event.stopPropagation()}>
+  return <div className="modal-backdrop image-backdrop" onMouseDown={close}><div className="image-viewer" role="dialog" aria-modal="true" aria-label="이미지 보기" onMouseDown={(event) => event.stopPropagation()}
+    onTouchStart={(event) => {
+      if (event.touches.length !== 1 || (event.target as Element).closest("button")) { touchStart.current = null; return; }
+      const touch = event.touches[0];
+      touchStart.current = { x: touch.clientX, y: touch.clientY, id: touch.identifier };
+    }}
+    onTouchMove={(event) => { if (event.touches.length !== 1) touchStart.current = null; }}
+    onTouchCancel={() => { touchStart.current = null; }}
+    onTouchEnd={(event) => {
+      const start = touchStart.current;
+      touchStart.current = null;
+      if (!start || event.touches.length) return;
+      const touch = Array.from(event.changedTouches).find((item) => item.identifier === start.id);
+      if (!touch) return;
+      const dx = touch.clientX - start.x;
+      const dy = touch.clientY - start.y;
+      if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.25) void navigate(dx < 0 ? 1 : -1);
+    }}>
     <button className="close viewer-close" onClick={close} aria-label="닫기">×</button>
     <button className="viewer-arrow previous" onClick={() => void navigate(-1)} disabled={loadingPage || (page === 0 && index <= 0)} aria-label="이전 이미지">‹</button>
     {image?.id === viewedId && imageErrorId !== viewedId ? <img src={image.url} alt="생성 이미지" /> : <p>{imageErrorId === viewedId ? "이미지를 불러오지 못했습니다." : "불러오는 중…"}</p>}
