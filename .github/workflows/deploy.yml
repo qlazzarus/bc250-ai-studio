@@ -32,6 +32,7 @@ jobs:
           python -m pip install 'uv==0.9.13'
           uv sync --locked --extra dev
           uv run bash scripts/test-studio.sh
+          uv run pytest -q scripts/test_studio_static_deploy.py
           uv run ruff check backend
       - name: Check and build frontend
         working-directory: frontend
