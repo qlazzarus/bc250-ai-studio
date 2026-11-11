@@ -246,7 +246,7 @@ function App() {
       <section className="panel jobs"><div className="section-title"><h2>작업 큐</h2><button className="quiet" onClick={() => void refresh()}>새로고침</button></div>{api && jobs.length ? <>{jobs.map((job) => <JobCard key={job.job_id} job={job} api={api} refresh={refresh} />)}<Pagination page={jobPage} hasNext={jobs.length === JOBS_PER_PAGE} onPage={setJobPage} /></> : <p className="empty">최근 작업이 없습니다.</p>}</section>
     </div>
     <section className="panel gallery"><div className="section-title"><h2>{showArchived ? "NSFW 보관함" : "NSFW 갤러리"}</h2><span>{assets.length} assets</span><button className="quiet" onClick={toggleArchived}>{showArchived ? "갤러리" : "보관함"}</button></div>{assets.length ? <><div className="asset-grid">{assets.map((asset) => <div className="asset" key={asset.asset_id}><button className="asset-image" onClick={() => setViewedId(asset.asset_id)} aria-label="이미지 보기">{assetUrls[asset.asset_id] ? <img src={assetUrls[asset.asset_id]} alt="생성 결과" /> : missingAssetIds[asset.asset_id] ? <span>이미지를 찾을 수 없음</span> : <span>불러오는 중…</span>}</button><div className="asset-footer"><small>{asset.asset_id.slice(0, 8)} · {date(asset.created_at)}</small><button className="quiet" onClick={() => void inspect(asset)}>정보</button></div></div>)}</div><Pagination page={assetPage} hasNext={assets.length === ASSETS_PER_PAGE} onPage={changeAssetPage} /></> : <p className="empty">{showArchived ? "보관된 이미지가 없습니다." : "아직 저장된 NSFW 결과가 없습니다."}</p>}</section>
-    {viewedId && <ImageViewer assets={assets} viewedId={viewedId} urls={assetUrls} missing={missingAssetIds} onSelect={setViewedId} close={() => setViewedId(null)} />}
+    {viewedId && <ImageViewer api={api} initialAssets={assets} initialPage={assetPage} initialId={viewedId} archived={showArchived} close={() => setViewedId(null)} />}
     {metadata && selectedAsset && <Metadata data={metadata} archived={Boolean(selectedAsset.archived_at)} close={() => { setMetadata(null); setSelectedAsset(null); }} reuse={reuse} changeArchive={changeArchive} destroy={destroySelected} />}
   </main>;
 }
@@ -272,25 +272,81 @@ function JobCard({ job, api, refresh }: { job: Job; api: StudioApi; refresh(): P
   return <article className="job"><div><span className={`badge ${job.status}`}>{job.status}</span><strong>{job.model_id}</strong><p>{job.prompt}</p><small>{job.items.map((item) => `${item.index + 1}: ${item.status}`).join(" · ")} · {date(job.created_at)}</small></div><div className="job-actions">{!terminal && <button onClick={() => void action("cancel")}>취소</button>}{["failed", "cancelled", "interrupted"].includes(job.status) && <button onClick={() => void action("retry")}>재시도</button>}</div></article>;
 }
 
-function ImageViewer({ assets, viewedId, urls, missing, onSelect, close }: { assets: Asset[]; viewedId: string; urls: Record<string, string>; missing: Record<string, true>; onSelect(id: string): void; close(): void }) {
+function ImageViewer({ api, initialAssets, initialPage, initialId, archived, close }: { api: StudioApi; initialAssets: Asset[]; initialPage: number; initialId: string; archived: boolean; close(): void }) {
+  const [assets, setAssets] = useState(initialAssets);
+  const [page, setPage] = useState(initialPage);
+  const [viewedId, setViewedId] = useState(initialId);
+  const [image, setImage] = useState<{ id: string; url: string } | null>(null);
+  const [imageErrorId, setImageErrorId] = useState<string | null>(null);
+  const [navigationError, setNavigationError] = useState("");
+  const [loadingPage, setLoadingPage] = useState(false);
+  const [atEnd, setAtEnd] = useState(false);
+  const loadingRef = useRef(false);
+  const mountedRef = useRef(true);
   const index = assets.findIndex((asset) => asset.asset_id === viewedId);
-  const previous = useCallback(() => { if (index > 0) onSelect(assets[index - 1].asset_id); }, [assets, index, onSelect]);
-  const next = useCallback(() => { if (index >= 0 && index < assets.length - 1) onSelect(assets[index + 1].asset_id); }, [assets, index, onSelect]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+  useEffect(() => {
+    let active = true;
+    let url: string | undefined;
+    void api.image(viewedId).then((loaded) => {
+      if (!active) { URL.revokeObjectURL(loaded); return; }
+      url = loaded;
+      setImageErrorId(null);
+      setImage({ id: viewedId, url: loaded });
+    }).catch(() => { if (active) setImageErrorId(viewedId); });
+    return () => { active = false; if (url) URL.revokeObjectURL(url); };
+  }, [api, viewedId]);
+
+  const navigate = useCallback(async (direction: -1 | 1) => {
+    if (loadingRef.current || index < 0) return;
+    const target = index + direction;
+    setNavigationError("");
+    if (target >= 0 && target < assets.length) {
+      setViewedId(assets[target].asset_id);
+      return;
+    }
+    const targetPage = page + direction;
+    if (targetPage < 0 || (direction === 1 && (assets.length < ASSETS_PER_PAGE || atEnd))) return;
+    loadingRef.current = true;
+    setLoadingPage(true);
+    try {
+      const nextAssets = await api.assets(archived, ASSETS_PER_PAGE, targetPage * ASSETS_PER_PAGE);
+      if (!mountedRef.current) return;
+      if (!nextAssets.length) {
+        if (direction === 1) setAtEnd(true);
+        return;
+      }
+      setAssets(nextAssets);
+      setPage(targetPage);
+      setAtEnd(false);
+      setViewedId(nextAssets[direction === 1 ? 0 : nextAssets.length - 1].asset_id);
+    } catch {
+      if (mountedRef.current) setNavigationError("이미지 목록을 불러오지 못했습니다. 다시 시도하세요.");
+    } finally {
+      loadingRef.current = false;
+      if (mountedRef.current) setLoadingPage(false);
+    }
+  }, [api, archived, assets, atEnd, index, page]);
+
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") close();
-      else if (event.key === "ArrowLeft") { event.preventDefault(); previous(); }
-      else if (event.key === "ArrowRight") { event.preventDefault(); next(); }
+      else if (event.key === "ArrowLeft") { event.preventDefault(); void navigate(-1); }
+      else if (event.key === "ArrowRight") { event.preventDefault(); void navigate(1); }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [close, previous, next]);
+  }, [close, navigate]);
   return <div className="modal-backdrop image-backdrop" onMouseDown={close}><div className="image-viewer" role="dialog" aria-modal="true" aria-label="이미지 보기" onMouseDown={(event) => event.stopPropagation()}>
     <button className="close viewer-close" onClick={close} aria-label="닫기">×</button>
-    <button className="viewer-arrow previous" onClick={previous} disabled={index <= 0} aria-label="이전 이미지">‹</button>
-    {urls[viewedId] ? <img src={urls[viewedId]} alt="생성 이미지" /> : <p>{missing[viewedId] ? "이미지를 찾을 수 없습니다." : "불러오는 중…"}</p>}
-    <button className="viewer-arrow next" onClick={next} disabled={index < 0 || index >= assets.length - 1} aria-label="다음 이미지">›</button>
-    <span className="viewer-count">{index + 1} / {assets.length} · 현재 페이지</span>
+    <button className="viewer-arrow previous" onClick={() => void navigate(-1)} disabled={loadingPage || (page === 0 && index <= 0)} aria-label="이전 이미지">‹</button>
+    {image?.id === viewedId && imageErrorId !== viewedId ? <img src={image.url} alt="생성 이미지" /> : <p>{imageErrorId === viewedId ? "이미지를 불러오지 못했습니다." : "불러오는 중…"}</p>}
+    <button className="viewer-arrow next" onClick={() => void navigate(1)} disabled={loadingPage || (index === assets.length - 1 && (assets.length < ASSETS_PER_PAGE || atEnd))} aria-label="다음 이미지">›</button>
+    <span className="viewer-count" aria-live="polite">{navigationError || (loadingPage ? "목록을 불러오는 중…" : `${page + 1} 페이지 · ${index + 1} / ${assets.length}`)}</span>
   </div></div>;
 }
 
