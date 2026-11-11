@@ -7,7 +7,7 @@ const sizes: Record<PixelAsset["kind"], number> = {
 
 const kinds = Object.keys(sizes) as PixelAsset["kind"][];
 
-export function PixelStudio({ api, reportError, onArt, disconnect }: { api: StudioApi; reportError(message: string): void; onArt(): void; disconnect(): void }) {
+export function PixelStudio({ api, reportError, onArt }: { api: StudioApi; reportError(message: string): void; onArt(): void }) {
   const [projects, setProjects] = useState<PixelProject[]>([]);
   const [sources, setSources] = useState<Asset[]>([]);
   const [sourceUrls, setSourceUrls] = useState<Record<string, string>>({});
@@ -148,7 +148,7 @@ export function PixelStudio({ api, reportError, onArt, disconnect }: { api: Stud
   }
 
   return <main className="shell pixel-shell">
-    <header><div><p className="eyebrow">BC-250 · PIXEL PIPELINE</p><h1>Pixel Studio</h1></div><div className="header-actions"><button className="quiet" onClick={onArt}>Art Studio</button><button className="quiet" onClick={disconnect}>연결 해제</button></div></header>
+    <header><div><p className="eyebrow">BC-250 · PIXEL PIPELINE</p><h1>Pixel Studio</h1></div><div className="header-actions"><button className="quiet" onClick={onArt}>Art Studio</button></div></header>
     <div className="pixel-layout">
       <section className="panel"><div className="section-title"><h2>프로젝트 / Art Bible</h2><span>{projects.length} projects</span></div>
         <label>프로젝트<select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">프로젝트 선택</option>{projects.map((project) => <option key={project.project_id} value={project.project_id}>{project.name}</option>)}</select></label>

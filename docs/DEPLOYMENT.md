@@ -433,7 +433,7 @@ npm run build
 npm run dev
 ```
 
-`http://127.0.0.1:5173`을 열어 API 주소에 `/api/v1`, API 키에 `STUDIO_API_KEY`를 입력합니다.
+`frontend/.env.local`의 `VITE_STUDIO_API_KEY`에 서버의 `STUDIO_API_KEY`를 설정하고 `http://127.0.0.1:5173`을 엽니다. API 주소는 `/api/v1`로 고정됩니다.
 Vite는 `/api`를 `http://127.0.0.1:18090`으로 전달합니다. 실제 엔진의 manual 정책에서는
 작업 접수 뒤 BC-250의 관리자가 별도로 manual grant해야 합니다.
 
@@ -442,7 +442,7 @@ Vite는 `/api`를 `http://127.0.0.1:18090`으로 전달합니다. 실제 엔진�
 정적 빌드는 민감한 키를 포함하지 않습니다. Mac에서 빌드한 뒤 `frontend/dist/`를 Studio 소스의
 동일 경로로 전송하고, [Caddy 템플릿](../deploy/Caddyfile.example)의 사이트 블록을 기존
 `Caddyfile`에 병합합니다. 템플릿은 `/api/*`만 loopback Studio로 전달하고 나머지는
-`frontend/dist`에서 제공합니다. 검증과 reload 후 도메인을 열어 `/api/v1`을 API 주소로 사용합니다.
+`frontend/dist`에서 제공합니다. 빌드할 때 `VITE_STUDIO_API_KEY`를 설정하고, 검증과 reload 후 도메인을 엽니다. 키는 브라우저 번들에 포함되므로 사이트 접근을 제한해야 합니다.
 
 ```bash
 sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

@@ -35,7 +35,10 @@ jobs:
           uv run ruff check backend
       - name: Check and build frontend
         working-directory: frontend
+        env:
+          VITE_STUDIO_API_KEY: ${{ secrets.BC250_STUDIO_API_KEY }}
         run: |
+          test -n "$VITE_STUDIO_API_KEY" || { echo "BC250_STUDIO_API_KEY secret is required" >&2; exit 1; }
           npm ci
           npm run lint
           npm run build

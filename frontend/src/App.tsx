@@ -2,8 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { type Asset, type AssetMetadata, type GenerationOption, type Job, type StudioModel, type SystemStatus, StudioApi } from "./api";
 import { PixelStudio } from "./PixelStudio";
 
-const BASE_KEY = "bc250.studio.base";
-const TOKEN_KEY = "bc250.studio.token";
+const API_KEY = import.meta.env.VITE_STUDIO_API_KEY || sessionStorage.getItem("bc250.studio.token") || "";
 const JOBS_PER_PAGE = 12;
 const ASSETS_PER_PAGE = 12;
 
@@ -40,9 +39,6 @@ function date(value: string | null) {
 }
 
 function App() {
-  const [baseUrl, setBaseUrl] = useState(() => sessionStorage.getItem(BASE_KEY) || "/api/v1");
-  const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY) || "");
-  const [connected, setConnected] = useState(() => Boolean(sessionStorage.getItem(TOKEN_KEY)));
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [models, setModels] = useState<StudioModel[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -55,12 +51,13 @@ function App() {
   const assetUrlsRef = useRef<Record<string, string>>({});
   const [metadata, setMetadata] = useState<AssetMetadata | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [viewedId, setViewedId] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [studio, setStudio] = useState<"art" | "pixel">("art");
 
-  const api = useMemo(() => connected ? new StudioApi(baseUrl.replace(/\/$/, ""), token) : null, [baseUrl, connected, token]);
+  const api = useMemo(() => new StudioApi("/api/v1", API_KEY), []);
   const activeModel = models.find((model) => model.model_id === settings.modelId);
   const generationOptions = activeModel?.generation_options;
   const cfgOption = generationOptions?.cfg_scale;
@@ -117,13 +114,6 @@ function App() {
     });
     return () => { active = false; };
   }, [api, assets, assetUrls, missingAssetIds]);
-
-  function connect(event: FormEvent) {
-    event.preventDefault();
-    sessionStorage.setItem(BASE_KEY, baseUrl.replace(/\/$/, ""));
-    sessionStorage.setItem(TOKEN_KEY, token);
-    setError(""); setConnected(true);
-  }
 
   function chooseModel(modelId: string) {
     const model = models.find((item) => item.model_id === modelId);
@@ -217,9 +207,6 @@ function App() {
     }
   }
 
-  if (!connected || !api) return <Connection baseUrl={baseUrl} token={token} setBaseUrl={setBaseUrl} setToken={setToken} connect={connect} error={error} />;
-
-  const disconnect = () => { setConnected(false); setToken(""); sessionStorage.removeItem(TOKEN_KEY); };
   const changeAssetPage = (page: number) => {
     Object.values(assetUrlsRef.current).forEach(URL.revokeObjectURL);
     setAssetUrls({}); setMissingAssetIds({}); setAssetPage(page);
@@ -229,10 +216,10 @@ function App() {
     setAssetUrls({}); setMissingAssetIds({}); setAssetPage(0); setShowArchived((value) => !value);
   };
 
-  if (studio === "pixel") return <><PixelStudio api={api} reportError={reportError} onArt={() => setStudio("art")} disconnect={disconnect} />{error && <div className="floating-error"><span>{error}</span><button onClick={() => setError("")}>닫기</button></div>}</>;
+  if (studio === "pixel") return <><PixelStudio api={api} reportError={reportError} onArt={() => setStudio("art")} />{error && <div className="floating-error"><span>{error}</span><button onClick={() => setError("")}>닫기</button></div>}</>;
 
   return <main className="shell">
-    <header><div><p className="eyebrow">BC-250 · LOCAL AI</p><h1>Art Studio</h1></div><div className="header-actions"><button className="quiet" onClick={() => setStudio("pixel")}>Pixel Studio</button><button className="quiet" onClick={disconnect}>연결 해제</button></div></header>
+    <header><div><p className="eyebrow">BC-250 · LOCAL AI</p><h1>Art Studio</h1></div><div className="header-actions"><button className="quiet" onClick={() => setStudio("pixel")}>Pixel Studio</button></div></header>
     <section className="statusbar"><span className={status?.recovery_required ? "dot error" : "dot"} />
       <span>{status?.simulated ? "Fake Engine" : "Vulkan Engine"}</span><span>정책: {status?.policy || "…"}</span>
       {status?.policy === "manual" && <span className="notice">작업 접수 후 관리자의 실행 허가가 필요합니다.</span>}
@@ -258,13 +245,10 @@ function App() {
       </section>
       <section className="panel jobs"><div className="section-title"><h2>작업 큐</h2><button className="quiet" onClick={() => void refresh()}>새로고침</button></div>{api && jobs.length ? <>{jobs.map((job) => <JobCard key={job.job_id} job={job} api={api} refresh={refresh} />)}<Pagination page={jobPage} hasNext={jobs.length === JOBS_PER_PAGE} onPage={setJobPage} /></> : <p className="empty">최근 작업이 없습니다.</p>}</section>
     </div>
-    <section className="panel gallery"><div className="section-title"><h2>{showArchived ? "NSFW 보관함" : "NSFW 갤러리"}</h2><span>{assets.length} assets</span><button className="quiet" onClick={toggleArchived}>{showArchived ? "갤러리" : "보관함"}</button></div>{assets.length ? <><div className="asset-grid">{assets.map((asset) => <button className="asset" onClick={() => void inspect(asset)} key={asset.asset_id}>{assetUrls[asset.asset_id] ? <img src={assetUrls[asset.asset_id]} alt="생성 결과" /> : missingAssetIds[asset.asset_id] ? <span>이미지를 찾을 수 없음</span> : <span>불러오는 중…</span>}<small>{asset.asset_id.slice(0, 8)} · {date(asset.created_at)}</small></button>)}</div><Pagination page={assetPage} hasNext={assets.length === ASSETS_PER_PAGE} onPage={changeAssetPage} /></> : <p className="empty">{showArchived ? "보관된 이미지가 없습니다." : "아직 저장된 NSFW 결과가 없습니다."}</p>}</section>
-    {metadata && selectedAsset && <Metadata data={metadata} imageUrl={assetUrls[selectedAsset.asset_id]} archived={Boolean(selectedAsset.archived_at)} close={() => { setMetadata(null); setSelectedAsset(null); }} reuse={reuse} changeArchive={changeArchive} destroy={destroySelected} />}
+    <section className="panel gallery"><div className="section-title"><h2>{showArchived ? "NSFW 보관함" : "NSFW 갤러리"}</h2><span>{assets.length} assets</span><button className="quiet" onClick={toggleArchived}>{showArchived ? "갤러리" : "보관함"}</button></div>{assets.length ? <><div className="asset-grid">{assets.map((asset) => <div className="asset" key={asset.asset_id}><button className="asset-image" onClick={() => setViewedId(asset.asset_id)} aria-label="이미지 보기">{assetUrls[asset.asset_id] ? <img src={assetUrls[asset.asset_id]} alt="생성 결과" /> : missingAssetIds[asset.asset_id] ? <span>이미지를 찾을 수 없음</span> : <span>불러오는 중…</span>}</button><div className="asset-footer"><small>{asset.asset_id.slice(0, 8)} · {date(asset.created_at)}</small><button className="quiet" onClick={() => void inspect(asset)}>정보</button></div></div>)}</div><Pagination page={assetPage} hasNext={assets.length === ASSETS_PER_PAGE} onPage={changeAssetPage} /></> : <p className="empty">{showArchived ? "보관된 이미지가 없습니다." : "아직 저장된 NSFW 결과가 없습니다."}</p>}</section>
+    {viewedId && <ImageViewer assets={assets} viewedId={viewedId} urls={assetUrls} missing={missingAssetIds} onSelect={setViewedId} close={() => setViewedId(null)} />}
+    {metadata && selectedAsset && <Metadata data={metadata} archived={Boolean(selectedAsset.archived_at)} close={() => { setMetadata(null); setSelectedAsset(null); }} reuse={reuse} changeArchive={changeArchive} destroy={destroySelected} />}
   </main>;
-}
-
-function Connection({ baseUrl, token, setBaseUrl, setToken, connect, error }: { baseUrl: string; token: string; setBaseUrl(value: string): void; setToken(value: string): void; connect(event: FormEvent): void; error: string }) {
-  return <main className="connect"><p className="eyebrow">BC-250 · LOCAL AI</p><h1>Art Studio</h1><p>Studio API에 연결합니다. API 키는 이 브라우저 탭의 sessionStorage에만 보관됩니다.</p><form onSubmit={connect}><label>API 주소<input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="/api/v1 또는 http://127.0.0.1:18090/api/v1" /></label><label>Client API key<input type="password" value={token} onChange={(event) => setToken(event.target.value)} autoComplete="off" /></label>{error && <p className="error-text">{error}</p>}<button className="generate">연결</button></form></main>;
 }
 
 function Pagination({ page, hasNext, onPage }: { page: number; hasNext: boolean; onPage(page: number): void }) {
@@ -288,8 +272,30 @@ function JobCard({ job, api, refresh }: { job: Job; api: StudioApi; refresh(): P
   return <article className="job"><div><span className={`badge ${job.status}`}>{job.status}</span><strong>{job.model_id}</strong><p>{job.prompt}</p><small>{job.items.map((item) => `${item.index + 1}: ${item.status}`).join(" · ")} · {date(job.created_at)}</small></div><div className="job-actions">{!terminal && <button onClick={() => void action("cancel")}>취소</button>}{["failed", "cancelled", "interrupted"].includes(job.status) && <button onClick={() => void action("retry")}>재시도</button>}</div></article>;
 }
 
-function Metadata({ data, imageUrl, archived, close, reuse, changeArchive, destroy }: { data: AssetMetadata; imageUrl?: string; archived: boolean; close(): void; reuse(item: AssetMetadata): void; changeArchive(restore: boolean): Promise<void>; destroy(): Promise<void> }) {
-  return <div className="modal-backdrop" role="presentation" onMouseDown={close}><aside className="modal preview-modal" role="dialog" aria-modal="true" aria-label="생성 이미지 상세" onMouseDown={(event) => event.stopPropagation()}><button className="close" onClick={close} aria-label="닫기">×</button><p className="eyebrow">GENERATE METADATA</p><h2>{data.model_id}</h2>{imageUrl ? <a className="preview-image-link" href={imageUrl} target="_blank" rel="noreferrer" title="원본 크기로 새 탭에서 열기"><img className="preview-image" src={imageUrl} alt={`생성 이미지: ${data.prompt}`} /></a> : <div className="preview-loading">원본 이미지를 불러오는 중…</div>}<p className="preview-hint">이미지를 클릭하면 원본을 새 탭에서 엽니다.</p><dl><dt>Seed</dt><dd>{data.seed}</dd><dt>Size</dt><dd>{data.width} × {data.height}</dd><dt>Steps / CFG</dt><dd>{data.steps} / {data.cfg_scale}</dd><dt>Sampler</dt><dd>{data.sampling_method ?? "기록 없음 · 모델 기본값"}</dd><dt>Scheduler</dt><dd>{data.scheduler ?? "CLI 기본값 (생략)"}</dd><dt>Engine</dt><dd>{data.simulated ? "Fake" : "Vulkan"}</dd><dt>Prompt</dt><dd>{data.prompt}</dd>{data.negative_prompt && <><dt>Negative</dt><dd>{data.negative_prompt}</dd></>}</dl><div className="metadata-actions"><button className="quiet" onClick={() => void changeArchive(archived)}>{archived ? "갤러리로 복원" : "보관"}</button>{archived && <button className="danger" onClick={() => void destroy()}>영구 삭제</button>}</div><button className="generate" onClick={() => reuse(data)}>이 설정으로 다시 생성</button></aside></div>;
+function ImageViewer({ assets, viewedId, urls, missing, onSelect, close }: { assets: Asset[]; viewedId: string; urls: Record<string, string>; missing: Record<string, true>; onSelect(id: string): void; close(): void }) {
+  const index = assets.findIndex((asset) => asset.asset_id === viewedId);
+  const previous = useCallback(() => { if (index > 0) onSelect(assets[index - 1].asset_id); }, [assets, index, onSelect]);
+  const next = useCallback(() => { if (index >= 0 && index < assets.length - 1) onSelect(assets[index + 1].asset_id); }, [assets, index, onSelect]);
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+      else if (event.key === "ArrowLeft") { event.preventDefault(); previous(); }
+      else if (event.key === "ArrowRight") { event.preventDefault(); next(); }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [close, previous, next]);
+  return <div className="modal-backdrop image-backdrop" onMouseDown={close}><div className="image-viewer" role="dialog" aria-modal="true" aria-label="이미지 보기" onMouseDown={(event) => event.stopPropagation()}>
+    <button className="close viewer-close" onClick={close} aria-label="닫기">×</button>
+    <button className="viewer-arrow previous" onClick={previous} disabled={index <= 0} aria-label="이전 이미지">‹</button>
+    {urls[viewedId] ? <img src={urls[viewedId]} alt="생성 이미지" /> : <p>{missing[viewedId] ? "이미지를 찾을 수 없습니다." : "불러오는 중…"}</p>}
+    <button className="viewer-arrow next" onClick={next} disabled={index < 0 || index >= assets.length - 1} aria-label="다음 이미지">›</button>
+    <span className="viewer-count">{index + 1} / {assets.length} · 현재 페이지</span>
+  </div></div>;
+}
+
+function Metadata({ data, archived, close, reuse, changeArchive, destroy }: { data: AssetMetadata; archived: boolean; close(): void; reuse(item: AssetMetadata): void; changeArchive(restore: boolean): Promise<void>; destroy(): Promise<void> }) {
+  return <div className="modal-backdrop" role="presentation" onMouseDown={close}><aside className="modal preview-modal" role="dialog" aria-modal="true" aria-label="생성 이미지 상세" onMouseDown={(event) => event.stopPropagation()}><button className="close" onClick={close} aria-label="닫기">×</button><p className="eyebrow">GENERATE METADATA</p><h2>{data.model_id}</h2><dl><dt>Seed</dt><dd>{data.seed}</dd><dt>Size</dt><dd>{data.width} × {data.height}</dd><dt>Steps / CFG</dt><dd>{data.steps} / {data.cfg_scale}</dd><dt>Sampler</dt><dd>{data.sampling_method ?? "기록 없음 · 모델 기본값"}</dd><dt>Scheduler</dt><dd>{data.scheduler ?? "CLI 기본값 (생략)"}</dd><dt>Engine</dt><dd>{data.simulated ? "Fake" : "Vulkan"}</dd><dt>Prompt</dt><dd>{data.prompt}</dd>{data.negative_prompt && <><dt>Negative</dt><dd>{data.negative_prompt}</dd></>}</dl><div className="metadata-actions"><button className="quiet" onClick={() => void changeArchive(archived)}>{archived ? "갤러리로 복원" : "보관"}</button>{archived && <button className="danger" onClick={() => void destroy()}>영구 삭제</button>}</div><button className="generate" onClick={() => reuse(data)}>이 설정으로 다시 생성</button></aside></div>;
 }
 
 export default App;
