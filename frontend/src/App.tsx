@@ -1,42 +1,21 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Asset, type AssetMetadata, type GenerationOption, type Job, type StudioModel, type SystemStatus, StudioApi } from "./api";
+import { type Asset, type AssetMetadata, type Job, type StudioModel, type SystemStatus, StudioApi } from "./api";
 import { PixelStudio } from "./PixelStudio";
-
-const API_KEY = import.meta.env.VITE_STUDIO_API_KEY || sessionStorage.getItem("bc250.studio.token") || "";
-const JOBS_PER_PAGE = 12;
-const ASSETS_PER_PAGE = 12;
-
-type Settings = {
-  modelId: string; prompt: string; negativePrompt: string; preset: string;
-  resolution: string; steps: number; cfgScale: number; samplingMethod: string | null;
-  scheduler: string | null; seed: string; batchCount: number;
-};
+import Settings from "./types/Settings";
+import { API_KEY, ASSETS_PER_PAGE, JOBS_PER_PAGE } from "./constants";
+import ImageViewer from "./components/ImageViewer";
+import Pagination from "./components/Pagination";
+import JobCard from "./components/JobCard";
+import Metadata from "./components/MetadataModal";
+import date from "./lib/date";
+import editable from "./lib/editable";
+import fixedValue from "./lib/fixedValue";
+import optionStatus from "./lib/optionStatus";
 
 const initialSettings: Settings = {
   modelId: "", prompt: "", negativePrompt: "", preset: "balanced", resolution: "512x512",
   steps: 4, cfgScale: 1, samplingMethod: null, scheduler: null, seed: "-1", batchCount: 1,
 };
-
-function editable(option: GenerationOption | undefined) {
-  if (!option || option.mode === "fixed" || option.mode === "unsupported") return false;
-  return option.allowed_values.length > 1 || option.minimum !== null || option.maximum !== null;
-}
-
-function fixedValue(option: GenerationOption | undefined, fallback: string) {
-  return option?.default === null || option?.default === undefined ? fallback : String(option.default);
-}
-
-function optionStatus(option: GenerationOption | undefined) {
-  if (!option) return "서버 capability 정보 없음";
-  if (option.mode === "experimental") return "실험적 · BC-250 실기 미검증";
-  if (option.mode === "verified") return "검증된 현재 범위";
-  if (option.mode === "unsupported") return "이 모델에서 지원하지 않음";
-  return "모델 고정값";
-}
-
-function date(value: string | null) {
-  return value ? new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "medium" }).format(new Date(value)) : "—";
-}
 
 function App() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
@@ -73,27 +52,61 @@ function App() {
   );
   const reportError = useCallback((message: string) => setError(message), []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     if (!api) return;
+    const controller = new AbortController();
+    const cancel = () => controller.abort();
+    if (signal?.aborted) return;
+    signal?.addEventListener("abort", cancel, { once: true });
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 10000);
     try {
       const [nextStatus, nextModels, nextJobs, nextAssets] = await Promise.all([
-        api.status(), api.models(), api.jobs(JOBS_PER_PAGE, jobPage * JOBS_PER_PAGE),
-        api.assets(showArchived, ASSETS_PER_PAGE, assetPage * ASSETS_PER_PAGE),
+        api.status(controller.signal), api.models(controller.signal), api.jobs(JOBS_PER_PAGE, jobPage * JOBS_PER_PAGE, controller.signal),
+        api.assets(showArchived, ASSETS_PER_PAGE, assetPage * ASSETS_PER_PAGE, controller.signal),
       ]);
+      if (controller.signal.aborted) return;
       setStatus(nextStatus); setModels(nextModels); setJobs(nextJobs); setAssets(nextAssets);
       const first = nextModels.find((model) => model.execution_enabled);
       setSettings((old) => old.modelId ? old : { ...old, modelId: first?.model_id || "" });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "API 연결에 실패했습니다.");
+      if (!signal?.aborted) setError(timedOut ? "API 응답 시간이 초과되었습니다. 다시 시도합니다." : reason instanceof Error ? reason.message : "API 연결에 실패했습니다.");
+    } finally {
+      window.clearTimeout(timeout);
+      signal?.removeEventListener("abort", cancel);
+      controller.abort();
     }
   }, [api, assetPage, jobPage, showArchived]);
 
-  useEffect(() => {
+  useEffect(() => { 
     if (!api) return;
-    const initial = window.setTimeout(() => void refresh(), 0);
-    const interval = window.setInterval(() => void refresh(), 4000);
-    return () => { window.clearTimeout(initial); window.clearInterval(interval); };
+
+    let stopped = false;
+    let timer: number | undefined;
+    const controller = new AbortController();
+
+    async function poll() {
+      try {
+        await refresh(controller.signal);
+      } finally {
+        if (!stopped) {
+          timer = window.setTimeout(() => void poll(), 4000);
+        }
+      }
+    }
+
+    void poll();
+
+    return () => {
+      stopped = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    }
   }, [api, refresh]);
+  
   // Object URLs must survive list refreshes. The old effect revoked every URL
   // whenever a new thumbnail arrived, which made gallery images intermittently
   // disappear or fail to open.
@@ -117,7 +130,7 @@ function App() {
 
   function chooseModel(modelId: string) {
     const model = models.find((item) => item.model_id === modelId);
-    if (!model) return;
+    if (!model || !model.execution_enabled) return;
     const preset = model.presets.balanced || Object.values(model.presets)[0];
     setSettings((old) => ({ ...old, modelId, prompt: old.prompt, negativePrompt: "",
       preset: model.presets.balanced ? "balanced" : Object.keys(model.presets)[0],
@@ -135,7 +148,11 @@ function App() {
     const preset = activeModel.presets[presetName];
     setSettings((old) => ({ ...old, preset: presetName, resolution: `${preset.width}x${preset.height}`,
       steps: preset.steps, cfgScale: preset.cfg_scale,
-      negativePrompt: requiredCfg?.includes(preset.cfg_scale) ? old.negativePrompt : "" }));
+      negativePrompt: 
+        !requiredCfg || requiredCfg?.includes(preset.cfg_scale) 
+        ? old.negativePrompt 
+        : "" 
+      }));
   }
 
   async function submit(event: FormEvent) {
@@ -221,7 +238,7 @@ function App() {
   return <main className="shell">
     <header><div><p className="eyebrow">BC-250 · LOCAL AI</p><h1>Art Studio</h1></div><div className="header-actions"><button className="quiet" onClick={() => setStudio("pixel")}>Pixel Studio</button></div></header>
     <section className="statusbar"><span className={status?.recovery_required ? "dot error" : "dot"} />
-      <span>{status?.simulated ? "Fake Engine" : "Vulkan Engine"}</span><span>정책: {status?.policy || "…"}</span>
+      <span>정책: {status?.policy || "…"}</span>
       {status?.policy === "manual" && <span className="notice">작업 접수 후 관리자의 실행 허가가 필요합니다.</span>}
       {status?.error?.message && <span className="notice error-text">{status.error.message}</span>}
     </section>
@@ -251,125 +268,5 @@ function App() {
   </main>;
 }
 
-function Pagination({ page, hasNext, onPage }: { page: number; hasNext: boolean; onPage(page: number): void }) {
-  return <nav className="pagination" aria-label="페이지 탐색">
-    <button className="quiet" disabled={page === 0} onClick={() => onPage(page - 1)}>이전</button>
-    <span>{page + 1} 페이지</span>
-    <button className="quiet" disabled={!hasNext} onClick={() => onPage(page + 1)}>다음</button>
-  </nav>;
-}
-
-function JobCard({ job, api, refresh }: { job: Job; api: StudioApi; refresh(): Promise<void> }) {
-  const terminal = ["completed", "failed", "cancelled", "interrupted"].includes(job.status);
-  const action = async (kind: "cancel" | "retry") => {
-    try {
-      if (kind === "cancel") await api.cancel(job.job_id);
-      else await api.retry(job.job_id);
-    } finally {
-      await refresh();
-    }
-  };
-  return <article className="job"><div><span className={`badge ${job.status}`}>{job.status}</span><strong>{job.model_id}</strong><p>{job.prompt}</p><small>{job.items.map((item) => `${item.index + 1}: ${item.status}`).join(" · ")} · {date(job.created_at)}</small></div><div className="job-actions">{!terminal && <button onClick={() => void action("cancel")}>취소</button>}{["failed", "cancelled", "interrupted"].includes(job.status) && <button onClick={() => void action("retry")}>재시도</button>}</div></article>;
-}
-
-function ImageViewer({ api, initialAssets, initialPage, initialId, archived, close }: { api: StudioApi; initialAssets: Asset[]; initialPage: number; initialId: string; archived: boolean; close(): void }) {
-  const [assets, setAssets] = useState(initialAssets);
-  const [page, setPage] = useState(initialPage);
-  const [viewedId, setViewedId] = useState(initialId);
-  const [image, setImage] = useState<{ id: string; url: string } | null>(null);
-  const [imageErrorId, setImageErrorId] = useState<string | null>(null);
-  const [navigationError, setNavigationError] = useState("");
-  const [loadingPage, setLoadingPage] = useState(false);
-  const [atEnd, setAtEnd] = useState(false);
-  const touchStart = useRef<{ x: number; y: number; id: number } | null>(null);
-  const loadingRef = useRef(false);
-  const mountedRef = useRef(true);
-  const index = assets.findIndex((asset) => asset.asset_id === viewedId);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
-  useEffect(() => {
-    let active = true;
-    let url: string | undefined;
-    void api.image(viewedId).then((loaded) => {
-      if (!active) { URL.revokeObjectURL(loaded); return; }
-      url = loaded;
-      setImageErrorId(null);
-      setImage({ id: viewedId, url: loaded });
-    }).catch(() => { if (active) setImageErrorId(viewedId); });
-    return () => { active = false; if (url) URL.revokeObjectURL(url); };
-  }, [api, viewedId]);
-
-  const navigate = useCallback(async (direction: -1 | 1) => {
-    if (loadingRef.current || index < 0) return;
-    const target = index + direction;
-    setNavigationError("");
-    if (target >= 0 && target < assets.length) {
-      setViewedId(assets[target].asset_id);
-      return;
-    }
-    const targetPage = page + direction;
-    if (targetPage < 0 || (direction === 1 && (assets.length < ASSETS_PER_PAGE || atEnd))) return;
-    loadingRef.current = true;
-    setLoadingPage(true);
-    try {
-      const nextAssets = await api.assets(archived, ASSETS_PER_PAGE, targetPage * ASSETS_PER_PAGE);
-      if (!mountedRef.current) return;
-      if (!nextAssets.length) {
-        if (direction === 1) setAtEnd(true);
-        return;
-      }
-      setAssets(nextAssets);
-      setPage(targetPage);
-      setAtEnd(false);
-      setViewedId(nextAssets[direction === 1 ? 0 : nextAssets.length - 1].asset_id);
-    } catch {
-      if (mountedRef.current) setNavigationError("이미지 목록을 불러오지 못했습니다. 다시 시도하세요.");
-    } finally {
-      loadingRef.current = false;
-      if (mountedRef.current) setLoadingPage(false);
-    }
-  }, [api, archived, assets, atEnd, index, page]);
-
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-      else if (event.key === "ArrowLeft") { event.preventDefault(); void navigate(-1); }
-      else if (event.key === "ArrowRight") { event.preventDefault(); void navigate(1); }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [close, navigate]);
-  return <div className="modal-backdrop image-backdrop" onMouseDown={close}><div className="image-viewer" role="dialog" aria-modal="true" aria-label="이미지 보기" onMouseDown={(event) => event.stopPropagation()}
-    onTouchStart={(event) => {
-      if (event.touches.length !== 1 || (event.target as Element).closest("button")) { touchStart.current = null; return; }
-      const touch = event.touches[0];
-      touchStart.current = { x: touch.clientX, y: touch.clientY, id: touch.identifier };
-    }}
-    onTouchMove={(event) => { if (event.touches.length !== 1) touchStart.current = null; }}
-    onTouchCancel={() => { touchStart.current = null; }}
-    onTouchEnd={(event) => {
-      const start = touchStart.current;
-      touchStart.current = null;
-      if (!start || event.touches.length) return;
-      const touch = Array.from(event.changedTouches).find((item) => item.identifier === start.id);
-      if (!touch) return;
-      const dx = touch.clientX - start.x;
-      const dy = touch.clientY - start.y;
-      if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.25) void navigate(dx < 0 ? 1 : -1);
-    }}>
-    <button className="close viewer-close" onClick={close} aria-label="닫기">×</button>
-    <button className="viewer-arrow previous" onClick={() => void navigate(-1)} disabled={loadingPage || (page === 0 && index <= 0)} aria-label="이전 이미지">‹</button>
-    {image?.id === viewedId && imageErrorId !== viewedId ? <img src={image.url} alt="생성 이미지" /> : <p>{imageErrorId === viewedId ? "이미지를 불러오지 못했습니다." : "불러오는 중…"}</p>}
-    <button className="viewer-arrow next" onClick={() => void navigate(1)} disabled={loadingPage || (index === assets.length - 1 && (assets.length < ASSETS_PER_PAGE || atEnd))} aria-label="다음 이미지">›</button>
-    <span className="viewer-count" aria-live="polite">{navigationError || (loadingPage ? "목록을 불러오는 중…" : `${page + 1} 페이지 · ${index + 1} / ${assets.length}`)}</span>
-  </div></div>;
-}
-
-function Metadata({ data, archived, close, reuse, changeArchive, destroy }: { data: AssetMetadata; archived: boolean; close(): void; reuse(item: AssetMetadata): void; changeArchive(restore: boolean): Promise<void>; destroy(): Promise<void> }) {
-  return <div className="modal-backdrop" role="presentation" onMouseDown={close}><aside className="modal preview-modal" role="dialog" aria-modal="true" aria-label="생성 이미지 상세" onMouseDown={(event) => event.stopPropagation()}><button className="close" onClick={close} aria-label="닫기">×</button><p className="eyebrow">GENERATE METADATA</p><h2>{data.model_id}</h2><dl><dt>Seed</dt><dd>{data.seed}</dd><dt>Size</dt><dd>{data.width} × {data.height}</dd><dt>Steps / CFG</dt><dd>{data.steps} / {data.cfg_scale}</dd><dt>Sampler</dt><dd>{data.sampling_method ?? "기록 없음 · 모델 기본값"}</dd><dt>Scheduler</dt><dd>{data.scheduler ?? "CLI 기본값 (생략)"}</dd><dt>Engine</dt><dd>{data.simulated ? "Fake" : "Vulkan"}</dd><dt>Prompt</dt><dd>{data.prompt}</dd>{data.negative_prompt && <><dt>Negative</dt><dd>{data.negative_prompt}</dd></>}</dl><div className="metadata-actions"><button className="quiet" onClick={() => void changeArchive(archived)}>{archived ? "갤러리로 복원" : "보관"}</button>{archived && <button className="danger" onClick={() => void destroy()}>영구 삭제</button>}</div><button className="generate" onClick={() => reuse(data)}>이 설정으로 다시 생성</button></aside></div>;
-}
 
 export default App;

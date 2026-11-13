@@ -152,12 +152,12 @@ export class StudioApi {
     return response.json() as Promise<T>;
   }
 
-  status() { return this.request<SystemStatus>("/system/status"); }
-  models() { return this.request<StudioModel[]>("/models"); }
-  jobs(limit = 20, offset = 0) { return this.request<Job[]>(`/jobs?limit=${limit}&offset=${offset}`); }
+  status(signal?: AbortSignal) { return this.request<SystemStatus>("/system/status", { signal }); }
+  models(signal?: AbortSignal) { return this.request<StudioModel[]>("/models", { signal }); }
+  jobs(limit = 20, offset = 0, signal?: AbortSignal) { return this.request<Job[]>(`/jobs?limit=${limit}&offset=${offset}`, { signal }); }
   job(id: string) { return this.request<Job>(`/jobs/${id}`); }
-  assets(archived = false, limit = 24, offset = 0) {
-    return this.request<Asset[]>(`/assets?namespace=nsfw&limit=${limit}&offset=${offset}&archived=${archived}`);
+  assets(archived = false, limit = 24, offset = 0, signal?: AbortSignal) {
+    return this.request<Asset[]>(`/assets?namespace=nsfw&limit=${limit}&offset=${offset}&archived=${archived}`, { signal });
   }
   sourceAssets() { return this.request<Asset[]>("/assets?limit=100&archived=false"); }
   metadata(id: string) { return this.request<AssetMetadata>(`/assets/${id}/metadata`); }
