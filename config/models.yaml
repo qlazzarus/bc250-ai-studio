@@ -1,63 +1,4 @@
-# Operator configuration. Only klein-4b-q4 has passed the recorded BC-250 test.
 models:
-- model_id: fake
-  display_name: Fake Engine — CPU test image
-  family: fake
-  engine: fake
-  model_path: null
-  text_encoder_path: null
-  vae_path: null
-  quantization: ''
-  supported_resolutions:
-  - - 64
-    - 64
-  - - 512
-    - 512
-  - - 768
-    - 768
-  supported_parameters:
-  - width
-  - height
-  - steps
-  - seed
-  - cfg_scale
-  - negative_prompt
-  presets:
-    fast:
-      width: 512
-      height: 512
-      steps: 1
-      cfg_scale: 1.0
-    balanced:
-      width: 512
-      height: 512
-      steps: 1
-      cfg_scale: 1.0
-    quality:
-      width: 512
-      height: 512
-      steps: 1
-      cfg_scale: 1.0
-  generation_options:
-    cfg_scale:
-      mode: verified
-      default: 1.0
-      allowed_values: []
-      minimum: 0.0
-      maximum: 30.0
-    negative_prompt:
-      mode: verified
-    sampling_method:
-      mode: fixed
-      default: null
-      allowed_values: []
-    scheduler:
-      mode: fixed
-      default: null
-      allowed_values: []
-  enabled: true
-  validation_status: tested
-  cli_args: []
 - model_id: klein-4b-q4
   display_name: FLUX.2 Klein 4B Q4_0
   family: flux2
@@ -449,4 +390,67 @@ models:
   enabled: true
   # Operator-supplied validation: balanced preset with LoRA strength 0.7 only.
   validation_status: tested
+  cli_args: [--backend, Vulkan0, --sampling-method, euler]
+- model_id: moss-image-nsfw-q8
+  display_name: MOSS-Image SFT 5B NSFW Q8_0
+  family: moss-image
+  engine: sdcpp
+
+  model_path: /opt/sd-models/moss-image/MOSS-Image-SFT-Q8_0.gguf
+  text_encoder_path: /opt/sd-models/moss-image/text_encoder/Qwen3.5-9B-Q4_K_M.gguf
+  vae_path: /opt/sd-models/moss-image/vae/flux2-vae.safetensors
+  tokenizer_path: /opt/sd-models/moss-image/tokenizer/tokenizer.json
+  quantization: Q8_0
+
+  supported_resolutions: [[512, 512], [768, 768]]
+  supported_parameters: [width, height, steps, seed, cfg_scale]
+
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 12
+      cfg_scale: 3.0
+      validation_status: experimental
+
+    balanced:
+      width: 512
+      height: 512
+      steps: 20
+      cfg_scale: 3.0
+      validation_status: experimental
+
+    quality:
+      width: 768
+      height: 768
+      steps: 20
+      cfg_scale: 3.0
+      validation_status: experimental
+
+  generation_options:
+    cfg_scale:
+      mode: verified
+      default: 3.0
+      allowed_values: [3.0]
+      note: "Base Q8 verified at 512x512 and 768x768, 20 steps, without LoRA. LoRA 0.7 pending validation."
+    negative_prompt:
+      mode: unsupported
+    sampling_method:
+      mode: fixed
+      default: euler
+      allowed_values: [euler]
+    scheduler:
+      mode: fixed
+      default: discrete
+      allowed_values: [discrete]
+
+  lora:
+    path: /opt/sd-models/moss-image/loras/MOSS-Image-NSFW-Uncensored-LoRA-F16.gguf
+    strength: 0.7
+    trigger: moss_xvstyle
+    enabled: true
+
+  flow_shift: 5.0
+  enabled: true
+  validation_status: configured
   cli_args: [--backend, Vulkan0, --sampling-method, euler]
