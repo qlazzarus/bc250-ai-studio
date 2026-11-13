@@ -18,7 +18,8 @@ from pydantic import ValidationError
 
 def test_registry_missing_files_and_presets(settings):
     registry = Registry(settings.registry_path, "fake")
-    assert len(registry.list()) == 8
+    assert {model["model_id"] for model in registry.list()} == set(registry.models)
+    assert registry.get("moss-image-nsfw-q8")["quantization"] == "Q8_0"
     assert registry.get("fake")["execution_enabled"]
     model = registry.get("z-image-nsfw-v2")
     assert not model["execution_enabled"]

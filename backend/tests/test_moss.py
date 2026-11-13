@@ -211,7 +211,7 @@ def test_moss_api_queue_png_and_service_recovery(settings, moss, tmp_path):
         client.headers.update(HEADERS)
         app.state.registry = moss
         models = {m["model_id"]: m for m in client.get("/api/v1/models").json()}
-        assert len(models) == 8
+        assert set(models) == set(moss.models)
         assert models[MODEL_ID]["execution_enabled"]
         assert models[MODEL_ID]["presets"]["fast"]["validation_status"] == "experimental"
         response = client.post(
