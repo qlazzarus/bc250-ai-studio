@@ -1,5 +1,7 @@
 # Phase 0 / Phase 1 validation record
 
+Latest Prompt Composer regression record: [P5 follow-up tracking](PROMPT_COMPOSER_FOLLOWUP.md) — missing HTTP-limit capability metadata fixed; 94 related backend tests passed on 2026-11-15. Historical counts below describe their original runs.
+
 Date: 2026-10-24 (Asia/Seoul).
 Host: macOS Darwin ARM64, not the Fedora BC-250 target.
 Inventory Python: 3.13.3; uv-selected project interpreter: CPython 3.13.15.

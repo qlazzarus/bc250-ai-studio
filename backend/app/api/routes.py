@@ -164,13 +164,20 @@ async def status(request: Request):
 async def capabilities(request: Request):
     s = state(request)
     coordination = s.gpu.model_switch_coordination_enabled()
+    max_body_bytes = getattr(s.settings, "max_body_bytes", None)
+    # Do not advertise an invented limit when a legacy/minimal settings object
+    # does not provide one. Other capabilities remain independently available.
+    request_limits = (
+        {"request_limits": {"max_body_bytes": max_body_bytes}}
+        if max_body_bytes is not None else {}
+    )
     return {
         "phase": 1,
         "engine": state(request).settings.engine,
         "job_types": ["image.generate", "image.batch"],
         "durable_sse": True,
         "prompt_composition": {"schema_versions": [1]},
-        "request_limits": {"max_body_bytes": s.settings.max_body_bytes},
+        **request_limits,
         "pixel_processing": False,
         "phaser_export": False,
         "integrated_chat_proxy": False,

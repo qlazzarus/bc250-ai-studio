@@ -9,9 +9,12 @@ from app.services.gate_admin import check_studio_protocol
 from app.services.gpu import GPUManager
 
 
-async def test_studio_advertises_coordination_only_for_complete_configuration():
+@pytest.mark.parametrize("max_body_bytes", [None, 1024, 131072])
+async def test_studio_advertises_coordination_only_for_complete_configuration(max_body_bytes):
     settings = SimpleNamespace(admission_owned_holds=True, gpu_lock_secure_precreated=True,
                                engine="fake")
+    if max_body_bytes is not None:
+        settings.max_body_bytes = max_body_bytes
     gpu = SimpleNamespace(file_lock=SimpleNamespace(path=Path("/run/bc250-gpu/gpu.lock")),
                           switch_barrier=SimpleNamespace(
                               path=Path("/var/lib/bc250-model-control/switch.json")))
@@ -19,7 +22,13 @@ async def test_studio_advertises_coordination_only_for_complete_configuration():
     gpu.model_switch_coordination_enabled = lambda: GPUManager.model_switch_coordination_enabled(gpu)
     state = SimpleNamespace(settings=settings, gpu=gpu)
     request = SimpleNamespace(app=SimpleNamespace(state=state))
-    assert (await capabilities(request))["model_switch_coordination"] == {
+    response = await capabilities(request)
+    if max_body_bytes is None:
+        assert "request_limits" not in response
+    else:
+        assert response["request_limits"] == {"max_body_bytes": max_body_bytes}
+    assert response["prompt_composition"] == {"schema_versions": [1]}
+    assert response["model_switch_coordination"] == {
         "protocol": 1, "enabled": True,
     }
     gpu.file_lock.path = Path("/run/bc250-ai-studio/gpu.lock")
