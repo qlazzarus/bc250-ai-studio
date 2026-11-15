@@ -1,6 +1,6 @@
 import type { SceneSpecification, SelectionSnapshot } from "./scene";
 
-export const COMPILER_VERSION = "1.2.0";
+export const COMPILER_VERSION = "1.3.0";
 
 /** Server-side caps from backend/app/models/schemas.py; keep the client in sync. */
 export const DRAFT_LIMIT = 8000;
@@ -20,7 +20,7 @@ export type CompileResult = {
   targetFamily: string;
   draft: string;
   sources: Source[];
-  unresolved: { kind: "selection" | "free_text"; id?: string; text: string }[];
+  unresolved: { kind: "selection" | "free_text"; id?: string | null; text: string }[];
   warnings: Warning[];
 };
 
@@ -114,8 +114,8 @@ export function compileScene(scene: SceneSpecification): CompileResult {
   result.draft = phrases.join(natural ? "; " : ", ");
   if (!scene.selections.length && !scene.freeTextKo.trim()) result.warnings.push({ code: "empty", ids: [] });
 
-  if (result.draft.length > DRAFT_LIMIT) {
-    result.warnings.push({ code: "over_limit", ids: [], detail: `${result.draft.length}/${DRAFT_LIMIT}` });
+  if (Array.from(result.draft).length > DRAFT_LIMIT) {
+    result.warnings.push({ code: "over_limit", ids: [], detail: `${Array.from(result.draft).length}/${DRAFT_LIMIT}` });
   }
   if (scene.selections.length > SELECTION_LIMIT) {
     result.warnings.push({ code: "over_limit", ids: [], detail: `${scene.selections.length}/${SELECTION_LIMIT} selections` });

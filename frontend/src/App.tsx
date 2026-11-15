@@ -15,6 +15,7 @@ import PromptBuilder from "./components/PromptBuilder";
 import { initialBuilderState, appliedForFamily, restoreComposition } from "./prompt/builderState";
 import { changeSceneFamily } from "./prompt/scene";
 import { DICTIONARY, DICTIONARY_VERSION } from "./prompt/dictionary";
+import { characterCount, validateSubmission } from "./prompt/validation";
 
 const initialSettings: Settings = {
   modelId: "", prompt: "", negativePrompt: "", preset: "balanced", resolution: "512x512",
@@ -38,6 +39,7 @@ function App() {
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [builder, setBuilder] = useState(initialBuilderState);
   const [compositionSupported, setCompositionSupported] = useState(false);
+  const [maxBodyBytes, setMaxBodyBytes] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [studio, setStudio] = useState<"art" | "pixel">("art");
@@ -143,14 +145,18 @@ function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    api.capabilities(controller.signal).then((data) => setCompositionSupported(Boolean(data.prompt_composition?.schema_versions?.includes(1)))).catch(() => setCompositionSupported(false));
+    api.capabilities(controller.signal).then((data) => {
+      setCompositionSupported(Boolean(data.prompt_composition?.schema_versions?.includes(1)));
+      const limit = data.request_limits?.max_body_bytes;
+      setMaxBodyBytes(typeof limit === "number" && Number.isSafeInteger(limit) && limit > 0 ? limit : null);
+    }).catch(() => { setCompositionSupported(false); setMaxBodyBytes(null); });
     return () => controller.abort();
   }, [api]);
 
   function changeBuilderFamily(family: string): boolean {
     if (!builder.scene.targetFamily || builder.scene.targetFamily === family) return true;
     if (builder.scene.selections.length && !window.confirm("모델 계열을 변경하면 사전 항목을 새 계열의 표현으로 다시 연결합니다. 기존 최종 프롬프트는 유지됩니다. 계속할까요?")) return false;
-    setBuilder((old) => ({ ...old, scene: changeSceneFamily(old.scene, family, DICTIONARY, DICTIONARY_VERSION), result: null, generatedFrom: null, applied: null }));
+    setBuilder((old) => ({ ...old, scene: changeSceneFamily(old.scene, family, DICTIONARY, DICTIONARY_VERSION), result: null, generatedFrom: null, applied: null, generatedMode: null, appliedScene: null, appliedPrompt: null, provenance: "current" }));
     return true;
   }
 
@@ -181,28 +187,39 @@ function App() {
       }));
   }
 
+  function buildRequest(): Record<string, unknown> {
+    const [width, height] = settings.resolution.split("x").map(Number);
+    const body: Record<string, unknown> = {
+      job_type: settings.batchCount > 1 ? "image.batch" : "image.generate", source: "nsfw",
+      model_id: activeModel?.model_id, prompt: settings.prompt,
+      width, height, steps: settings.steps, seed: Number(settings.seed),
+      batch_count: settings.batchCount, preset: settings.preset,
+    };
+    const applied = appliedForFamily(builder, activeModel?.family ?? "", compositionSupported);
+    if (applied && compositionSupported) body.prompt_composition = applied;
+    if (cfgEditable) body.cfg_scale = settings.cfgScale;
+    if (negativeEnabled && settings.negativePrompt) body.negative_prompt = settings.negativePrompt;
+    if (editable(samplingOption) && settings.samplingMethod) body.sampling_method = settings.samplingMethod;
+    if (editable(schedulerOption) && settings.scheduler) body.scheduler = settings.scheduler;
+    return body;
+  }
+  const submissionIssues = validateSubmission(buildRequest(), activeModel?.family ?? "", maxBodyBytes);
+  const promptIssues = submissionIssues.filter((issue) => issue.field === "prompt");
+  const negativeIssues = submissionIssues.filter((issue) => issue.field === "negative_prompt");
+  const otherIssues = submissionIssues.filter((issue) => !["prompt", "negative_prompt"].includes(issue.field));
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!api || !activeModel) return;
-    const [width, height] = settings.resolution.split("x").map(Number);
     const seed = Number(settings.seed);
-    if (!settings.prompt.trim() || !Number.isInteger(seed) || seed < -1) {
-      setError("프롬프트와 올바른 seed 값을 입력하세요."); return;
+    const body = buildRequest();
+    const issues = validateSubmission(body, activeModel.family, maxBodyBytes);
+    if (issues.length) { setError(issues.map((issue) => `${issue.field}: ${issue.message}`).join(" / ")); return; }
+    if (!Number.isInteger(seed) || seed < -1) {
+      setError("올바른 seed 값을 입력하세요."); return;
     }
     setSubmitting(true); setError("");
     try {
-      const body: Record<string, unknown> = {
-        job_type: settings.batchCount > 1 ? "image.batch" : "image.generate", source: "nsfw",
-        model_id: activeModel.model_id, prompt: settings.prompt,
-        width, height, steps: settings.steps, seed,
-        batch_count: settings.batchCount, preset: settings.preset,
-      };
-      const applied = appliedForFamily(builder, activeModel.family);
-      if (applied && compositionSupported) body.prompt_composition = applied;
-      if (cfgEditable) body.cfg_scale = settings.cfgScale;
-      if (negativeEnabled && settings.negativePrompt) body.negative_prompt = settings.negativePrompt;
-      if (editable(samplingOption) && settings.samplingMethod) body.sampling_method = settings.samplingMethod;
-      if (editable(schedulerOption) && settings.scheduler) body.scheduler = settings.scheduler;
       await api.createJob(body);
       setJobPage(0);
     } catch (reason) {
@@ -282,16 +299,20 @@ function App() {
             <option value="">모델 선택</option>{models.map((model) => <option key={model.model_id} value={model.model_id} disabled={!model.execution_enabled}>{model.display_name}{model.execution_enabled ? "" : " · 사용 불가"}</option>)}
           </select></label>
           {!compositionSupported && <p className="prompt-warning">서버가 구성 이력 저장을 지원하지 않거나 확인할 수 없습니다. 최종 프롬프트만 저장됩니다.</p>}
-          <PromptBuilder family={activeModel?.family ?? ""} value={settings.prompt} onChange={(prompt) => setSettings((old) => ({ ...old, prompt }))} state={builder} setState={setBuilder} />
-          <label>최종 프롬프트<textarea value={settings.prompt} onChange={(event) => setSettings({ ...settings, prompt: event.target.value })} placeholder="장면, 피사체, 조명, 스타일을 설명하세요." rows={5} /></label>
-          <label className={negativeEnabled ? "" : "disabled"}>Negative prompt<textarea disabled={!negativeEnabled} value={settings.negativePrompt} onChange={(event) => setSettings({ ...settings, negativePrompt: event.target.value })} placeholder={negativeEnabled ? "제외할 요소를 입력하세요." : "이 모델의 현재 CFG에서는 negative prompt를 사용할 수 없습니다."} rows={2} /></label>
+          <PromptBuilder compositionSupported={compositionSupported} family={activeModel?.family ?? ""} value={settings.prompt} onChange={(prompt) => setSettings((old) => ({ ...old, prompt }))} state={builder} setState={setBuilder} />
+          <label>최종 프롬프트<textarea aria-invalid={promptIssues.length > 0} aria-describedby="prompt-errors" value={settings.prompt} onChange={(event) => setSettings({ ...settings, prompt: event.target.value })} placeholder="장면, 피사체, 조명, 스타일을 설명하세요." rows={5} /></label>
+          <div id="prompt-errors" role="status"><p className="prompt-hint">{characterCount(settings.prompt)}/8000자</p>{promptIssues.map((issue, index) => <p className="prompt-warning" key={index}>{issue.message}</p>)}</div>
+          <label className={negativeEnabled ? "" : "disabled"}>Negative prompt<textarea aria-invalid={negativeIssues.length > 0} aria-describedby="negative-errors" disabled={!negativeEnabled} value={settings.negativePrompt} onChange={(event) => setSettings({ ...settings, negativePrompt: event.target.value })} placeholder={negativeEnabled ? "제외할 요소를 입력하세요." : "이 모델의 현재 CFG에서는 negative prompt를 사용할 수 없습니다."} rows={2} /></label>
+          <div id="negative-errors" role="status">{negativeIssues.map((issue, index) => <p className="prompt-warning" key={index}>{issue.message}</p>)}</div>
           {negativeOption && <p className="option-note">Negative prompt: {optionStatus(negativeOption)}{requiredCfg && ` · CFG ${requiredCfg.join(" / ")}에서만 사용 가능`}{negativeOption.note && ` · ${negativeOption.note}`}</p>}
           <div className="chips">{activeModel && Object.keys(activeModel.presets).map((name) => <button type="button" className={settings.preset === name ? "selected" : ""} key={name} onClick={() => choosePreset(name)}>{name}{activeModel.presets[name].validation_status === "experimental" ? " · experimental" : ""}</button>)}</div>
           <div className="grid2"><label>해상도<select value={settings.resolution} onChange={(event) => setSettings({ ...settings, resolution: event.target.value })}>{activeModel?.supported_resolutions.map(([width, height]) => <option key={`${width}x${height}`}>{width}x{height}</option>)}</select></label><label>수량<input type="number" min="1" max="16" value={settings.batchCount} onChange={(event) => setSettings({ ...settings, batchCount: Number(event.target.value) })} /></label></div>
           <div className="grid3"><label>Steps<input type="number" min="1" max="100" value={settings.steps} onChange={(event) => setSettings({ ...settings, steps: Number(event.target.value) })} /></label><label>CFG{cfgEditable && cfgOption?.allowed_values.length ? <select value={settings.cfgScale} onChange={(event) => { const cfgScale = Number(event.target.value); setSettings((old) => ({ ...old, cfgScale, negativePrompt: requiredCfg?.includes(cfgScale) ? old.negativePrompt : "" })); }}>{cfgOption.allowed_values.map((value) => <option key={String(value)} value={String(value)}>{value}</option>)}</select> : <input disabled={!cfgEditable} type="number" min={cfgOption?.minimum ?? 0} max={cfgOption?.maximum ?? 30} step="0.1" value={settings.cfgScale} onChange={(event) => { const cfgScale = Number(event.target.value); setSettings((old) => ({ ...old, cfgScale, negativePrompt: requiredCfg?.includes(cfgScale) ? old.negativePrompt : "" })); }} />}</label><label>Seed<input value={settings.seed} onChange={(event) => setSettings({ ...settings, seed: event.target.value })} /></label></div>
           {cfgOption && <p className="option-note">CFG: {optionStatus(cfgOption)}{cfgOption.note && ` · ${cfgOption.note}`}</p>}
           {generationOptions && <div className="fixed-options"><span>Sampler: {fixedValue(samplingOption, "CLI 기본값")} · {optionStatus(samplingOption)}</span><span>Scheduler: {fixedValue(schedulerOption, "CLI 기본값 (생략)")} · {optionStatus(schedulerOption)}</span></div>}
-          <button className="generate" disabled={submitting || !activeModel?.execution_enabled}>{submitting ? "접수 중…" : settings.batchCount > 1 ? `${settings.batchCount}개 생성` : "이미지 생성"}</button>
+          <div role="status">{otherIssues.map((issue, index) => <p className="prompt-warning" key={index}>저장할 구성/요청 · {issue.field}: {issue.message} 선택·설명을 수정한 뒤 초안을 다시 적용하세요.</p>)}</div>
+          {maxBodyBytes === null && <p className="prompt-hint">서버 요청 크기 한도를 확인할 수 없어 전체 바이트 제한은 서버에서 검사합니다.</p>}
+          <button className="generate" disabled={submitting || !activeModel?.execution_enabled || submissionIssues.length > 0}>{submitting ? "접수 중…" : settings.batchCount > 1 ? `${settings.batchCount}개 생성` : "이미지 생성"}</button>
         </form>
       </section>
       <section className="panel jobs"><div className="section-title"><h2>작업 큐</h2><button className="quiet" onClick={() => void refresh()}>새로고침</button></div>{api && jobs.length ? <>{jobs.map((job) => <JobCard key={job.job_id} job={job} api={api} refresh={refresh} />)}<Pagination page={jobPage} hasNext={jobs.length === JOBS_PER_PAGE} onPage={setJobPage} /></> : <p className="empty">최근 작업이 없습니다.</p>}</section>

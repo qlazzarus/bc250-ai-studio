@@ -163,7 +163,7 @@ export class StudioApi {
     return response.json() as Promise<T>;
   }
 
-  capabilities(signal?: AbortSignal) { return this.request<{ prompt_composition?: { schema_versions?: number[] } }>("/system/capabilities", { signal }); }
+  capabilities(signal?: AbortSignal) { return this.request<{ prompt_composition?: { schema_versions?: number[] }; request_limits?: { max_body_bytes?: number } }>("/system/capabilities", { signal }); }
   status(signal?: AbortSignal) { return this.request<SystemStatus>("/system/status", { signal }); }
   models(signal?: AbortSignal) { return this.request<StudioModel[]>("/models", { signal }); }
   jobs(limit = 20, offset = 0, signal?: AbortSignal) { return this.request<Job[]>(`/jobs?limit=${limit}&offset=${offset}`, { signal }); }

@@ -170,6 +170,7 @@ async def capabilities(request: Request):
         "job_types": ["image.generate", "image.batch"],
         "durable_sse": True,
         "prompt_composition": {"schema_versions": [1]},
+        "request_limits": {"max_body_bytes": s.settings.max_body_bytes},
         "pixel_processing": False,
         "phaser_export": False,
         "integrated_chat_proxy": False,
