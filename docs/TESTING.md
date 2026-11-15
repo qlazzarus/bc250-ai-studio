@@ -1,6 +1,6 @@
 # Phase 0 / Phase 1 validation record
 
-Latest Prompt Composer regression record: [P5 follow-up tracking](PROMPT_COMPOSER_FOLLOWUP.md) — missing HTTP-limit capability metadata fixed; 94 related backend tests passed on 2026-11-15. Historical counts below describe their original runs.
+Latest Prompt Composer regression record: [P5 follow-up tracking](PROMPT_COMPOSER_FOLLOWUP.md) — missing HTTP-limit capability metadata fixed; 94 related backend tests passed on 2026-11-15. The original 129-test Studio scope now passes 131 tests, and the Starlette/httpx2 warning was removed by adding `httpx2` as a dev dependency (TEST-D01). Historical counts below describe their original runs.
 
 Date: 2026-10-24 (Asia/Seoul).
 Host: macOS Darwin ARM64, not the Fedora BC-250 target.
@@ -16,9 +16,10 @@ no model files were downloaded, and no GPU inference was executed.
 - `sh -n scripts/dev.sh`: **passed**.
 - `python3 scripts/probe_server.py --help`: **passed**.
 
-One dependency warning: the installed Starlette TestClient warns that httpx support
-is deprecated in favor of httpx2. The tests currently pass using the locked httpx
-version. This is not a hardware compatibility warning.
+One dependency warning: the installed Starlette TestClient warned that httpx support
+was deprecated in favor of httpx2. This record predates the fix; as of 2026-11-15
+`httpx2>=2,<3` is a dev dependency (TEST-D01), so the warning no longer appears.
+This was not a hardware compatibility warning.
 
 ## Evidence and coverage
 

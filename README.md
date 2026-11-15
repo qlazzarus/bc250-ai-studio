@@ -58,6 +58,7 @@ API 기본 주소: `http://127.0.0.1:8090`. 데이터 기본 위치:
 - [실행·서버 조사·배포·복구](docs/DEPLOYMENT.md)
 - [단계별 구현 범위](docs/ROADMAP.md)
 - [사전 프롬프트 현재 구현과 다음 개선 순서](docs/PROMPT_COMPOSER_CURRENT.md)
+- [Prompt Composer 남은 작업·회귀 추적 (P5-C 브라우저 검증 결과 포함)](docs/PROMPT_COMPOSER_FOLLOWUP.md)
 - [프롬프트 구성·포즈 생성 모드 발전 계획](docs/GENERATION_MODES_DESIGN.md)
 - [프롬프트 구성 작업 계획과 1.2.0 고도화·배포 점검 기록](docs/PROMPT_COMPOSER_TASKS.md)
 - [테스트 결과와 한계](docs/TESTING.md)
