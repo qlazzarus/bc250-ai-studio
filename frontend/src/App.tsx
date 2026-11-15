@@ -12,7 +12,7 @@ import editable from "./lib/editable";
 import fixedValue from "./lib/fixedValue";
 import optionStatus from "./lib/optionStatus";
 import PromptBuilder from "./components/PromptBuilder";
-import { initialBuilderState, restoreComposition } from "./prompt/builderState";
+import { initialBuilderState, appliedForFamily, restoreComposition } from "./prompt/builderState";
 import { changeSceneFamily } from "./prompt/scene";
 import { DICTIONARY, DICTIONARY_VERSION } from "./prompt/dictionary";
 
@@ -197,7 +197,8 @@ function App() {
         width, height, steps: settings.steps, seed,
         batch_count: settings.batchCount, preset: settings.preset,
       };
-      if (builder.applied && compositionSupported && builder.applied.target_family === activeModel.family) body.prompt_composition = builder.applied;
+      const applied = appliedForFamily(builder, activeModel.family);
+      if (applied && compositionSupported) body.prompt_composition = applied;
       if (cfgEditable) body.cfg_scale = settings.cfgScale;
       if (negativeEnabled && settings.negativePrompt) body.negative_prompt = settings.negativePrompt;
       if (editable(samplingOption) && settings.samplingMethod) body.sampling_method = settings.samplingMethod;

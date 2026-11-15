@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DICTIONARY, DICTIONARY_VERSION, MODEL_FAMILIES, searchDictionary, validateDictionary } from '../src/prompt/dictionary.ts';
+import { DICTIONARY, DICTIONARY_VERSION, MODEL_FAMILIES, familyCoverage, searchDictionary, validateDictionary } from '../src/prompt/dictionary.ts';
 import { removeEntry, selectEntry } from '../src/prompt/scene.ts';
 import { compileScene } from '../src/prompt/compiler.ts';
 
@@ -40,7 +40,7 @@ test('unknown model family is explicitly unavailable', () => {
   assert.deepEqual(scene.selections[0].mapping, { status: 'unavailable' });
 });
 
-test('version 1.1.0 preserves all twelve 1.0.0 entries and their family mappings', () => {
+test('version 1.2.0 preserves all twelve 1.0.0 entries and their family mappings', () => {
   const legacy = [
     ['subject.person', 'subject', '인물', ['사람'], 'a person'],
     ['subject.portrait', 'subject', '인물 초상', ['초상화', '포트레이트'], 'a portrait'],
@@ -55,7 +55,7 @@ test('version 1.1.0 preserves all twelve 1.0.0 entries and their family mappings
     ['style.photographic', 'style', '사진 스타일', ['사진', '포토리얼'], 'photographic style'],
     ['style.illustration', 'style', '일러스트', ['그림', '삽화'], 'illustration style'],
   ];
-  assert.equal(DICTIONARY_VERSION, '1.1.0');
+  assert.equal(DICTIONARY_VERSION, '1.2.0');
   assert.equal(DICTIONARY.length, 100);
   for (const [id, category, labelKo, aliases, text] of legacy) {
     const entry = DICTIONARY.find((item) => item.id === id);
@@ -65,7 +65,7 @@ test('version 1.1.0 preserves all twelve 1.0.0 entries and their family mappings
       fake: { status: 'unavailable' },
     } });
   }
-  assert.equal(DICTIONARY.filter((item) => item.mappings['moss-image'].status === 'unavailable').length, 88);
+  assert.equal(DICTIONARY.filter((item) => item.mappings['moss-image'].status === 'unavailable').length, 0);
   assert.ok(DICTIONARY.every((item) => item.mappings.fake.status === 'unavailable'));
 });
 
@@ -74,7 +74,7 @@ test('expanded entries provide family-specific phrases and remain searchable by 
   assert.equal(entry.mappings.sd15.text, 'black hair');
   assert.equal(entry.mappings['z-image'].text, 'with black hair');
   assert.equal(entry.mappings.flux2.text, 'with black hair');
-  assert.equal(entry.mappings['moss-image'].status, 'unavailable');
+  assert.equal(entry.mappings['moss-image'].text, 'with black hair');
   const oldScene = { schemaVersion: 1, targetFamily: 'sd15', freeTextKo: '', selections: [{
     id: 'lighting.soft', category: 'lighting', labelKo: '부드러운 조명', dictionaryVersion: '1.0.0',
     mapping: { status: 'mapped', text: 'soft lighting' },
@@ -82,4 +82,14 @@ test('expanded entries provide family-specific phrases and remain searchable by 
   const restored = compileScene(oldScene);
   assert.equal(restored.draft, 'soft lighting');
   assert.equal(restored.sources[0].dictionaryVersion, '1.0.0');
+});
+
+test('family coverage reports the renderable share without implying model support', () => {
+  for (const family of ['sd15', 'z-image', 'flux2', 'moss-image']) {
+    assert.deepEqual(familyCoverage(DICTIONARY, family), { mapped: 100, total: 100, family });
+  }
+  const fake = familyCoverage(DICTIONARY, 'fake');
+  assert.equal(fake.mapped, 0);
+  assert.equal(fake.total, 100);
+  assert.equal(familyCoverage(DICTIONARY, 'unlisted').mapped, 0);
 });

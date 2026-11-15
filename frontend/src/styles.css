@@ -286,3 +286,9 @@
 .prompt-warning ul { padding-left: 20px; white-space: pre-wrap; }
 .prompt-builder button:focus-visible, .prompt-choice input:focus-visible { outline: 2px solid #d1adff; outline-offset: 3px; }
 .prompt-builder button:disabled { opacity: .5; cursor: not-allowed; }
+.prompt-selected { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 14px; }
+.prompt-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #4a4d59; border-radius: 99px; padding: 4px 4px 4px 10px; background: #20222a; color: #e6e8ef; font-size: .76rem; font-weight: 600; }
+.prompt-chip[data-unmapped] { border-color: #6b5a33; background: #2a2418; color: #f4cb84; }
+.prompt-chip button { border: 0; background: transparent; color: inherit; padding: 0 4px; border-radius: 99px; font-size: .95rem; line-height: 1; }
+.prompt-chip button:hover { background: rgba(255, 255, 255, .12); }
+.prompt-selected > .quiet { padding: 4px 9px; font-size: .74rem; }

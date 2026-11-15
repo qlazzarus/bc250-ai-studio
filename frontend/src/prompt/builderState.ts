@@ -7,6 +7,16 @@ export const initialBuilderState: PromptBuilderState = {
   scene: { schemaVersion: 1, targetFamily: "", selections: [], freeTextKo: "" }, result: null, generatedFrom: null, applied: null,
 };
 
+/** A draft is stale when the scene moved on after it was compiled. */
+export function isDraftStale(state: PromptBuilderState): boolean {
+  return state.result !== null && JSON.stringify(state.scene) !== state.generatedFrom;
+}
+
+/** The approved snapshot only describes the model family it was compiled for. */
+export function appliedForFamily(state: PromptBuilderState, family: string): PromptComposition | null {
+  return state.applied && state.applied.target_family === family ? state.applied : null;
+}
+
 /** Restore the captured values without looking them up in the current dictionary. */
 export function restoreComposition(composition: PromptComposition): PromptBuilderState {
   const scene: SceneSpecification = {

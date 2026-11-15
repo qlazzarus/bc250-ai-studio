@@ -1,5 +1,5 @@
 /** Operator-maintained seed vocabulary. Expressions are proposals, not quality claims. */
-export const DICTIONARY_VERSION = "1.1.0";
+export const DICTIONARY_VERSION = "1.2.0";
 export const MODEL_FAMILIES = ["sd15", "z-image", "flux2", "moss-image", "fake"] as const;
 export type ModelFamily = (typeof MODEL_FAMILIES)[number];
 export type Mapping = { status: "mapped"; text: string } | { status: "unavailable" };
@@ -127,12 +127,27 @@ export const DICTIONARY: DictionaryEntry[] = [
     mappings: { sd15: mapped(text), "z-image": mapped(text), flux2: mapped(text),
       "moss-image": mapped(text), fake: unavailable() },
   })),
+  // MOSS-Image and the Z-Image/FLUX families are natural-language models, so the
+  // curated natural phrase is reused verbatim. This is a structural reuse of an
+  // existing operator draft, not a BC-250 quality or support claim.
   ...expandedEntries.map(([id, category, labelKo, aliases, sd, natural]) => ({
     id, category, labelKo, aliases: [...aliases], active: true,
     mappings: { sd15: mapped(sd), "z-image": mapped(natural), flux2: mapped(natural),
-      "moss-image": unavailable(), fake: unavailable() },
+      "moss-image": mapped(natural), fake: unavailable() },
   })),
 ];
+
+export type FamilyCoverage = { mapped: number; total: number; family: string };
+
+/** How many entries can be rendered for a family, so the UI can warn up front. */
+export function familyCoverage(dictionary: DictionaryEntry[], family: string): FamilyCoverage {
+  const active = dictionary.filter((entry) => entry.active);
+  const mapped = active.filter((entry) => {
+    const mapping = entry.mappings[family as ModelFamily];
+    return mapping?.status === "mapped" && mapping.text.trim().length > 0;
+  }).length;
+  return { mapped, total: active.length, family };
+}
 
 /** Call before publishing/loading an operator dictionary. */
 export function validateDictionary(dictionary: DictionaryEntry[]): string[] {

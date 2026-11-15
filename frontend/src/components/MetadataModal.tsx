@@ -30,9 +30,16 @@ function Metadata({ data, archived, close, reuse, changeArchive, destroy }: { da
         </dl>
         {data.prompt_composition && <details><summary>프롬프트 구성 이력</summary>
           <p>사전 선택: {data.prompt_composition.selections.map((item) => item.label_ko).join(", ") || "없음"}</p>
+          {data.prompt_composition.selections.some((item) => item.mapping_status !== "mapped") && <p>
+            미변환: {data.prompt_composition.selections.filter((item) => item.mapping_status !== "mapped")
+              .map((item) => item.label_ko).join(", ")}
+          </p>}
           <p>추가 설명: {data.prompt_composition.free_text_ko || "없음"}</p>
           <p>생성 초안: {data.prompt_composition.draft_prompt || "없음"}</p>
-          <p>컴파일러 {data.prompt_composition.compiler_version} · {data.prompt_composition.target_family}</p>
+          {data.prompt_composition.unresolved.length > 0 && <p>
+            초안에서 빠진 항목: {data.prompt_composition.unresolved.map((item) => item.text).join(", ")}
+          </p>}
+          <p>컴파일러 {data.prompt_composition.compiler_version} · {data.prompt_composition.target_family} · 스키마 v{data.prompt_composition.schema_version}</p>
         </details>}
         <div className="metadata-actions">
             <button className="quiet" onClick={() => void changeArchive(archived)}>

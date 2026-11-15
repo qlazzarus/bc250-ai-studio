@@ -58,6 +58,7 @@ API 기본 주소: `http://127.0.0.1:8090`. 데이터 기본 위치:
 - [실행·서버 조사·배포·복구](docs/DEPLOYMENT.md)
 - [단계별 구현 범위](docs/ROADMAP.md)
 - [프롬프트 구성·포즈 생성 모드 발전 계획](docs/GENERATION_MODES_DESIGN.md)
+- [프롬프트 구성 작업 계획과 1.2.0 고도화·배포 점검 기록](docs/PROMPT_COMPOSER_TASKS.md)
 - [테스트 결과와 한계](docs/TESTING.md)
 - [다음 프로젝트 LLM 클라이언트 인계 문서](docs/NEXT_PROJECT_LLM_CLIENT.md)
 - [Pixel Studio 설계·API·후속 범위](docs/PIXEL_STUDIO.md)
@@ -67,6 +68,9 @@ Pixel Art·Phaser Export는 Phase 3, 통합 LLM 채팅 프록시는 Phase 4입�
 ```sh
 uv run pytest -q
 uv run ruff check .
+# Prompt-composition contract probe (rejection-only; needs a running API + key).
+STUDIO_API_KEY=<client key> STUDIO_BASE_URL=http://127.0.0.1:18080 \
+  uv run python scripts/probe_studio_prompt_composition.py
 ```
 
 > 일부 과거 테스트 문서에서 언급하는 서버 진단 자료와 생성 결과물은 공개 저장소에 포함하지 않습니다.

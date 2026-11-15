@@ -99,18 +99,78 @@ test('family rebinding preserves input and correctly reports MOSS and unknown ma
   const original = sceneFor('sd15', ['subject.person', 'appearance.short_hair'], '한글 원문');
   const moss = changeSceneFamily(original, 'moss-image', DICTIONARY, DICTIONARY_VERSION);
   const output = compileScene(moss);
-  assert.equal(output.draft, 'a person');
-  assert.deepEqual(output.unresolved, [
-    { kind: 'selection', id: 'appearance.short_hair', text: '짧은 머리' },
-    { kind: 'free_text', text: '한글 원문' },
-  ]);
+  assert.equal(output.draft, 'a person; with short hair');
+  assert.deepEqual(output.unresolved, [{ kind: 'free_text', text: '한글 원문' }]);
   const flux = changeSceneFamily(moss, 'flux2', DICTIONARY, DICTIONARY_VERSION);
   assert.equal(compileScene(flux).draft, 'a person; with short hair');
   const unknown = changeSceneFamily(flux, 'unlisted', DICTIONARY, DICTIONARY_VERSION);
   assert.equal(compileScene(unknown).draft, '');
   assert.equal(compileScene(unknown).unresolved.length, 3);
   assert.equal(original.selections[1].mapping.text, 'short hair');
+  // An entry removed from the dictionary keeps its captured value but reports
+  // the missing mapping instead of silently reusing another family's phrase.
+  const missing = changeSceneFamily(original, 'flux2', [], DICTIONARY_VERSION);
+  assert.deepEqual(missing.selections[0].mapping, { status: 'unavailable' });
+  assert.equal(compileScene(missing).draft, '');
 });
+
+test('warnings distinguish conflicting selections from duplicate phrases', () => {
+  const conflictOnly = compileScene(sceneFor('sd15', ['composition.full_body', 'composition.close_up']));
+  assert.ok(conflictOnly.warnings.some((w) => w.code === 'conflict'));
+  assert.ok(!conflictOnly.warnings.some((w) => w.code === 'duplicate_phrase'));
+  // Two different IDs that freeze the same expression emit the phrase once.
+  const scene = sceneFor('sd15', ['subject.person']);
+  scene.selections.push({ id: 'subject.person_copy', category: 'subject', labelKo: '인물 사본',
+    dictionaryVersion: DICTIONARY_VERSION, mapping: { status: 'mapped', text: 'a person' } });
+  const output = compileScene(scene);
+  assert.equal(output.draft, 'a person');
+  assert.equal(output.sources.length, 2);
+  const duplicate = output.warnings.find((w) => w.code === 'duplicate_phrase');
+  assert.deepEqual(duplicate.ids, ['subject.person', 'subject.person_copy']);
+});
+
+test('over-limit and SD 1.5 token budget warnings never truncate the draft', () => {
+  const scene = { schemaVersion: 1, targetFamily: 'sd15', freeTextKo: '', selections: [
+    { id: 'a.one', category: 'subject', labelKo: '하나', dictionaryVersion: '1.2.0', mapping: { status: 'mapped', text: 'x'.repeat(4000) } },
+    { id: 'a.two', category: 'style', labelKo: '둘', dictionaryVersion: '1.2.0', mapping: { status: 'mapped', text: 'y'.repeat(4000) } },
+  ] };
+  const output = compileScene(scene);
+  assert.equal(output.draft.length, 8002);
+  const limit = output.warnings.find((w) => w.code === 'over_limit');
+  assert.equal(limit.detail, '8002/8000');
+  assert.equal(output.warnings.filter((w) => w.code === 'over_limit').length, 1);
+});
+
+test('token budget only applies to the sd15 tag window', () => {
+  const scene = (family) => ({ schemaVersion: 1, targetFamily: family, freeTextKo: '',
+    selections: Array.from({ length: 30 }, (_, index) => ({
+      id: `subject.extra_${index}`, category: 'subject', labelKo: `항목 ${index}`,
+      dictionaryVersion: '1.2.0',
+      mapping: { status: 'mapped', text: `a person standing outside building ${index}` },
+    })) });
+  const sd = compileScene(scene('sd15'));
+  assert.equal(sd.warnings.filter((w) => w.code === 'token_budget').length, 1);
+  assert.equal(sd.draft.split(', ').length, 30);
+  for (const family of ['z-image', 'flux2', 'moss-image']) {
+    assert.equal(compileScene(scene(family)).warnings.some((w) => w.code === 'token_budget'), false, family);
+  }
+  const short = { ...scene('sd15'), selections: scene('sd15').selections.slice(0, 2) };
+  assert.equal(compileScene(short).warnings.some((w) => w.code === 'token_budget'), false);
+});
+
+test('selection count over the server cap is reported but kept', () => {
+  const selections = Array.from({ length: 101 }, (_, index) => ({
+    id: `subject.cap_${index}`, category: 'subject', labelKo: `항목 ${index}`,
+    dictionaryVersion: '1.2.0', mapping: { status: 'mapped', text: `item ${index}` },
+  }));
+  const output = compileScene({ schemaVersion: 1, targetFamily: 'flux2', freeTextKo: '', selections });
+  assert.equal(output.sources.length, 101);
+  const limit = output.warnings.filter((w) => w.code === 'over_limit');
+  assert.equal(limit.length, 1);
+  assert.equal(limit[0].detail, '101/100 selections');
+});
+
+
 
 test('a 1.0.0 captured selection remains independent of current dictionary', () => {
   const saved = { schemaVersion: 1, targetFamily: 'sd15', freeTextKo: '', selections: [{
