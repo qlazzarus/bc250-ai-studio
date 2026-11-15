@@ -2,6 +2,8 @@
 
 2026-11-07 커밋 `434167a`의 수동 Studio 배포가 성공했고 Studio·gate·Client·llama 상태와 gate 파일 일치를 확인했다. `.github/workflows/deploy.yml`은 main push 및 수동 실행을 지원한다. 모델 전환은 별도 llm-client 작업이며 Studio 배포의 선행 조건이 아니다.
 
+변경 영역별 배포 시간 개선 가능성과 안전 조건은 [최적화 검토](ACTIONS_DEPLOY_OPTIMIZATION.md)에 정리했다. 현재 workflow와 서버 설치기는 여전히 전체 릴리스 경로다.
+
 ## 현재 범위와 보호
 
 - Studio 테스트·lint·프런트엔드 빌드 후 Git에 기록된 소스와 빌드 결과를 패키징한다. **커밋되지 않은 변경은 포함되지 않는다.**

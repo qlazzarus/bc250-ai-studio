@@ -47,7 +47,8 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
   function setScene(update: (scene: SceneSpecification) => SceneSpecification) {
     setState((current) => {
       const scene = current.scene.targetFamily === family ? current.scene : changeSceneFamily(current.scene, family, DICTIONARY, DICTIONARY_VERSION);
-      return { ...current, scene: update(scene) };
+      const next = { ...current, scene: update(scene) };
+      return family ? withGeneratedDraft(next, compileScene(next.scene)) : next;
     });
   }
 
@@ -73,8 +74,8 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
 
   function clearScene() {
     if (state.scene.selections.length && !window.confirm("선택한 사전 항목을 모두 해제합니다. 추가 설명과 최종 프롬프트는 유지됩니다. 계속할까요?")) return;
-    setState((current) => ({ ...current, scene: { ...current.scene, selections: [] } }));
-    setNotice("선택을 비웠습니다. 초안을 다시 만들어 주세요.");
+    setScene((scene) => ({ ...scene, selections: [] }));
+    setNotice("선택을 비웠습니다. 미리보기를 확인하세요.");
   }
 
   function warningText(code: string, ids: string[], detail?: string) {
@@ -104,7 +105,10 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
         현재 모델 계열에서 사전 표현 {coverage.mapped}/{coverage.total}개를 변환할 수 있습니다. 나머지는 선택해도 미변환으로 표시됩니다.
       </p>}
       <label>사전 검색<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="예: 인물, 조명, 전신" /></label>
-      <label>분류<select value={category} onChange={(event) => setCategory(event.target.value)}><option value="">전체</option>{categories.map((item) => <option key={item} value={item}>{labels[item] ?? item}</option>)}</select></label>
+      <div className="prompt-categories" role="group" aria-label="사전 분류">
+        {["", ...categories].map((item) => <button type="button" key={item || "all"} aria-pressed={category === item} onClick={() => setCategory(item)}>{item ? labels[item] ?? item : "전체"}{item && ` ${state.scene.selections.filter((entry) => (displayGroup[entry.category] ?? entry.category) === item).length}`}</button>)}
+      </div>
+      <p className="prompt-hint">{category ? labels[category] : "전체"} 분류에서 검색 · {options.length}개 결과. 다른 분류의 선택도 유지됩니다.</p>
       <fieldset className="prompt-choices" aria-describedby="selection-errors" aria-invalid={compositionSupported && compositionIssues.some((issue) => issue.field === "selections")}><legend>사전 항목 선택</legend>
         {options.length ? options.map((item) => {
           const mapping = family ? item.mappings[family as keyof typeof item.mappings] : undefined;
@@ -117,19 +121,23 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
       </fieldset>
       <div id="selection-errors">{compositionSupported && compositionIssues.filter((issue) => issue.field === "selections").map((issue, index) => <p className="prompt-warning" key={index}>{issue.message}</p>)}</div>
       <p className="prompt-hint">선택 {selected.size}개{category || query ? " · 필터 밖의 선택도 유지됩니다." : ""}</p>
-      {state.scene.selections.length > 0 && <div className="prompt-selected" aria-label="선택한 사전 항목">
-        {state.scene.selections.map((item) => <span className="prompt-chip" key={item.id} data-unmapped={item.mapping.status !== "mapped" || undefined}>
-          {item.labelKo}
-          <button type="button" onClick={() => setScene((scene) => removeEntry(scene, item.id))} aria-label={`${item.labelKo} 선택 해제`}>×</button>
-        </span>)}
-        <button type="button" className="quiet" onClick={clearScene}>선택 비우기</button>
-      </div>}
+      {state.scene.selections.length > 0 && <section className="prompt-groups" aria-label="선택한 장면 구성">
+        <div className="prompt-group-heading"><strong>선택한 장면 구성</strong><button type="button" className="quiet" onClick={clearScene}>선택 비우기</button></div>
+        {[...groupOrder, ...new Set(state.scene.selections.map((item) => displayGroup[item.category] ?? item.category).filter((group) => !groupOrder.includes(group)))].map((group) => {
+          const items = state.scene.selections.filter((item) => (displayGroup[item.category] ?? item.category) === group);
+          return items.length > 0 && <div className="prompt-group" key={group}><strong>{labels[group] ?? group}</strong><div className="prompt-selected">{items.map((item) => <span className="prompt-chip" key={item.id} data-unmapped={item.mapping.status !== "mapped" || undefined}>
+            <span>{item.labelKo} <small>→ {item.mapping.status === "mapped" ? item.mapping.text : "미변환"}</small></span>
+            <button type="button" onClick={() => setScene((scene) => removeEntry(scene, item.id))} aria-label={`${item.labelKo} 선택 해제`}>×</button>
+          </span>)}</div></div>;
+        })}
+        <p className="prompt-hint">선택 시 저장한 {state.scene.targetFamily} 계열 표현입니다. 중복 표현이나 미지원 계열은 미리보기 결과를 확인하세요.</p>
+      </section>}
       <label>추가 설명 (원문)<textarea aria-invalid={compositionSupported && freeIssues.length > 0} aria-describedby="free-text-help" rows={3} value={state.scene.freeTextKo} onChange={(event) => setScene((scene) => ({ ...scene, freeTextKo: event.target.value }))} placeholder="원하는 장면을 입력하세요. 자동으로 번역되지는 않습니다." /></label>
       <div id="free-text-help" className="prompt-hint">
         <p>{characterCount(state.scene.freeTextKo)}/4000자 · 원문은 그대로 보존하며 자동 번역하지 않습니다.</p>
         {freeIssues.map((issue, index) => <p className="prompt-warning" key={index}>{issue.message}{!compositionSupported && " 구성 이력 미저장: 직접 생성은 계속 가능합니다."}</p>)}
       </div>
-      <label>{state.provenance === "saved" ? "재생성 시 추가 설명 반영 방식 (과거 방식은 기록 없음)" : "추가 설명 반영 방식"}<select value={state.freeTextMode} onChange={(event) => setState((current) => ({ ...current, freeTextMode: event.target.value as "separate" | "verbatim" }))}>
+      <label>{state.provenance === "saved" ? "재생성 시 추가 설명 반영 방식 (과거 방식은 기록 없음)" : "추가 설명 반영 방식"}<select value={state.freeTextMode} onChange={(event) => setState((current) => { const next = { ...current, freeTextMode: event.target.value as "separate" | "verbatim" }; return family && next.scene.targetFamily === family ? withGeneratedDraft(next, compileScene(next.scene)) : next; })}>
         <option value="separate">별도 보관 · 최종 프롬프트는 직접 편집</option>
         <option value="verbatim">원문 그대로 초안과 최종 프롬프트에 반영</option>
       </select></label>
@@ -137,9 +145,9 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
       <button type="button" className="quiet" onClick={generate}>{state.provenance === "saved" ? "현재 컴파일러로 초안 다시 만들기" : "초안 만들기"}</button>
       {state.result && <section className="prompt-result" aria-label="프롬프트 초안">
         {state.provenance === "saved" && <p className="prompt-hint">저장된 초안과 미변환 목록입니다. 당시 경고·출처는 기록 없음입니다. 다시 만들기는 저장된 선택 표현에 현재 컴파일 규칙을 적용합니다.</p>}
-        {!dirty && state.provenance === "current" && <p className="prompt-hint">현재 선택 기준으로 초안을 생성했습니다.</p>}
+        {!dirty && state.provenance === "current" && <p className="prompt-hint">현재 선택 기준 최신 미리보기입니다. 최종 프롬프트는 적용할 때만 바뀝니다.</p>}
         {dirty && <p className="prompt-warning">선택 또는 설명이 바뀌었습니다. 초안을 다시 만들어 주세요. 현재 최종 프롬프트는 유지됩니다.</p>}
-        <label>생성된 초안<textarea aria-invalid={blocked} aria-describedby="draft-errors" readOnly value={state.result.draft} rows={3} placeholder="표현을 만들 수 없습니다." /></label>
+        <label>프롬프트 미리보기<textarea aria-invalid={blocked} aria-describedby="draft-errors" readOnly value={state.result.draft} rows={3} placeholder="표현을 만들 수 없습니다." /></label>
         <p className="prompt-hint">{characterCount(state.result.draft)}자 · 컴파일러 {state.result.compilerVersion}</p>
         {state.result.unresolved.length > 0 && <div className="prompt-warning"><strong>변환되지 않은 항목</strong><ul>{state.result.unresolved.map((item, index) => <li key={`${item.id ?? "text"}-${index}`}>{item.text}</li>)}</ul><span>미변환은 번역되지 않았다는 뜻입니다. 원문 반영 방식에서는 추가 설명이 그대로 포함됩니다. 선택 항목의 미제공 표현은 직접 입력하세요.</span></div>}
         {state.result.warnings.filter((item) => item.code !== "empty").map((item, index) => <p className="prompt-warning" key={`${item.code}-${index}`}>{warningText(item.code, item.ids, item.detail)}</p>)}
