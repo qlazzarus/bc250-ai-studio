@@ -11,6 +11,10 @@ import date from "./lib/date";
 import editable from "./lib/editable";
 import fixedValue from "./lib/fixedValue";
 import optionStatus from "./lib/optionStatus";
+import PromptBuilder from "./components/PromptBuilder";
+import { initialBuilderState, restoreComposition } from "./prompt/builderState";
+import { changeSceneFamily } from "./prompt/scene";
+import { DICTIONARY, DICTIONARY_VERSION } from "./prompt/dictionary";
 
 const initialSettings: Settings = {
   modelId: "", prompt: "", negativePrompt: "", preset: "balanced", resolution: "512x512",
@@ -32,6 +36,8 @@ function App() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [viewedId, setViewedId] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(initialSettings);
+  const [builder, setBuilder] = useState(initialBuilderState);
+  const [compositionSupported, setCompositionSupported] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [studio, setStudio] = useState<"art" | "pixel">("art");
@@ -128,11 +134,31 @@ function App() {
     return () => { active = false; };
   }, [api, assets, assetUrls, missingAssetIds]);
 
+  useEffect(() => {
+    if (!settings.prompt && !builder.scene.selections.length && !builder.scene.freeTextKo) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [settings.prompt, builder.scene]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    api.capabilities(controller.signal).then((data) => setCompositionSupported(Boolean(data.prompt_composition?.schema_versions?.includes(1)))).catch(() => setCompositionSupported(false));
+    return () => controller.abort();
+  }, [api]);
+
+  function changeBuilderFamily(family: string): boolean {
+    if (!builder.scene.targetFamily || builder.scene.targetFamily === family) return true;
+    if (builder.scene.selections.length && !window.confirm("모델 계열을 변경하면 사전 항목을 새 계열의 표현으로 다시 연결합니다. 기존 최종 프롬프트는 유지됩니다. 계속할까요?")) return false;
+    setBuilder((old) => ({ ...old, scene: changeSceneFamily(old.scene, family, DICTIONARY, DICTIONARY_VERSION), result: null, generatedFrom: null, applied: null }));
+    return true;
+  }
+
   function chooseModel(modelId: string) {
     const model = models.find((item) => item.model_id === modelId);
-    if (!model || !model.execution_enabled) return;
+    if (!model || !model.execution_enabled || !changeBuilderFamily(model.family)) return;
     const preset = model.presets.balanced || Object.values(model.presets)[0];
-    setSettings((old) => ({ ...old, modelId, prompt: old.prompt, negativePrompt: "",
+    setSettings((old) => ({ ...old, modelId, prompt: old.prompt, negativePrompt: old.negativePrompt,
       preset: model.presets.balanced ? "balanced" : Object.keys(model.presets)[0],
       resolution: `${preset.width}x${preset.height}`, steps: preset.steps,
       cfgScale: Number(model.generation_options?.cfg_scale.default ?? preset.cfg_scale),
@@ -171,6 +197,7 @@ function App() {
         width, height, steps: settings.steps, seed,
         batch_count: settings.batchCount, preset: settings.preset,
       };
+      if (builder.applied && compositionSupported && builder.applied.target_family === activeModel.family) body.prompt_composition = builder.applied;
       if (cfgEditable) body.cfg_scale = settings.cfgScale;
       if (negativeEnabled && settings.negativePrompt) body.negative_prompt = settings.negativePrompt;
       if (editable(samplingOption) && settings.samplingMethod) body.sampling_method = settings.samplingMethod;
@@ -194,6 +221,10 @@ function App() {
   }
 
   function reuse(item: AssetMetadata) {
+    if (settings.prompt && settings.prompt !== item.prompt && !window.confirm("현재 최종 프롬프트를 선택한 결과의 프롬프트로 바꿉니다. 계속할까요?")) return;
+    const model = models.find((entry) => entry.model_id === item.model_id);
+    if (model && !changeBuilderFamily(model.family)) return;
+    setBuilder(item.prompt_composition ? restoreComposition(item.prompt_composition) : initialBuilderState);
     setSettings({ modelId: item.model_id, prompt: item.prompt, negativePrompt: item.negative_prompt,
       preset: item.preset, resolution: `${item.width}x${item.height}`, steps: item.steps,
       cfgScale: item.cfg_scale, samplingMethod: item.sampling_method ?? null,
@@ -249,7 +280,9 @@ function App() {
           <label>모델<select value={settings.modelId} onChange={(event) => chooseModel(event.target.value)}>
             <option value="">모델 선택</option>{models.map((model) => <option key={model.model_id} value={model.model_id} disabled={!model.execution_enabled}>{model.display_name}{model.execution_enabled ? "" : " · 사용 불가"}</option>)}
           </select></label>
-          <label>프롬프트<textarea value={settings.prompt} onChange={(event) => setSettings({ ...settings, prompt: event.target.value })} placeholder="장면, 피사체, 조명, 스타일을 설명하세요." rows={5} /></label>
+          {!compositionSupported && <p className="prompt-warning">서버가 구성 이력 저장을 지원하지 않거나 확인할 수 없습니다. 최종 프롬프트만 저장됩니다.</p>}
+          <PromptBuilder family={activeModel?.family ?? ""} value={settings.prompt} onChange={(prompt) => setSettings((old) => ({ ...old, prompt }))} state={builder} setState={setBuilder} />
+          <label>최종 프롬프트<textarea value={settings.prompt} onChange={(event) => setSettings({ ...settings, prompt: event.target.value })} placeholder="장면, 피사체, 조명, 스타일을 설명하세요." rows={5} /></label>
           <label className={negativeEnabled ? "" : "disabled"}>Negative prompt<textarea disabled={!negativeEnabled} value={settings.negativePrompt} onChange={(event) => setSettings({ ...settings, negativePrompt: event.target.value })} placeholder={negativeEnabled ? "제외할 요소를 입력하세요." : "이 모델의 현재 CFG에서는 negative prompt를 사용할 수 없습니다."} rows={2} /></label>
           {negativeOption && <p className="option-note">Negative prompt: {optionStatus(negativeOption)}{requiredCfg && ` · CFG ${requiredCfg.join(" / ")}에서만 사용 가능`}{negativeOption.note && ` · ${negativeOption.note}`}</p>}
           <div className="chips">{activeModel && Object.keys(activeModel.presets).map((name) => <button type="button" className={settings.preset === name ? "selected" : ""} key={name} onClick={() => choosePreset(name)}>{name}{activeModel.presets[name].validation_status === "experimental" ? " · experimental" : ""}</button>)}</div>

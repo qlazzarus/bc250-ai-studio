@@ -1,3 +1,4 @@
+import json
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
@@ -46,6 +47,63 @@ Scheduler = Literal[
 ]
 
 
+class CompositionSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=100)
+    category: str = Field(min_length=1, max_length=100)
+    label_ko: str = Field(min_length=1, max_length=300)
+    dictionary_version: str = Field(min_length=1, max_length=100)
+    mapping_status: Literal["mapped", "unavailable"]
+    rendered: str | None = Field(default=None, max_length=300)
+
+    @model_validator(mode="after")
+    def check_mapping(self):
+        if self.mapping_status == "mapped" and (not self.rendered or not self.rendered.strip()):
+            raise ValueError("Mapped selection requires a nonempty expression")
+        if self.mapping_status == "unavailable" and self.rendered is not None:
+            raise ValueError("Unavailable selection must not include an expression")
+        return self
+
+
+class CompositionUnresolved(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["selection", "free_text"]
+    id: str | None = Field(default=None, max_length=100)
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class PromptComposition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    schema_version: Literal[1]
+    compiler_version: str = Field(min_length=1, max_length=100)
+    target_family: str = Field(min_length=1, max_length=100)
+    selections: list[CompositionSelection] = Field(max_length=100)
+    free_text_ko: str = Field(default="", max_length=4000)
+    draft_prompt: str = Field(default="", max_length=8000)
+    unresolved: list[CompositionUnresolved] = Field(default_factory=list, max_length=101)
+
+    @model_validator(mode="after")
+    def validate_snapshot(self):
+        ids = [entry.id for entry in self.selections]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Duplicate composition selection ID")
+        encoded = json.dumps(self.model_dump(), ensure_ascii=False, separators=(",", ":"))
+        if len(encoded.encode("utf-8")) > 32768:
+            raise ValueError("Prompt composition exceeds 32 KiB")
+        def contains_nul(value):
+            if isinstance(value, str):
+                return "\x00" in value
+            if isinstance(value, dict):
+                return any(contains_nul(item) for item in value.values())
+            if isinstance(value, list):
+                return any(contains_nul(item) for item in value)
+            return False
+
+        if contains_nul(self.model_dump()):
+            raise ValueError("NUL characters are not allowed")
+        return self
+
+
 class JobRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     job_type: Literal["image.generate", "image.batch"] = "image.generate"
@@ -66,6 +124,7 @@ class JobRequest(BaseModel):
     preset: Literal["fast", "balanced", "quality"] = "balanced"
     lora_enabled: StrictBool | None = None
     client_reference: str | None = Field(default=None, max_length=200)
+    prompt_composition: PromptComposition | None = None
 
     @model_validator(mode="after")
     def validate_batch(self):

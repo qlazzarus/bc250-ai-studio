@@ -71,7 +71,18 @@ export type Asset = {
   file_url: string;
 };
 
+export type PromptComposition = {
+  schema_version: 1;
+  compiler_version: string;
+  target_family: string;
+  selections: { id: string; category: string; label_ko: string; dictionary_version: string; mapping_status: "mapped" | "unavailable"; rendered: string | null }[];
+  free_text_ko: string;
+  draft_prompt: string;
+  unresolved: { kind: "selection" | "free_text"; id?: string | null; text: string }[];
+};
+
 export type AssetMetadata = {
+  prompt_composition?: PromptComposition | null;
   asset_id: string;
   model_id: string;
   prompt: string;
@@ -152,6 +163,7 @@ export class StudioApi {
     return response.json() as Promise<T>;
   }
 
+  capabilities(signal?: AbortSignal) { return this.request<{ prompt_composition?: { schema_versions?: number[] } }>("/system/capabilities", { signal }); }
   status(signal?: AbortSignal) { return this.request<SystemStatus>("/system/status", { signal }); }
   models(signal?: AbortSignal) { return this.request<StudioModel[]>("/models", { signal }); }
   jobs(limit = 20, offset = 0, signal?: AbortSignal) { return this.request<Job[]>(`/jobs?limit=${limit}&offset=${offset}`, { signal }); }

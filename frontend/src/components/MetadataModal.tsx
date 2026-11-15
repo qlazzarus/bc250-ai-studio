@@ -28,6 +28,12 @@ function Metadata({ data, archived, close, reuse, changeArchive, destroy }: { da
                 </>
             )}
         </dl>
+        {data.prompt_composition && <details><summary>프롬프트 구성 이력</summary>
+          <p>사전 선택: {data.prompt_composition.selections.map((item) => item.label_ko).join(", ") || "없음"}</p>
+          <p>추가 설명: {data.prompt_composition.free_text_ko || "없음"}</p>
+          <p>생성 초안: {data.prompt_composition.draft_prompt || "없음"}</p>
+          <p>컴파일러 {data.prompt_composition.compiler_version} · {data.prompt_composition.target_family}</p>
+        </details>}
         <div className="metadata-actions">
             <button className="quiet" onClick={() => void changeArchive(archived)}>
                 {archived ? "갤러리로 복원" : "보관"}

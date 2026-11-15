@@ -174,6 +174,8 @@ class Registry:
             raise ValueError("Model is missing, disabled, or belongs to another engine mode")
         if model["validation_status"] == "failed":
             raise ValueError("Model failed validation; operator review required")
+        if request.prompt_composition and request.prompt_composition.target_family != model["family"]:
+            raise ValueError("Prompt composition family does not match model")
         spec = request.model_dump()
         lora_enabled = spec.get("lora_enabled")
         if lora_enabled is not None and not model["lora_toggle_supported"]:

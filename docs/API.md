@@ -49,6 +49,12 @@ Structured errors: 401 missing/invalid token, 403 admin needed, 404 absent,
 409 state conflict, 422 validation/unsupported/unavailable model, 503 recovery block.
 Prompt lengths, batch sizes, dimensions, concurrency and HTTP body size are bounded.
 
+## Prompt composition snapshot
+
+`GET /system/capabilities` advertises `prompt_composition.schema_versions: [1]` when this optional request is supported. `POST /jobs` accepts `prompt_composition` as a bounded, versioned explanation of the applied draft: target family, compiler version, selected IDs/categories/labels/dictionary versions and captured mapping values, original Korean free text, draft and unresolved items. The submitted top-level `prompt` remains authoritative. Registry validation rejects a target family that differs from the chosen model. No composition field affects engine arguments.
+
+The job spec, durable SSE events, per-asset metadata and JSON sidecar retain the snapshot; retry copies it without recompiling. Old job and asset reads return `null` when absent. Requests omitting the field remain valid. Composition metadata is visible to authenticated Studio clients under the existing shared access model and is stored in event and asset copies. Deploy the server first; clients must feature-detect and inform users if the composition cannot be saved. See [P0 decisions](PROMPT_COMPOSER_P0.md).
+
 ## Model generation options
 
 `GET /models` and `GET /models/{model_id}` preserve the existing model object and

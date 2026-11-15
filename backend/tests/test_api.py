@@ -344,6 +344,7 @@ def test_legacy_job_and_metadata_default_new_option_fields_without_reinterpretat
         legacy_spec = registry.resolve(JobRequest(model_id="fake", prompt="legacy", seed=123))
         legacy_spec.pop("sampling_method")
         legacy_spec.pop("scheduler")
+        legacy_spec.pop("prompt_composition")
         asset_id = "legacy-asset"
         with client.app.state.db.session.begin() as session:
             session.add(
@@ -370,10 +371,12 @@ def test_legacy_job_and_metadata_default_new_option_fields_without_reinterpretat
         assert legacy.status_code == 200
         assert legacy.json()["sampling_method"] is None
         assert legacy.json()["scheduler"] is None
+        assert legacy.json()["prompt_composition"] is None
         metadata = client.get(f"/api/v1/assets/{asset_id}/metadata")
         assert metadata.status_code == 200
         assert metadata.json()["sampling_method"] is None
         assert metadata.json()["scheduler"] is None
+        assert metadata.json()["prompt_composition"] is None
 
         retried = client.post("/api/v1/jobs/legacy-job/retry")
         assert retried.status_code == 202

@@ -57,6 +57,7 @@ API 기본 주소: `http://127.0.0.1:8090`. 데이터 기본 위치:
 - [모델 레지스트리](docs/MODELS.md)
 - [실행·서버 조사·배포·복구](docs/DEPLOYMENT.md)
 - [단계별 구현 범위](docs/ROADMAP.md)
+- [프롬프트 구성·포즈 생성 모드 발전 계획](docs/GENERATION_MODES_DESIGN.md)
 - [테스트 결과와 한계](docs/TESTING.md)
 - [다음 프로젝트 LLM 클라이언트 인계 문서](docs/NEXT_PROJECT_LLM_CLIENT.md)
 - [Pixel Studio 설계·API·후속 범위](docs/PIXEL_STUDIO.md)

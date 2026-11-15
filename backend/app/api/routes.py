@@ -169,6 +169,7 @@ async def capabilities(request: Request):
         "engine": state(request).settings.engine,
         "job_types": ["image.generate", "image.batch"],
         "durable_sse": True,
+        "prompt_composition": {"schema_versions": [1]},
         "pixel_processing": False,
         "phaser_export": False,
         "integrated_chat_proxy": False,
@@ -655,6 +656,7 @@ async def metadata(asset_id: str, request: Request):
     # settings remain inspectable and the client can distinguish absence.
     details.setdefault("sampling_method", None)
     details.setdefault("scheduler", None)
+    details.setdefault("prompt_composition", None)
     return details
 
 
