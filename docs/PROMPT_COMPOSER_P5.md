@@ -117,11 +117,13 @@ models:
 
 ControlNet Pose/IP-Adapter/img2img는 텍스트 renderer 외에 자산 업로드/권한/보관, 조건 이미지 전처리, engine capability, 요청 schema와 GPU 메모리 검증이 필요하다. 후보 변경 파일·마이그레이션·구 버전 읽기 전략을 별도 제안하고 승인 후 구현한다. 완료 조건은 다인 속성/관계의 구조 및 v1 왕복/legacy 보존 시험이다. 이번에는 Scene v2·새 참조 API·DB migration을 구현하지 않았다.
 
-## P8 — 선택적 LLM 보조 (구현하지 않음)
+## P8 — 선택적 LLM 보조 (A5/A7 결정론 선행 구현)
 
 번역·장면 보강·모델별 제안·누락/충돌 설명·캐릭터 구성을 사용자의 명시적 요청으로만 수행한다. 원문/결정론적 초안/LLM 제안을 분리하고 제안 diff와 적용/거부를 제공한다. 별도 인증된 Client/gate 경계와 GPU admission/drain을 설계하며 LLM 실패·응답 불완전·메모리 부족에도 현재 사전/직접 생성이 계속 동작해야 한다. 변경 대상 후보는 Client 연동 API와 제안 UI, 응답 스키마이며 이번 구현에는 없다. 완료 조건은 원문 보존·실패 복구·명시적 적용·자원 전환 검증이다.
 
-이 단계의 구체적 자동화 후보는 [LLM 자동화 제안](PROMPT_COMPOSER_LLM_AUTOMATION.md)에 8개(오프라인 배치 A1–A4, 온라인 제안 A5–A7, 평가 보조 A8)로 정리했다. 그 문서는 우선순위·계약 초안·GPU 경합 규칙·측정 지표·위험을 다루며, 역시 설계만이다. 사전 스키마·Scene v2·제안 API·운영 GPU 사용은 승인 전 수행하지 않는다.
+이 단계의 구체적 자동화 후보는 [LLM 자동화 제안](PROMPT_COMPOSER_LLM_AUTOMATION.md)에 8개(오프라인 배치 A1–A4, 온라인 제안 A5–A7, 평가 보조 A8)로 정리했다. 그 문서는 우선순위·계약 초안·GPU 경합 규칙·측정 지표·위험을 다룬다. 사전 스키마·Scene v2·제안 API·운영 GPU 사용은 승인 전 수행하지 않는다.
+
+2026-11-15에 A5(원문→사전 후보)와 A7(경고 해설)을 **LLM 없이 결정론으로 선행 구현**했다(`frontend/src/prompt/proposals.ts`, `PromptBuilder.tsx`). 타이핑 중에는 호출하지 않고 버튼을 눌렀을 때만 제안을 계산하며, 수락은 기존 `selectEntry()`를 재사용한다. 충돌 경고는 문장 설명만 하고 자동 해제하지 않는다. 이 구현은 서버·스키마·GPU·CI를 건드리지 않으므로 P8 승인 경계에 해당하지 않는다. LLM 교체는 `ProposalRequest`/`SelectionHint` 타입을 유지한 채 구현만 바꾸면 된다. 상세는 [후속 추적의 LLM 기록](PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
 
 ## 검증 기록과 승인 경계
 

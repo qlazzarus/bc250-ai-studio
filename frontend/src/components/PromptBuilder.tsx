@@ -3,6 +3,7 @@ import { compileScene, DRAFT_LIMIT } from "../prompt/compiler";
 import { type PromptBuilderState, isDraftStale, withGeneratedDraft, withAppliedDraft, draftComposition, applicationStatus } from "../prompt/builderState";
 import { DICTIONARY, DICTIONARY_VERSION, familyCoverage, searchDictionary } from "../prompt/dictionary";
 import { changeSceneFamily, removeEntry, selectEntry, type SceneSpecification } from "../prompt/scene";
+import { explainWarning, suggestSelections } from "../prompt/proposals";
 
 import { characterCount, validateComposition, validateText } from "../prompt/validation";
 
@@ -29,6 +30,8 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [notice, setNotice] = useState("");
+  /** Hints stay hidden until the user asks; nothing is proposed while typing. */
+  const [hintsOpen, setHintsOpen] = useState(false);
   const selected = new Set(state.scene.selections.map((item) => item.id));
   const categories = groupOrder.filter((group) => DICTIONARY.some((item) => item.active && (displayGroup[item.category] ?? item.category) === group));
   const options = useMemo(() => searchDictionary(DICTIONARY, query)
@@ -43,6 +46,11 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
   const issues = compositionSupported ? [...draftIssues, ...compositionIssues] : draftIssues;
   const freeIssues = validateText(state.scene.freeTextKo, "free_text_ko", 4000);
   const blocked = issues.length > 0;
+  const selectedKey = state.scene.selections.map((item) => item.id).join("\u0000");
+  // Recomputed from the immutable free text only when the user opens the panel.
+  const hints = useMemo(() => (hintsOpen && family
+    ? suggestSelections({ freeTextKo: state.scene.freeTextKo, family, dictionary: DICTIONARY, selectedIds: selectedKey.split("\u0000") })
+    : []), [hintsOpen, family, state.scene.freeTextKo, selectedKey]);
 
   function setScene(update: (scene: SceneSpecification) => SceneSpecification) {
     setState((current) => {
@@ -78,17 +86,18 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
     setNotice("선택을 비웠습니다. 미리보기를 확인하세요.");
   }
 
-  function warningText(code: string, ids: string[], detail?: string) {
-    const names = ids.map((id) => state.scene.selections.find((item) => item.id === id)?.labelKo ?? id).join(" / ");
-    if (code === "conflict") return `함께 선택한 항목을 확인하세요: ${names}`;
-    if (code === "unsupported_family") return "이 모델 계열의 사전 변환은 아직 제공되지 않습니다.";
-    if (code === "duplicate") return `중복된 항목: ${ids.join(", ")}`;
-    if (code === "duplicate_phrase") return `같은 표현이 겹쳐 한 번만 사용했습니다: ${names}`;
-    if (code === "over_limit") return detail?.includes("selection")
-      ? `선택 항목이 서버 한도를 넘었습니다 (${detail}).`
-      : `초안이 서버 저장 한도(${DRAFT_LIMIT}자)를 넘었습니다 (${detail}). 일부를 줄이세요.`;
-    if (code === "token_budget") return `프롬프트가 SD 1.5 텍스트 창을 넘을 수 있습니다 (${detail}). 뒤쪽 항목이 반영되지 않을 수 있습니다.`;
-    return "";
+  /** Only ever removes duplicates the explanation explicitly marked as redundant. */
+  function removeRedundant(ids: string[]) {
+    if (!ids.length) return;
+    setScene((scene) => ids.reduce((next, id) => removeEntry(next, id), scene));
+    setNotice("중복 항목을 해제했습니다. 미리보기를 확인하세요.");
+  }
+
+  function acceptHint(id: string) {
+    const entry = DICTIONARY.find((item) => item.id === id && item.active);
+    if (!entry) return;
+    setScene((scene) => selectEntry(scene, entry, DICTIONARY_VERSION));
+    setNotice(`"${entry.labelKo}"을(를) 선택에 추가했습니다. 원문은 그대로 유지됩니다.`);
   }
 
   return <div className="prompt-builder">
@@ -137,6 +146,27 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
         <p>{characterCount(state.scene.freeTextKo)}/4000자 · 원문은 그대로 보존하며 자동 번역하지 않습니다.</p>
         {freeIssues.map((issue, index) => <p className="prompt-warning" key={index}>{issue.message}{!compositionSupported && " 구성 이력 미저장: 직접 생성은 계속 가능합니다."}</p>)}
       </div>
+      <div className="prompt-proposals">
+        <button type="button" className="quiet" aria-expanded={hintsOpen} aria-controls="prompt-proposals"
+          disabled={!family || !state.scene.freeTextKo.trim()}
+          onClick={() => setHintsOpen(!hintsOpen)}>
+          {hintsOpen ? "제안 닫기" : "원문에서 사전 항목 찾기"}
+        </button>
+        <p className="prompt-hint">입력한 원문에서 사전 항목을 찾아 제안합니다. 원문은 바뀌지 않고, 추가는 직접 눌러야 반영됩니다.</p>
+        {hintsOpen && <div id="prompt-proposals" className="prompt-proposal-list" role="group" aria-label="사전 항목 제안">
+          {hints.length === 0
+            ? <p className="prompt-hint">원문에서 사전 항목을 찾지 못했습니다. 직접 선택하거나 원문을 그대로 사용하세요.</p>
+            : hints.map((hint) => <div className="prompt-proposal" key={hint.id}>
+              <div>
+                <strong>{hint.labelKo}</strong>
+                <small> · {labels[displayGroup[hint.category] ?? hint.category] ?? hint.category} · 일치 “{hint.matchedPhrase}”</small>
+                {!hint.available && <small className="prompt-proposal__warn"> · 이 모델은 미변환</small>}
+              </div>
+              <span className="prompt-proposal__score" aria-label={`신뢰도 ${Math.round(hint.confidence * 100)}%`}>{Math.round(hint.confidence * 100)}%</span>
+              <button type="button" className="quiet" onClick={() => acceptHint(hint.id)}>선택에 추가</button>
+            </div>)}
+        </div>}
+      </div>
       <label>{state.provenance === "saved" ? "재생성 시 추가 설명 반영 방식 (과거 방식은 기록 없음)" : "추가 설명 반영 방식"}<select value={state.freeTextMode} onChange={(event) => setState((current) => { const next = { ...current, freeTextMode: event.target.value as "separate" | "verbatim" }; return family && next.scene.targetFamily === family ? withGeneratedDraft(next, compileScene(next.scene)) : next; })}>
         <option value="separate">별도 보관 · 최종 프롬프트는 직접 편집</option>
         <option value="verbatim">원문 그대로 초안과 최종 프롬프트에 반영</option>
@@ -150,7 +180,14 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
         <label>프롬프트 미리보기<textarea aria-invalid={blocked} aria-describedby="draft-errors" readOnly value={state.result.draft} rows={3} placeholder="표현을 만들 수 없습니다." /></label>
         <p className="prompt-hint">{characterCount(state.result.draft)}자 · 컴파일러 {state.result.compilerVersion}</p>
         {state.result.unresolved.length > 0 && <div className="prompt-warning"><strong>변환되지 않은 항목</strong><ul>{state.result.unresolved.map((item, index) => <li key={`${item.id ?? "text"}-${index}`}>{item.text}</li>)}</ul><span>미변환은 번역되지 않았다는 뜻입니다. 원문 반영 방식에서는 추가 설명이 그대로 포함됩니다. 선택 항목의 미제공 표현은 직접 입력하세요.</span></div>}
-        {state.result.warnings.filter((item) => item.code !== "empty").map((item, index) => <p className="prompt-warning" key={`${item.code}-${index}`}>{warningText(item.code, item.ids, item.detail)}</p>)}
+        {state.result.warnings.filter((item) => item.code !== "empty").map((item, index) => {
+          const explanation = explainWarning(item, (id) => state.scene.selections.find((entry) => entry.id === id)?.labelKo ?? id, DRAFT_LIMIT);
+          return <div className="prompt-warning prompt-warning--action" key={`${item.code}-${index}`}>
+            <span>{explanation.message}</span>
+            {explanation.removeIds.length > 0 && <button type="button" className="quiet"
+              onClick={() => removeRedundant(explanation.removeIds)}>중복 해제</button>}
+          </div>;
+        })}
         {state.result.warnings.some((item) => item.code === "empty") && <p className="prompt-warning">사전 항목을 선택하거나 설명을 입력하세요.</p>}
         <div id="draft-errors" role="status">{issues.map((issue, index) => <p className="prompt-warning" key={index}>{issue.field}: {issue.message}</p>)}</div>
         <button type="button" className="quiet" disabled={(!state.result.draft && !separateOnly) || dirty || blocked || state.result.targetFamily !== family} onClick={applyDraft}>{separateOnly ? "설명만 이력에 적용 (최종 입력 유지)" : "초안을 최종 프롬프트에 적용"}</button>

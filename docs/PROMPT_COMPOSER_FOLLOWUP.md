@@ -1,6 +1,6 @@
 # Prompt Composer 남은 작업과 회귀 추적
 
-갱신일: 2026-11-15 · 기준: `e85d8dc` + TEST-D01 의존성 변경. P5-R02·P5-C01/C02/C03·P6-UX·TEST-D01 로컬 완료.
+갱신일: 2026-11-15 · 기준: `e85d8dc` + TEST-D01 의존성 변경 + LLM A5/A7 결정론 선행 구현. P5-R02·P5-C01/C02/C03·P6-UX·TEST-D01·LLM-A5/A7 로컬 완료.
 현재 상태를 이 문서에서 추적한다. 설계와 수동 절차는 [P5 상세](PROMPT_COMPOSER_P5.md), 실제 동작은 [현재 구현](PROMPT_COMPOSER_CURRENT.md), P0–P4 이력은 [작업 계획](PROMPT_COMPOSER_TASKS.md)을 따른다.
 
 상태는 `미착수`, `진행`, `환경 대기`, `설계만`, `로컬 검증 완료`로 구분한다. 로컬 테스트 통과를 브라우저·운영·GPU 완료로 바꾸지 않는다. 항목을 완료 처리할 때 실행 명령, 대상 커밋/환경, 결과와 증거를 추가한다.
@@ -24,10 +24,45 @@
 | P7-S01 | 후속 / 설계만 | Scene v2 actor별 속성·관계·공통 배경·v1 unassigned 보존 설계 | 스키마 변경 이유·영향·변환/복구 계획 승인 후 구현 |
 | P7-I01 | 후속 / 설계만 | 참조 이미지·ControlNet/IP-Adapter/img2img의 자산·권한·엔진 계약 검토 | 업로드/전처리/모델 지원/GPU 메모리 검증. 프롬프트 문자열만으로 지원 완료 처리하지 않음 |
 | P8-L01 | 후속 / 설계만 | 명시적 LLM 번역/보강 제안과 적용/거부, Client/gate 연결 설계 | 실패 시 원문·사전/직접 생성 보존, 응답 검증 및 GPU 전환 검증. 세부 자동화 후보는 [LLM 자동화 제안](PROMPT_COMPOSER_LLM_AUTOMATION.md) |
-| LLM-A1..A8 | 후속 / 설계만 | 사전 커버리지 갭·충돌쌍·alias·family 표현 감사(오프라인 A1–A4), 원문→사전 후보·경고 설명·속성 귀속 제안(온라인 A5·A7·A6), 평가 채점 보조(A8) | [LLM 자동화 제안](PROMPT_COMPOSER_LLM_AUTOMATION.md)의 지표 기준선 수집과 계약 승인. 권장 순서 A2·A3 → A1 → A4 → A5 → A7 → A8 → A6 |
+| LLM-A5/A7 | 후속 / 로컬 검증 완료 | 원문→사전 후보 제안(A5), 경고 해설·안전한 중복 해소(A7)를 LLM 없이 결정론으로 선행 구현 | `frontend/src/prompt/proposals.ts`, 단위 9건·프런트 38건·tsc/lint/build·실제 Chromium(360/1280px) 통과. LLM 교체는 계약 승인 후 |
+| LLM-A1..A4·A6·A8 | 후속 / 설계만 | 사전 커버리지 갭·충돌쌍·alias·family 표현 감사(오프라인 A1–A4), 속성 귀속 제안(A6), 평가 채점 보조(A8) | [LLM 자동화 제안](PROMPT_COMPOSER_LLM_AUTOMATION.md)의 지표 기준선 수집과 계약 승인. 권장 순서 A2·A3 → A1 → A4 → A8 → A6 |
 | TEST-D01 | 낮음 / 로컬 검증 완료 | Starlette TestClient의 httpx 사용 중단 예정 경고 검토 | `httpx2>=2,<3` dev 의존성 추가·lock 갱신으로 경고 제거. Studio 131건·전체 ruff 통과, 아래 기록 |
 
-다음 실행 순서: P5-L01(운영 배포·롤백 검증) → P6-Q02(GPU 품질) → P6-Q01/P5-D01 설계 승인. LLM 자동화(A1–A8)는 설계 승인 후 A2·A3부터 병행 착수할 수 있다. P6–P8·LLM 설계는 병행 검토할 수 있으나 운영·GPU 검증을 완료로 표시하지 않는다. 기존 승인 범위 밖의 스키마 변경은 별도로 보고한다.
+다음 실행 순서: P5-L01(운영 배포·롤백 검증) → P6-Q02(GPU 품질) → P6-Q01/P5-D01 설계 승인. LLM 자동화는 A5/A7 결정론 UI가 들어갔으므로, 계약 승인 시 A2·A3(사전 파일만 변경)와 A5/A7 서버 교체를 함께 진행할 수 있다. P6–P8·LLM 설계는 병행 검토할 수 있으나 운영·GPU 검증을 완료로 표시하지 않는다. 기존 승인 범위 밖의 스키마 변경은 별도로 보고한다.
+
+## LLM 자동화 A5/A7 결정론 선행 구현 (2026-11-15)
+
+[LLM 자동화 제안](PROMPT_COMPOSER_LLM_AUTOMATION.md)의 A5(원문→사전 후보)와 A7(경고 해설)을 LLM 없이 먼저 구현해 UI와 계약을 고정했다. 서버·스키마·사전 데이터·GPU·CI는 변경하지 않았다.
+
+구현:
+
+- `frontend/src/prompt/proposals.ts`(신규): `suggestSelections()`는 `labelKo`/`aliases` 부분 문자열 매칭으로 후보를 만들고, 존재하는 사전 id만 반환한다. 신뢰도는 구절 길이·라벨 일치·계열 매핑 여부로 결정론적으로 계산한다. `explainWarning()`은 compiler 경고를 한국어 한 문장으로 바꾸고, 안전할 때만 제거할 뒤쪽 중복 id를 준다.
+- `PromptBuilder.tsx`: "원문에서 사전 항목 찾기" 버튼을 눌렀을 때만 제안을 계산(타이핑 중 자동 호출 없음). 수락은 기존 `selectEntry()`를 그대로 사용한다. 경고는 `prompt-warning--action` 행으로 렌더하고 중복 해제 버튼은 `removeIds`가 있을 때만 노출한다.
+- `styles.css`: 제안 목록·경고 액션 스타일과 460px 미디어 쿼리.
+
+검증:
+
+```sh
+node --experimental-strip-types --test frontend/tests/*.test.mjs   # 39 passed
+cd frontend && npx tsc -b && npm run lint && npm run build         # 통과
+```
+
+| ID | 시나리오 | 관찰 결과 |
+| --- | --- | --- |
+| LLM-U1 | 타이핑만 vs 버튼 클릭 | 텍스트만으로는 제안 패널 없음(버튼 비활성), 클릭 시 4건 제안, 원문 불변 |
+| LLM-U2 | 제안 수락 | 칩 1개 추가, 원문 그대로, 선택 1개 |
+| LLM-U3 | 선택 항목 제외 | 수락한 "긴 머리"가 제안 목록에서 사라짐 |
+| LLM-U4 | 충돌 경고 | "함께 쓰기 어려운 조합입니다: 전신 / 클로즈업. 둘 중 하나를 해제하세요." + **자동 해제 버튼 0개** |
+| LLM-U5 | 비우기 후 | 경고 0건 |
+| LLM-U6 | 360×780 | 제안 목록 가로 넘침 0, 후보 4건 표시 |
+
+로그: 제안 신뢰도 65/65/45/45%, `matchedPhrase`가 원문 부분 문자열임을 단위 테스트로 고정. 스크린샷(임시): `llm-u-proposals`, `llm-u-conflict`, `llm-u-360`.
+
+한계:
+
+- LLM은 붙이지 않았다. 현재 제안은 **표현이 문자 그대로 포함된 경우만** 잡는다. "골목에 선 여자"처럼 사전에 없는 표현은 후보가 나오지 않는다(A1/A5 LLM의 몫).
+- 신뢰도는 모델 확률이 아니라 규칙 점수다. 수락률·오매칭률 기준선은 아직 없다.
+- A5/A7의 서버 계약(`POST /api/v1/prompt/proposals`)은 [설계 초안](PROMPT_COMPOSER_LLM_AUTOMATION.md)일 뿐 구현하지 않았다.
 
 ## P5-R01 원인과 수정 기록
 
