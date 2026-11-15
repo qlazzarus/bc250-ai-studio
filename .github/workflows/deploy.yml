@@ -51,7 +51,8 @@ jobs:
           git archive HEAD pyproject.toml uv.lock backend config | tar -x -C "$stage"
           mkdir -p "$stage/frontend/dist"
           cp -R frontend/dist/. "$stage/frontend/dist/"
-          tar -czf /tmp/bc250-ai-studio-release.tar.gz -C "$stage" pyproject.toml uv.lock backend config frontend/dist
+          # Reproducible archive: the same commit must hash the same on every run.
+          python scripts/package-release.py "$stage" /tmp/bc250-ai-studio-release.tar.gz
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.BC250_SSH_PRIVATE_KEY }}

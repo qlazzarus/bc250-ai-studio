@@ -16,7 +16,7 @@ spec.loader.exec_module(module)
 def fixture(tmp_path, changed='backend/app/api/routes.py', extra=None):
     app = tmp_path / 'app'
     names = ['pyproject.toml', 'uv.lock', 'config/models.yaml',
-             'backend/app/api/routes.py', 'backend/app/services/gpu.py']
+             'backend/app/api/routes.py', 'backend/app/services/gpu.py', 'backend/alembic/env.py']
     for name in names:
         path = app / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -38,7 +38,7 @@ def test_only_reviewed_p4_change_is_reported(tmp_path):
 
 
 def test_unexpected_gpu_or_config_change_is_rejected(tmp_path):
-    for index, name in enumerate(['backend/app/services/gpu.py', 'config/models.yaml']):
+    for index, name in enumerate(['backend/app/services/gpu.py', 'backend/alembic/env.py', 'config/models.yaml']):
         folder = tmp_path / str(index)
         folder.mkdir()
         with pytest.raises(ValueError, match='Unexpected'):

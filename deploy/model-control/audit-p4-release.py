@@ -69,8 +69,8 @@ def audit(archive, app, expected_sha256):
                 if name.startswith('backend/') or name in PINNED_FILES}
     changes = sorted(name for name in set(current) | set(relevant)
                      if current.get(name) != relevant.get(name))
-    unexpected = [name for name in changes if name.startswith('backend/app/')
-                  and name not in ALLOWED_APP_CHANGES]
+    unexpected = [name for name in changes if name.startswith('backend/')
+                  and not name.startswith('backend/tests/') and name not in ALLOWED_APP_CHANGES]
     unexpected += [name for name in PINNED_FILES if name in changes]
     if unexpected:
         raise ValueError('Unexpected runtime or pinned file changes: ' + ', '.join(unexpected))
