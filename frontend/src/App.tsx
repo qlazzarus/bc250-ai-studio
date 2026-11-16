@@ -43,6 +43,8 @@ function App() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [studio, setStudio] = useState<"art" | "pixel">("art");
+  const [promptDirty, setPromptDirty] = useState(false);
+  const [promptBlurred, setPromptBlurred] = useState(false);
 
   const api = useMemo(() => new StudioApi("/api/v1", API_KEY), []);
   const activeModel = models.find((model) => model.model_id === settings.modelId);
@@ -207,6 +209,12 @@ function App() {
   const promptIssues = submissionIssues.filter((issue) => issue.field === "prompt");
   const negativeIssues = submissionIssues.filter((issue) => issue.field === "negative_prompt");
   const otherIssues = submissionIssues.filter((issue) => !["prompt", "negative_prompt"].includes(issue.field));
+  // An untouched empty prompt is a starting hint, not an error the user caused.
+  // Once the field is edited, blurred, or holds restored text, show the real state.
+  const promptTouched = promptDirty || promptBlurred;
+  const showPromptIssues = settings.prompt.length > 0 || promptTouched;
+  const promptHint = !promptTouched && settings.prompt.length === 0
+    ? "생성할 장면을 적거나, 위의 사전 구성으로 초안을 만들어 적용하세요." : "";
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -299,9 +307,9 @@ function App() {
             <option value="">모델 선택</option>{models.map((model) => <option key={model.model_id} value={model.model_id} disabled={!model.execution_enabled}>{model.display_name}{model.execution_enabled ? "" : " · 사용 불가"}</option>)}
           </select></label>
           {!compositionSupported && <p className="prompt-warning">서버가 구성 이력 저장을 지원하지 않거나 확인할 수 없습니다. 최종 프롬프트만 저장됩니다.</p>}
-          <PromptBuilder compositionSupported={compositionSupported} family={activeModel?.family ?? ""} value={settings.prompt} onChange={(prompt) => setSettings((old) => ({ ...old, prompt }))} state={builder} setState={setBuilder} />
-          <label>최종 프롬프트<textarea aria-invalid={promptIssues.length > 0} aria-describedby="prompt-errors" value={settings.prompt} onChange={(event) => setSettings({ ...settings, prompt: event.target.value })} placeholder="장면, 피사체, 조명, 스타일을 설명하세요." rows={5} /></label>
-          <div id="prompt-errors" role="status"><p className="prompt-hint">{characterCount(settings.prompt)}/8000자</p>{promptIssues.map((issue, index) => <p className="prompt-warning" key={index}>{issue.message}</p>)}</div>
+          <PromptBuilder compositionSupported={compositionSupported} family={activeModel?.family ?? ""} value={settings.prompt} onChange={(prompt) => { setPromptDirty(true); setSettings((old) => ({ ...old, prompt })); }} state={builder} setState={setBuilder} />
+          <label>최종 프롬프트<textarea aria-invalid={showPromptIssues && promptIssues.length > 0} aria-describedby="prompt-errors" value={settings.prompt} onChange={(event) => { setPromptDirty(true); setSettings({ ...settings, prompt: event.target.value }); }} onBlur={() => setPromptBlurred(true)} placeholder="장면, 피사체, 조명, 스타일을 설명하세요." rows={5} /></label>
+          <div id="prompt-errors" role="status"><p className="prompt-hint">{characterCount(settings.prompt)}/8000자</p>{promptHint && <p className="prompt-hint">{promptHint}</p>}{showPromptIssues && promptIssues.map((issue, index) => <p className="prompt-warning" key={index}>{issue.message}</p>)}</div>
           <label className={negativeEnabled ? "" : "disabled"}>Negative prompt<textarea aria-invalid={negativeIssues.length > 0} aria-describedby="negative-errors" disabled={!negativeEnabled} value={settings.negativePrompt} onChange={(event) => setSettings({ ...settings, negativePrompt: event.target.value })} placeholder={negativeEnabled ? "제외할 요소를 입력하세요." : "이 모델의 현재 CFG에서는 negative prompt를 사용할 수 없습니다."} rows={2} /></label>
           <div id="negative-errors" role="status">{negativeIssues.map((issue, index) => <p className="prompt-warning" key={index}>{issue.message}</p>)}</div>
           {negativeOption && <p className="option-note">Negative prompt: {optionStatus(negativeOption)}{requiredCfg && ` · CFG ${requiredCfg.join(" / ")}에서만 사용 가능`}{negativeOption.note && ` · ${negativeOption.note}`}</p>}

@@ -4,6 +4,8 @@
 
 작성일: 2026-11-15. 기준 커밋 `12ee5ea`와 기존 문서 변경을 보존하고 적용한 로컬 변경이다. Scene v1·prompt_composition v1·최종 prompt 실행 기준·retry 복사를 유지한다. 사전은 1.2.0, 컴파일러는 1.3.0이다. P0–P4 기록은 [기존 작업 계획](PROMPT_COMPOSER_TASKS.md)에 보존한다.
 
+이 문서는 유지해야 할 계약과 후속 설계 참고자료다. 아래 구현/시험 절차는 P5 당시 설계 이력이며 현재 상태 판정은 [추적 목록](PROMPT_COMPOSER_FOLLOWUP.md)을 따른다. 정리 전 원문은 [archive](archive/prompt-composer/2026-11-16/PROMPT_COMPOSER_P5.md)에 보존했다.
+
 ## 대조 결과와 위험
 
 | 발견 사항 | 위험도 | 조치 |

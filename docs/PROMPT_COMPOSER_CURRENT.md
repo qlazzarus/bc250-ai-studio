@@ -1,10 +1,23 @@
 # 사전 프롬프트 현재 구현과 개선 기준
 
-현재 남은 작업과 회귀 수정 상태는 [후속 작업 추적](PROMPT_COMPOSER_FOLLOWUP.md)에서 관리한다. capability 설정 누락 회귀(P5-R01)와 원래 129건 범위 재실행(P5-R02)은 통과했고, P5-C01/C02/C03 브라우저 검증·P6-UX 화면 검증·TEST-D01(httpx2)도 로컬에서 완료했다. 운영 배포·롤백과 GPU 품질 검증은 별도 미완료다.
+현재 남은 작업과 회귀 수정 상태는 [후속 작업 추적](PROMPT_COMPOSER_FOLLOWUP.md)에서 관리한다. capability 설정 누락 회귀(P5-R01)와 원래 129건 범위 재실행(P5-R02)은 통과했고, P5-C01/C02/C03 브라우저 검증·P6-UX 화면 검증·TEST-D01(httpx2)도 로컬에서 완료했다. **P6-UX-R2는 U01–U10 구현·실측 완료, U11 계측 완료·사용자 확인 대기, U12 대기다.** 운영 배포·롤백과 GPU 품질 검증은 별도 미완료다.
 
-검토일: 2026-11-15 · 기준: `12ee5ea` 및 P5 로컬 변경. [P5 상세 설계·검증 절차](PROMPT_COMPOSER_P5.md). 이번 검토는 구현과 문서의 대조이며 운영 서버 재점검이나 GPU 품질 평가가 아니다. 작업 순서는 **현재 구현 확인 → 문서 동기화 → 기능 개선**이다. 이 문서는 현재 동작의 기준이고, [작업 계획](PROMPT_COMPOSER_TASKS.md)의 P0–P4 설명과 배포 기록은 단계별 이력이다.
+검토일: 2026-11-16 · 기준: `730e077`. [P5 상세 설계·검증 절차](PROMPT_COMPOSER_P5.md). 이번 검토는 구현과 문서의 대조이며 운영 서버 재점검이나 GPU 품질 평가가 아니다. 작업 순서는 **현재 구현 확인 → 문서 동기화 → 기능 개선**이다. 이 문서는 현재 동작의 기준이고, [작업 계획](PROMPT_COMPOSER_TASKS.md)의 P0–P4 설명과 배포 기록은 단계별 이력이다.
 
 P6-UX에서는 카테고리 버튼·그룹별 선택/표현과 편집 시 자동 미리보기를 도입했다. 저장된 과거 초안은 복원 시 유지하며 편집 또는 재생성 시 현재 규칙을 적용한다. 브라우저 검증 상태는 [후속 추적](PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
+
+2026-11-16 [P6-UX-R2](PROMPT_COMPOSER_UX_REVIEW.md)의 **U01–U10을 구현·실측 완료**했고 U11 계측도 마쳤다(사용자 의견 확인 대기). 이 문서의 §구성 UI·§사용 순서 설명 중 아래 변경분은 이미 현재 코드에 반영되어 있다.
+
+- **배치**: `prompt-stage` 안에서 `prompt-explore`(탐색)와 `prompt-scene`(장면·미리보기)로 구획을 나눴다. **실측 결과 컴포저 폭이 328–566px이라 2열은 켜지 않는다** — 항상 1열 세로 적층이며, `@container (min-width: 900px)` 가드는 향후 확장용이다. U01의 "데스크톱 960px 이상 2열" 전제는 철회했다([UX_LAYOUT §4](PROMPT_COMPOSER_UX_LAYOUT.md)).
+- **탐색**: 분류 버튼에 `선택 n`을 표시하고, 검색 0건에서 `전체에서 검색`·`검색 초기화` 두 복구 경로를 제공한다.
+- **칩**: 한국어 이름 중심으로 표시하고 영어 표현은 `표현` 접이식 상세로 옮겼다.
+- **미리보기**: 정상 편집에서는 `초안 만들기`를 숨기고 자동 미리보기를 쓴다. 재생성이 필요한 상태(과거 복원·계열 변경)에서만 버튼이 나온다.
+- **포함/보관 안내**: `prompt-inclusion` 행이 원문 포함(`data-included`)/별도 보관/방식 미기록(`data-unknown`)을 미리보기 기준으로 명시한다.
+- **제안**: `신뢰도 n%` 대신 `일치`로 표시하고 규칙 점수는 `title`/`aria-label`에만 남겼다.
+- **최종 입력 오류 시점**: 빈 진입은 시작 안내, blur/편집 후/제출 시도 시 오류. 생성 버튼 차단 자체는 그대로다.
+- **반응형**: 26px 이상 터치 타깃, `focus-visible` 표시, 460px 이하 규칙.
+
+U01–U11 산출물과 실측 수치는 [UX_LAYOUT §7](PROMPT_COMPOSER_UX_LAYOUT.md)에, 태스크 상태는 [실행 명세](PROMPT_COMPOSER_EXECUTION_TASKS.md)에 있다. U12(정합성 회귀·상위 종료)는 아직 대기다.
 
 ## 구성과 데이터 흐름
 
@@ -14,12 +27,16 @@ P6-UX에서는 카테고리 버튼·그룹별 선택/표현과 편집 시 자동
 | 선택 스냅샷 | `frontend/src/prompt/scene.ts` | Scene v1에 대상 계열, 선택 당시 이름·분류·사전 버전·매핑, 자유 입력 보관. 계열 변경 시 현재 사전으로 명시적 재결속 |
 | 컴파일러 | `frontend/src/prompt/compiler.ts` | 버전 1.3.0. 스냅샷을 분류·ID 순으로 정렬해 초안·출처·미변환 항목·경고 반환. 네트워크/LLM 호출 없음 |
 | 화면 상태 | `frontend/src/prompt/builderState.ts` | 편집 중 scene, 생성 결과 result, 생성 당시 scene 문자열 generatedFrom, 마지막 적용 이력 applied 분리 |
-| 구성 UI | `frontend/src/components/PromptBuilder.tsx` | 검색·10개 표시 분류·다중 선택·선택 칩·선택 비우기·추가 설명·초안 생성/적용 |
+| 구성 UI | `frontend/src/components/PromptBuilder.tsx` | `prompt-stage`(탐색 1열 + 장면/미리보기 1열) · 검색·10개 표시 분류·``선택 n``·0건 복구·다중 선택·한국어 칩+접이식 영어 상세·선택 비우기·추가 설명·자동 미리보기/명시적 적용·포함 여부 안내 |
+| 제안·경고 해설 | `frontend/src/prompt/proposals.ts` | `suggestSelections()` 규칙 기반 후보(사전 ID만 반환, 원문 불변), `explainWarning()` 한국어 경고 문장 + 안전할 때만 중복 해제 ID |
+| 표시 계산 | `frontend/src/prompt/presentation.ts` | 검색 필터·0건 복구 선택지·미리보기 버튼 노출 조건·포함/보관 안내 문구·적용 상태 라벨. 순수 함수만 두고 부수효과 없음 |
 | 제출과 재사용 | `frontend/src/App.tsx` | capability 확인, 최종 prompt 제출, 적용 이력 첨부, 모델 변경 확인, 결과 재사용 |
 | 서버 계약 | `backend/app/models/schemas.py`, `backend/app/services/registry.py` | 구성 v1 구조·크기·매핑 상태·중복 ID·모델 계열 일치 검증. 실제 실행 기준은 최상위 prompt |
 | 결과 표시 | `frontend/src/components/MetadataModal.tsx` | 선택 이름·원문·초안·미변환/누락·컴파일러 버전 표시 |
 
-사용 순서는 모델 선택 → 사전 선택/추가 설명 → 초안 만들기 → 초안을 최종 프롬프트에 적용 → 최종 입력 직접 수정 → 생성이다. 생성된 초안 칸은 읽기 전용이며 편집은 적용 후 최종 프롬프트 칸에서 한다. P5는 추가 설명의 원문 반영/별도 보관을 명시적으로 선택하게 한다. 사전을 사용하지 않고 직접 입력할 수도 있다.
+사용 순서는 모델 선택 → 사전 선택/추가 설명 → (자동 미리보기 확인) → 초안을 최종 프롬프트에 적용 → 최종 입력 직접 수정 → 생성이다. 정상 편집에서는 `초안 만들기` 버튼이 나오지 않고, 과거 복원·계열 변경처럼 재생성이 필요한 상태에서만 나타난다. 생성된 초안 칸은 읽기 전용이며 편집은 적용 후 최종 프롬프트 칸에서 한다. P5는 추가 설명의 원문 반영/별도 보관을 명시적으로 선택하게 한다. 사전을 사용하지 않고 직접 입력할 수도 있다.
+
+빈 최종 입력은 진입 즉시 오류가 아니라 시작 안내다. 오류는 blur·편집 후 지움·제출 시도에서 표시하고 생성 버튼 차단은 그대로 유지한다.
 
 ## 사전과 모델별 출력
 
@@ -80,23 +97,12 @@ P5-A 제출 전 검증·적용 상태, P5-B 자유 입력·과거 사실 복원�
 
 그다음은 P6 모델별 renderer/복수 시드 평가, P7 Scene v2·캐릭터 귀속, P8 선택적 LLM이다. 이번에는 설계만 수행했으며 새 저장 스키마·Scene v2·GPU 최적화는 구현하지 않았다.
 
-## 이번 검증
+## 현재 검증 기준 (2026-11-16)
 
-2026-11-15 P5 변경 후 검증:
+소스 `730e077`을 대조했다. 이번 재실행 결과: `node --experimental-strip-types --test frontend/tests/*.test.mjs` **38 passed**, `STUDIO_TEST_PYTHON=.venv/bin/python bash scripts/test-studio.sh` **131 passed, 6.87초**, 경고 없음. 같은 머신의 전체 `.venv/bin/python -m pytest -q`는 **48 failed / 273 passed / 6 skipped**이며, 실패는 모두 macOS/GNU 도구·Linux 소켓·systemd 의존 model-switch/control 테스트다([TEST-PLATFORM01](PROMPT_COMPOSER_FOLLOWUP.md)). 이전 문서의 39건 표기는 현재 수집 결과와 달라 현재 기준으로 사용하지 않는다. 과거 20/29/38건 등 단계별 수와 브라우저 관찰은 [archive](archive/prompt-composer/2026-11-16/README.md)에 보존한다. 이번에는 브라우저·운영·GPU를 실행하지 않았다.
 
-- `node --experimental-strip-types --test frontend/tests/*.test.mjs`: 29건 통과. 실제 Python/Pydantic과 JSON UTF-8 크기 대조 포함. 이 교차 검증은 `.venv/bin/python` 또는 `PYTHON`으로 지정한 backend 의존성이 설치된 Python을 사용한다.
-- `.venv/bin/python -m pytest backend/tests/test_prompt_composition.py backend/tests/test_api.py -q`: 40건 통과. Starlette/httpx 사용 중단 예정 경고 1건 → TEST-D01로 해소.
-- `cd frontend && npm run build && npm run lint`: 통과.
-- `.venv/bin/ruff check backend/app/api/routes.py backend/tests/test_prompt_composition.py`: 통과.
-- `git diff --check`: 통과.
+## 규칙 기반 제안 (A5/A7)
 
-2026-11-15 후속 완료 검증(이번 턴):
+`frontend/src/prompt/proposals.ts`와 PromptBuilder가 원문의 사전 이름/별칭 부분 문자열을 찾아 후보를 제시한다. 사용자가 제안 버튼을 열고 수락해야 선택에 반영한다. 원문은 보존하고 기존 선택/비활성 항목은 제외한다. confidence는 규칙 점수이며 모델 확률이 아니다. 경고 해설과 제거 가능한 중복 후보를 표시하지만 충돌은 자동 해제하지 않는다. 사전 ID·Scene·API 계약·컴파일러는 그대로다. LLM 네트워크 호출이나 서버 proposals API는 구현되지 않았다.
 
-- `STUDIO_TEST_PYTHON=.venv/bin/python bash scripts/test-studio.sh`: **131 passed**, 경고 0건. 같은 suite를 `b98ad81`에서 재현하면 `1 failed, 128 passed`.
-- `.venv/bin/python -m pytest -q` (P5 관련 8개 파일): 94건 통과.
-- `.venv/bin/ruff check backend`: 통과. `git diff --check`: 통과.
-- `node --experimental-strip-types --test frontend/tests/*.test.mjs`: 29건 통과. `npm run lint && npm run build`: 통과.
-- 실제 Chromium(Playwright, 로컬 캐시)으로 P5-C01/C02/C03 + P6-UX 시나리오 25항목 통과. 상세 표는 [후속 추적](PROMPT_COMPOSER_FOLLOWUP.md).
-- `uv sync --locked --extra dev`로 httpx2 도입 후에도 Studio suite·ruff 통과.
-
-이전 세션 기준 기록: 브라우저 도구는 `The browser access host is unavailable`로 연결하지 못했다. 2026-11-15 후속 턴에서 로컬 캐시 Chromium으로 실제 클릭·키보드·좁은 화면 검증을 수행했고, 운영 배포/롤백, GPU 생성·품질, 전체 저장소 회귀는 여전히 미검증이다. 전체 저장소 pytest는 macOS에서 GNU chmod/소켓 의존 테스트가 실패하는 기존 문제가 있어 48 failed / 273 passed / 6 skipped이며, [TERRA_STUDIO_CLOSEOUT_PLAN](TERRA_STUDIO_CLOSEOUT_PLAN.md)에 기록된 플랫폼 한계와 같다. 최초 구현 대조 단계에서는 프런트 20건/백엔드 38건을 확인했으며, P5 추가 검증과 구분한다. 과거 테스트 수와 배포 관찰은 [작업 계획의 기록](PROMPT_COMPOSER_TASKS.md)에 남긴다.
+Actions는 Python/Node 검증·전체 빌드·전체 패키징을 계속 실행한다. 변경 영역별 skip은 [설계 문서](ACTIONS_DEPLOY_OPTIMIZATION.md) 단계다. 미완료 작업은 [추적 목록](PROMPT_COMPOSER_FOLLOWUP.md)에서 관리한다.

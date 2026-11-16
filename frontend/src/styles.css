@@ -275,6 +275,21 @@
 }
 
 .prompt-builder { margin-bottom: 16px; }
+/* Measured composer widths (Chromium 149, 2026-11-16): 566px at 1440,
+   496px at 1280, 355px at 960 in the two-column workspace, and 638px once the
+   workspace collapses to one column below 820px. Splitting a 330–566px column
+   leaves ~165–283px per side, which is narrower than the 230px list the picker
+   already scrolls, so a side-by-side layout does not fit here. The regions stay
+   stacked; the grid is kept so a future wider layout is a one-line change.
+   See docs/PROMPT_COMPOSER_UX_LAYOUT.md §4. */
+.prompt-builder { container-type: inline-size; container-name: prompt-composer; }
+.prompt-stage { display: grid; gap: 14px 18px; align-items: start; grid-template-columns: minmax(0, 1fr); }
+.prompt-explore, .prompt-scene { min-width: 0; }
+.prompt-section-heading { margin: 0 0 8px; font-size: .72rem; font-weight: 800; letter-spacing: .1em; color: #8f95a1; text-transform: uppercase; }
+/* Guard rail: only a composer that genuinely spans a wide screen splits in two. */
+@container prompt-composer (min-width: 900px) {
+  .prompt-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+}
 .prompt-builder > .quiet { width: 100%; text-align: left; }
 .prompt-hint { color: #aeb4c1; font-size: .75rem; line-height: 1.5; margin: 8px 0 12px; }
 .prompt-choices { border: 1px solid #41444f; border-radius: 8px; padding: 10px; max-height: 230px; overflow-y: auto; margin: 0; }
@@ -288,6 +303,14 @@
 .prompt-builder button:disabled { opacity: .5; cursor: not-allowed; }
 .prompt-selected { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 14px; }
 .prompt-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #4a4d59; border-radius: 99px; padding: 4px 4px 4px 10px; background: #20222a; color: #e6e8ef; font-size: .76rem; font-weight: 600; }
+.prompt-chip__label { white-space: nowrap; }
+.prompt-chip__detail { position: relative; }
+.prompt-chip__detail summary { list-style: none; cursor: pointer; border: 1px solid #4a4d59; border-radius: 99px; padding: 1px 7px; font-size: .68rem; color: #b9bdc8; font-weight: 700; }
+.prompt-chip__detail summary::-webkit-details-marker { display: none; }
+.prompt-chip__detail summary::after { content: " ▾"; }
+.prompt-chip__detail[open] summary::after { content: " ▴"; }
+.prompt-chip__detail > span { display: block; margin-top: 4px; padding: 4px 7px; border-radius: 6px; background: #171920; color: #c9cdd7; font-weight: 400; overflow-wrap: anywhere; }
+.prompt-chip__unmapped { color: #f4cb84; font-size: .68rem; font-weight: 700; }
 .prompt-chip[data-unmapped] { border-color: #6b5a33; background: #2a2418; color: #f4cb84; }
 .prompt-chip button { border: 0; background: transparent; color: inherit; padding: 0 4px; border-radius: 99px; font-size: .95rem; line-height: 1; }
 .prompt-chip button:hover { background: rgba(255, 255, 255, .12); }
@@ -316,7 +339,39 @@
 .prompt-proposal > .quiet { padding: 5px 9px; font-size: .74rem; white-space: nowrap; }
 .prompt-warning--action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
 .prompt-warning--action > .quiet { padding: 3px 8px; font-size: .72rem; white-space: nowrap; }
+/* The count stays on the pill's single line; a second line cost 26–39px of
+   height at 360px and pushed the apply control further away (U11 measurement). */
+.prompt-category-count { display: inline; margin-left: 4px; font-size: .68rem; font-weight: 700; opacity: .72; letter-spacing: .02em; }
+.prompt-empty { padding: 10px; border: 1px dashed #41444f; border-radius: 8px; }
+.prompt-empty .prompt-hint { margin: 0 0 8px; }
+.prompt-empty__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.prompt-inclusion { margin: 8px 0; padding: 6px 9px; border-radius: 6px; background: #1d2734; border: 1px solid #33454f; color: #a9c6d8; font-size: .74rem; line-height: 1.45; }
+.prompt-inclusion[data-included] { background: #1d3026; border-color: #35513f; color: #a9d8bb; }
+.prompt-inclusion[data-unknown] { background: #2a2418; border-color: #6b5a33; color: #f4cb84; }
+.prompt-status { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 8px 0 12px; font-size: .76rem; color: #cfd4e0; }
+.prompt-status > strong { color: #c6aaff; }
+.prompt-status__detail summary { cursor: pointer; color: #9aa1ad; font-size: .72rem; }
+.prompt-status__detail p { margin: 6px 0; color: #aeb4c1; font-size: .74rem; line-height: 1.5; }
+.prompt-meta summary { cursor: pointer; color: #9aa1ad; font-size: .72rem; }
+.prompt-meta p { margin: 6px 0; }
+.prompt-result > .quiet:last-child:not(:disabled) { border-color: #c3a0ff; color: #e7dcff; }
+/* U09: keep chips, category buttons and the apply control usable by touch and keyboard. */
+.prompt-chip button { min-width: 26px; min-height: 26px; display: inline-flex; align-items: center; justify-content: center; }
+.prompt-chip__detail summary { min-height: 26px; display: inline-flex; align-items: center; }
+.prompt-categories button { min-height: 32px; }
+.prompt-empty__actions .quiet { min-height: 32px; }
+.prompt-result > .quiet:last-child { width: 100%; padding: 9px 12px; }
+.prompt-chip__detail summary:focus-visible, .prompt-chip button:focus-visible,
+.prompt-status__detail summary:focus-visible, .prompt-meta summary:focus-visible { outline: 2px solid #d1adff; outline-offset: 2px; }
 @media (max-width: 460px) {
+  .prompt-selected { gap: 5px; }
+  .prompt-chip { max-width: 100%; }
+  .prompt-chip__detail { flex: 1 1 auto; min-width: 0; }
+  .prompt-chip__detail > span { margin-top: 6px; }
+  /* "선택 n" widened every pill; a tighter pill keeps the same 3 rows at 360px. */
+  .prompt-categories { gap: 5px; }
+  .prompt-categories button { padding: 5px 8px; font-size: .74rem; }
+  .prompt-category-count { font-size: .64rem; }
   .prompt-proposal { grid-template-columns: minmax(0, 1fr) auto; }
   .prompt-proposal > .quiet { grid-column: 1 / -1; text-align: center; }
 }

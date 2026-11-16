@@ -1,9 +1,13 @@
 import { useMemo, useState } from "react";
 import { compileScene, DRAFT_LIMIT } from "../prompt/compiler";
-import { type PromptBuilderState, isDraftStale, withGeneratedDraft, withAppliedDraft, draftComposition, applicationStatus } from "../prompt/builderState";
-import { DICTIONARY, DICTIONARY_VERSION, familyCoverage, searchDictionary } from "../prompt/dictionary";
+import { type PromptBuilderState, isDraftStale, withGeneratedDraft, withAppliedDraft, draftComposition } from "../prompt/builderState";
+import { DICTIONARY, DICTIONARY_VERSION, familyCoverage } from "../prompt/dictionary";
 import { changeSceneFamily, removeEntry, selectEntry, type SceneSpecification } from "../prompt/scene";
 import { explainWarning, suggestSelections } from "../prompt/proposals";
+import {
+  DISPLAY_GROUP as displayGroup, GROUP_ORDER as groupOrder, activeGroups, filterOptions,
+  selectionCounts, recoveryActions, previewControls, inclusionNotice, appliedStatus,
+} from "../prompt/presentation";
 
 import { characterCount, validateComposition, validateText } from "../prompt/validation";
 
@@ -11,10 +15,6 @@ const labels: Record<string, string> = {
   subject: "대상", appearance: "외형", clothing: "의상", expression: "표정", action: "동작", pose: "포즈",
   location: "장소", setting: "배경", composition: "구도", camera: "카메라", lighting: "조명", style: "스타일", mood: "분위기",
 };
-// Existing IDs keep their original category value; the picker groups them under
-// the display-only names from the seed expansion plan.
-const displayGroup: Record<string, string> = { action: "pose", location: "setting", composition: "camera" };
-const groupOrder = ["subject", "appearance", "clothing", "expression", "pose", "setting", "camera", "lighting", "style", "mood"];
 
 type Props = {
   family: string;
@@ -33,12 +33,11 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
   /** Hints stay hidden until the user asks; nothing is proposed while typing. */
   const [hintsOpen, setHintsOpen] = useState(false);
   const selected = new Set(state.scene.selections.map((item) => item.id));
-  const categories = groupOrder.filter((group) => DICTIONARY.some((item) => item.active && (displayGroup[item.category] ?? item.category) === group));
-  const options = useMemo(() => searchDictionary(DICTIONARY, query)
-    .filter((item) => !category || (displayGroup[item.category] ?? item.category) === category), [query, category]);
+  const categories = activeGroups(DICTIONARY);
+  const counts = selectionCounts(state.scene.selections);
+  const options = useMemo(() => filterOptions(DICTIONARY, query, category), [query, category]);
   const coverage = useMemo(() => (family ? familyCoverage(DICTIONARY, family) : null), [family]);
   const dirty = isDraftStale(state);
-  const status = applicationStatus(state, value);
   const candidate = draftComposition(state);
   const separateOnly = state.result?.draft === "" && state.freeTextMode === "separate" && state.scene.freeTextKo.length > 0;
   const draftIssues = state.result ? validateText(separateOnly ? value : state.result.draft, separateOnly ? "prompt" : "draft_prompt", 8000, true) : [];
@@ -47,6 +46,9 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
   const freeIssues = validateText(state.scene.freeTextKo, "free_text_ko", 4000);
   const blocked = issues.length > 0;
   const selectedKey = state.scene.selections.map((item) => item.id).join("\u0000");
+  const controls = previewControls(state, family, { blocked, separateOnly, prompt: value, dirty });
+  const inclusion = inclusionNotice(state, state.result);
+  const status = appliedStatus(state, value);
   // Recomputed from the immutable free text only when the user opens the panel.
   const hints = useMemo(() => (hintsOpen && family
     ? suggestSelections({ freeTextKo: state.scene.freeTextKo, family, dictionary: DICTIONARY, selectedIds: selectedKey.split("\u0000") })
@@ -105,17 +107,30 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
       {open ? "사전 구성 닫기" : "사전으로 프롬프트 구성"}
     </button>
     <p className="prompt-hint">초안을 적용하면 서버 지원 여부에 따라 선택 사항과 초안이 생성 결과에 함께 저장됩니다. 새로고침 전 입력은 저장되지 않습니다.</p>
-    {state.applied && <div role="status" className="prompt-hint">
-      <p>{status.historicalApplicationUnknown ? "과거 구성 복원: 적용 당시 문자열과 반영 방식은 별도 기록되지 않았습니다." : status.promptModified ? "적용 후 최종 프롬프트를 직접 수정했습니다. 구성 이력은 마지막 적용 상태로 저장되며 의미 일치를 보장하지 않습니다." : "마지막 적용 문자열과 최종 프롬프트가 같습니다. 문자열 동일성만 확인합니다."}</p>
-      {status.selectionChanged && <p>선택 또는 설명을 편집 중입니다. 다시 적용하기 전에는 마지막 적용 구성이 저장됩니다.</p>}
+    {state.applied && <div role="status" className="prompt-status">
+      <strong>{status === "unknown" ? "과거 복원 · 적용 정보 기록 없음"
+        : status === "modified" ? "적용 후 수정됨"
+        : status === "selectionChanged" ? "적용 후 선택 변경됨"
+        : "적용됨"}</strong>
+      <details className="prompt-status__detail">
+        <summary>자세히</summary>
+        <p>{status === "unknown" ? "과거 구성 복원: 적용 당시 문자열과 반영 방식은 별도 기록되지 않았습니다."
+          : status === "modified" ? "적용 후 최종 프롬프트를 직접 수정했습니다. 구성 이력은 마지막 적용 상태로 저장되며 의미 일치를 보장하지 않습니다."
+          : status === "selectionChanged" ? "선택 또는 설명을 편집 중입니다. 다시 적용하기 전에는 마지막 적용 구성이 저장됩니다."
+          : "마지막 적용 문자열과 최종 프롬프트가 같습니다. 문자열 일치만 확인하며 의미 일치를 보장하지 않습니다."}</p>
+        <p>구성 이력은 마지막 적용 시점의 선택으로 저장됩니다. 적용 후에는 최종 프롬프트를 직접 수정할 수 있습니다.</p>
+      </details>
     </div>}
     <div id="prompt-builder-panel" hidden={!open}>
       {coverage && coverage.mapped < coverage.total && <p className="prompt-warning">
         현재 모델 계열에서 사전 표현 {coverage.mapped}/{coverage.total}개를 변환할 수 있습니다. 나머지는 선택해도 미변환으로 표시됩니다.
       </p>}
+      <div className="prompt-stage">
+      <section className="prompt-explore" aria-label="사전 항목 탐색">
+      <h3 className="prompt-section-heading">항목 탐색</h3>
       <label>사전 검색<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="예: 인물, 조명, 전신" /></label>
       <div className="prompt-categories" role="group" aria-label="사전 분류">
-        {["", ...categories].map((item) => <button type="button" key={item || "all"} aria-pressed={category === item} onClick={() => setCategory(item)}>{item ? labels[item] ?? item : "전체"}{item && ` ${state.scene.selections.filter((entry) => (displayGroup[entry.category] ?? entry.category) === item).length}`}</button>)}
+        {["", ...categories].map((item) => <button type="button" key={item || "all"} aria-pressed={category === item} onClick={() => setCategory(item)}>{item ? labels[item] ?? item : "전체"}<span className="prompt-category-count">{item ? `선택 ${counts[item] ?? 0}` : `선택 ${selected.size}`}</span></button>)}
       </div>
       <p className="prompt-hint">{category ? labels[category] : "전체"} 분류에서 검색 · {options.length}개 결과. 다른 분류의 선택도 유지됩니다.</p>
       <fieldset className="prompt-choices" aria-describedby="selection-errors" aria-invalid={compositionSupported && compositionIssues.some((issue) => issue.field === "selections")}><legend>사전 항목 선택</legend>
@@ -126,20 +141,38 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
             <input type="checkbox" checked={selected.has(item.id)} onChange={(event) => { const checked = event.target.checked; setScene((scene) => checked ? selectEntry(scene, item, DICTIONARY_VERSION) : removeEntry(scene, item.id)); }} />
             <span>{item.labelKo} <small>· {labels[displayGroup[item.category] ?? item.category] ?? item.category}{status}</small></span>
           </label>;
-        }) : <p className="prompt-hint">검색 결과가 없습니다.</p>}
+        }) : <div className="prompt-empty">
+          <p className="prompt-hint">검색 결과가 없습니다.</p>
+          <div className="prompt-empty__actions">{recoveryActions(query, category).map((action) => <button
+            type="button" className="quiet" key={action.kind}
+            onClick={() => { setCategory(action.nextCategory); setQuery(action.nextQuery); }}>{action.label}</button>)}</div>
+        </div>}
       </fieldset>
       <div id="selection-errors">{compositionSupported && compositionIssues.filter((issue) => issue.field === "selections").map((issue, index) => <p className="prompt-warning" key={index}>{issue.message}</p>)}</div>
       <p className="prompt-hint">선택 {selected.size}개{category || query ? " · 필터 밖의 선택도 유지됩니다." : ""}</p>
-      {state.scene.selections.length > 0 && <section className="prompt-groups" aria-label="선택한 장면 구성">
-        <div className="prompt-group-heading"><strong>선택한 장면 구성</strong><button type="button" className="quiet" onClick={clearScene}>선택 비우기</button></div>
+      </section>
+      <section className="prompt-scene" aria-label="선택한 장면과 미리보기">
+      <h3 className="prompt-section-heading">장면과 미리보기</h3>
+      {state.scene.selections.length === 0
+        ? <div className="prompt-empty"><p className="prompt-hint">선택한 항목이 없습니다. 위의 항목 탐색에서 대상부터 골라 보세요. 사전을 쓰지 않고 원문만으로 구성할 수도 있습니다.</p></div>
+        : <section className="prompt-groups" aria-label="선택한 장면 구성">
+        <div className="prompt-group-heading"><strong>선택한 항목</strong><button type="button" className="quiet" onClick={clearScene}>선택 비우기</button></div>
         {[...groupOrder, ...new Set(state.scene.selections.map((item) => displayGroup[item.category] ?? item.category).filter((group) => !groupOrder.includes(group)))].map((group) => {
           const items = state.scene.selections.filter((item) => (displayGroup[item.category] ?? item.category) === group);
-          return items.length > 0 && <div className="prompt-group" key={group}><strong>{labels[group] ?? group}</strong><div className="prompt-selected">{items.map((item) => <span className="prompt-chip" key={item.id} data-unmapped={item.mapping.status !== "mapped" || undefined}>
-            <span>{item.labelKo} <small>→ {item.mapping.status === "mapped" ? item.mapping.text : "미변환"}</small></span>
-            <button type="button" onClick={() => setScene((scene) => removeEntry(scene, item.id))} aria-label={`${item.labelKo} 선택 해제`}>×</button>
-          </span>)}</div></div>;
+          return items.length > 0 && <div className="prompt-group" key={group}><strong>{labels[group] ?? group}</strong><div className="prompt-selected">{items.map((item) => {
+            const mapped = item.mapping.status === "mapped";
+            const text = item.mapping.status === "mapped" ? item.mapping.text : null;
+            return <div className="prompt-chip" key={item.id} data-unmapped={!mapped || undefined}>
+              <span className="prompt-chip__label">{item.labelKo}</span>
+              {text !== null ? <details className="prompt-chip__detail">
+                <summary aria-label={`${item.labelKo} 표현 보기`}>표현</summary>
+                <span>{text}</span>
+              </details> : <span className="prompt-chip__unmapped">미변환</span>}
+              <button type="button" onClick={() => setScene((scene) => removeEntry(scene, item.id))} aria-label={`${item.labelKo} 선택 해제`}>×</button>
+            </div>;
+          })}</div></div>;
         })}
-        <p className="prompt-hint">선택 시 저장한 {state.scene.targetFamily} 계열 표현입니다. 중복 표현이나 미지원 계열은 미리보기 결과를 확인하세요.</p>
+        <p className="prompt-hint">선택할 때 저장한 {state.scene.targetFamily} 계열 표현입니다. 칩의 “표현”을 열면 영어 대응을 볼 수 있습니다.</p>
       </section>}
       <label>추가 설명 (원문)<textarea aria-invalid={compositionSupported && freeIssues.length > 0} aria-describedby="free-text-help" rows={3} value={state.scene.freeTextKo} onChange={(event) => setScene((scene) => ({ ...scene, freeTextKo: event.target.value }))} placeholder="원하는 장면을 입력하세요. 자동으로 번역되지는 않습니다." /></label>
       <div id="free-text-help" className="prompt-hint">
@@ -162,7 +195,8 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
                 <small> · {labels[displayGroup[hint.category] ?? hint.category] ?? hint.category} · 일치 “{hint.matchedPhrase}”</small>
                 {!hint.available && <small className="prompt-proposal__warn"> · 이 모델은 미변환</small>}
               </div>
-              <span className="prompt-proposal__score" aria-label={`신뢰도 ${Math.round(hint.confidence * 100)}%`}>{Math.round(hint.confidence * 100)}%</span>
+              <span className="prompt-proposal__score" title="규칙 일치 점수이며 모델 확률이 아닙니다."
+                aria-label={`일치 표현 ${hint.matchedPhrase}, 규칙 점수 ${Math.round(hint.confidence * 100)}점`}>일치</span>
               <button type="button" className="quiet" onClick={() => acceptHint(hint.id)}>선택에 추가</button>
             </div>)}
         </div>}
@@ -172,14 +206,18 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
         <option value="verbatim">원문 그대로 초안과 최종 프롬프트에 반영</option>
       </select></label>
       <p className="prompt-hint">방식은 이 화면에서만 관리됩니다. 저장 이력에는 원문과 실제 적용 초안을 남기며, 방식 자체는 별도로 기록하지 않습니다.</p>
-      <button type="button" className="quiet" onClick={generate}>{state.provenance === "saved" ? "현재 컴파일러로 초안 다시 만들기" : "초안 만들기"}</button>
+      {controls.showGenerate && <button type="button" className="quiet" onClick={generate}>{controls.generateLabel}</button>}
       {state.result && <section className="prompt-result" aria-label="프롬프트 초안">
         {state.provenance === "saved" && <p className="prompt-hint">저장된 초안과 미변환 목록입니다. 당시 경고·출처는 기록 없음입니다. 다시 만들기는 저장된 선택 표현에 현재 컴파일 규칙을 적용합니다.</p>}
-        {!dirty && state.provenance === "current" && <p className="prompt-hint">현재 선택 기준 최신 미리보기입니다. 최종 프롬프트는 적용할 때만 바뀝니다.</p>}
+        {controls.autoPreview && !dirty && <p className="prompt-hint">현재 선택 기준 최신 미리보기입니다. 최종 프롬프트는 적용할 때만 바뀝니다.</p>}
         {dirty && <p className="prompt-warning">선택 또는 설명이 바뀌었습니다. 초안을 다시 만들어 주세요. 현재 최종 프롬프트는 유지됩니다.</p>}
+        {inclusion && <p className="prompt-inclusion" data-included={inclusion.included || undefined} data-unknown={inclusion.unknown || undefined}>{inclusion.text}</p>}
         <label>프롬프트 미리보기<textarea aria-invalid={blocked} aria-describedby="draft-errors" readOnly value={state.result.draft} rows={3} placeholder="표현을 만들 수 없습니다." /></label>
-        <p className="prompt-hint">{characterCount(state.result.draft)}자 · 컴파일러 {state.result.compilerVersion}</p>
-        {state.result.unresolved.length > 0 && <div className="prompt-warning"><strong>변환되지 않은 항목</strong><ul>{state.result.unresolved.map((item, index) => <li key={`${item.id ?? "text"}-${index}`}>{item.text}</li>)}</ul><span>미변환은 번역되지 않았다는 뜻입니다. 원문 반영 방식에서는 추가 설명이 그대로 포함됩니다. 선택 항목의 미제공 표현은 직접 입력하세요.</span></div>}
+        <details className="prompt-meta">
+          <summary>미리보기 상세</summary>
+          <p className="prompt-hint">{characterCount(state.result.draft)}자 · 컴파일러 {state.result.compilerVersion}</p>
+        </details>
+        {state.result.unresolved.length > 0 && <div className="prompt-warning"><strong>변환되지 않은 항목</strong><ul>{state.result.unresolved.map((item, index) => <li key={`${item.id ?? "text"}-${index}`}>{item.text}</li>)}</ul><span>미변환은 번역되지 않았다는 뜻입니다. 원문 포함 방식에서는 추가 설명이 미리보기에 그대로 들어갑니다. 선택 항목의 미제공 표현은 직접 입력하세요.</span></div>}
         {state.result.warnings.filter((item) => item.code !== "empty").map((item, index) => {
           const explanation = explainWarning(item, (id) => state.scene.selections.find((entry) => entry.id === id)?.labelKo ?? id, DRAFT_LIMIT);
           return <div className="prompt-warning prompt-warning--action" key={`${item.code}-${index}`}>
@@ -188,10 +226,12 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
               onClick={() => removeRedundant(explanation.removeIds)}>중복 해제</button>}
           </div>;
         })}
-        {state.result.warnings.some((item) => item.code === "empty") && <p className="prompt-warning">사전 항목을 선택하거나 설명을 입력하세요.</p>}
+        {state.result.warnings.some((item) => item.code === "empty") && <p className="prompt-hint">사전 항목을 선택하거나 설명을 입력하면 미리보기가 만들어집니다.</p>}
         <div id="draft-errors" role="status">{issues.map((issue, index) => <p className="prompt-warning" key={index}>{issue.field}: {issue.message}</p>)}</div>
-        <button type="button" className="quiet" disabled={(!state.result.draft && !separateOnly) || dirty || blocked || state.result.targetFamily !== family} onClick={applyDraft}>{separateOnly ? "설명만 이력에 적용 (최종 입력 유지)" : "초안을 최종 프롬프트에 적용"}</button>
+        <button type="button" className="quiet" disabled={!controls.canApply} onClick={applyDraft}>{controls.applyLabel}</button>
       </section>}
+      </section>
+      </div>
       <p className="prompt-hint" role="status">{notice}</p>
     </div>
   </div>;
