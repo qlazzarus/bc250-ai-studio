@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { DICTIONARY } from '../src/prompt/dictionary.ts';
 import { compileScene } from '../src/prompt/compiler.ts';
 import { initialBuilderState, withGeneratedDraft, withAppliedDraft, restoreComposition } from '../src/prompt/builderState.ts';
@@ -119,6 +121,32 @@ test('applied status distinguishes edited, unchanged, selected and unknown histo
   assert.equal(appliedStatus(applied, applied.result.draft + '!'), 'modified');
   assert.equal(appliedStatus({ ...applied, scene: { ...applied.scene, freeTextKo: '추가' } }, applied.result.draft), 'selectionChanged');
   assert.equal(appliedStatus(restoreComposition(snapshot()), 'draft'), 'unknown');
+});
+
+test('background guidance stays collapsed and state text stays visible', () => {
+  const source = readFileSync(fileURLToPath(new URL('../src/components/PromptBuilder.tsx', import.meta.url)), 'utf8');
+  // U11 showed these paragraphs pushed the apply control 63-81px further away.
+  const collapsed = [
+    '초안을 적용하면 서버 지원 여부',
+    '입력한 원문에서 사전 항목을 찾아 제안합니다',
+    '방식은 이 화면에서만 관리됩니다',
+    '선택할 때 저장한',
+    '원문은 그대로 보존하며 자동 번역하지 않습니다',
+    '검색은 선택한 분류 안에서만 적용됩니다',
+    '현재 선택 기준 최신 미리보기입니다',
+  ];
+  for (const phrase of collapsed) {
+    const line = source.split('\n').find((text) => text.includes(phrase));
+    assert.ok(line, `missing guidance: ${phrase}`);
+    assert.match(line, /<HelpNote/, `guidance must collapse: ${phrase}`);
+  }
+  // Contract and safety text must never hide behind a disclosure.
+  assert.ok(!/<HelpNote[^>]*>\{inclusion/.test(source) && !/inclusion\.text\}<\/HelpNote>/.test(source));
+  assert.ok(source.includes('<p className="prompt-inclusion"'));
+  assert.ok(source.includes('className="prompt-warning"'));
+  // The counter itself is always on screen; only its explanation collapses.
+  assert.match(source, /<HelpNote summary=\{`\$\{characterCount\(state\.scene\.freeTextKo\)\}\/4000자`\}>/);
+  assert.ok(source.includes('id="free-text-help"'));
 });
 
 test('selecting entries through the shared path still yields sorted compiler output', () => {

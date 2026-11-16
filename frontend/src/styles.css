@@ -354,6 +354,11 @@
 .prompt-status__detail p { margin: 6px 0; color: #aeb4c1; font-size: .74rem; line-height: 1.5; }
 .prompt-meta summary { cursor: pointer; color: #9aa1ad; font-size: .72rem; }
 .prompt-meta p { margin: 6px 0; }
+/* Background guidance is collapsed by default; the summary line is what stays on screen. */
+.prompt-help { margin: 2px 0 4px; }
+.prompt-help > summary { cursor: pointer; color: #8f95a1; font-size: .7rem; line-height: 1.35; }
+.prompt-help > .prompt-hint { margin: 4px 0 0; }
+.prompt-help[open] > summary { color: #b9bfcb; }
 .prompt-result > .quiet:last-child:not(:disabled) { border-color: #c3a0ff; color: #e7dcff; }
 /* U09: keep chips, category buttons and the apply control usable by touch and keyboard. */
 .prompt-chip button { min-width: 26px; min-height: 26px; display: inline-flex; align-items: center; justify-content: center; }
@@ -362,7 +367,8 @@
 .prompt-empty__actions .quiet { min-height: 32px; }
 .prompt-result > .quiet:last-child { width: 100%; padding: 9px 12px; }
 .prompt-chip__detail summary:focus-visible, .prompt-chip button:focus-visible,
-.prompt-status__detail summary:focus-visible, .prompt-meta summary:focus-visible { outline: 2px solid #d1adff; outline-offset: 2px; }
+.prompt-status__detail summary:focus-visible, .prompt-meta summary:focus-visible,
+.prompt-help > summary:focus-visible { outline: 2px solid #d1adff; outline-offset: 2px; }
 @media (max-width: 460px) {
   .prompt-selected { gap: 5px; }
   .prompt-chip { max-width: 100%; }

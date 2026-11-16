@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { compileScene, DRAFT_LIMIT } from "../prompt/compiler";
 import { type PromptBuilderState, isDraftStale, withGeneratedDraft, withAppliedDraft, draftComposition } from "../prompt/builderState";
 import { DICTIONARY, DICTIONARY_VERSION, familyCoverage } from "../prompt/dictionary";
@@ -24,6 +24,16 @@ type Props = {
   state: PromptBuilderState;
   setState: (update: (state: PromptBuilderState) => PromptBuilderState) => void;
 };
+
+/**
+ * Background guidance stays collapsed by default: at 1440px these paragraphs cost
+ * 112px and at 360px 162px of the composer, and the U11 measurement showed that
+ * cost pushed the apply control further away. State and contract text (inclusion,
+ * warnings, errors, counts) is never placed here.
+ */
+function HelpNote({ summary, children }: { summary: string; children: ReactNode }) {
+  return <details className="prompt-help"><summary>{summary}</summary><p className="prompt-hint">{children}</p></details>;
+}
 
 export default function PromptBuilder({ family, compositionSupported, value, onChange, state, setState }: Props) {
   const [open, setOpen] = useState(false);
@@ -106,7 +116,7 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
     <button type="button" className="quiet" aria-expanded={open} aria-controls="prompt-builder-panel" onClick={() => setOpen(!open)}>
       {open ? "사전 구성 닫기" : "사전으로 프롬프트 구성"}
     </button>
-    <p className="prompt-hint">초안을 적용하면 서버 지원 여부에 따라 선택 사항과 초안이 생성 결과에 함께 저장됩니다. 새로고침 전 입력은 저장되지 않습니다.</p>
+    <HelpNote summary="저장 범위 안내">초안을 적용하면 서버 지원 여부에 따라 선택 사항과 초안이 생성 결과에 함께 저장됩니다. 새로고침 전 입력은 저장되지 않습니다.</HelpNote>
     {state.applied && <div role="status" className="prompt-status">
       <strong>{status === "unknown" ? "과거 복원 · 적용 정보 기록 없음"
         : status === "modified" ? "적용 후 수정됨"
@@ -132,7 +142,7 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
       <div className="prompt-categories" role="group" aria-label="사전 분류">
         {["", ...categories].map((item) => <button type="button" key={item || "all"} aria-pressed={category === item} onClick={() => setCategory(item)}>{item ? labels[item] ?? item : "전체"}<span className="prompt-category-count">{item ? `선택 ${counts[item] ?? 0}` : `선택 ${selected.size}`}</span></button>)}
       </div>
-      <p className="prompt-hint">{category ? labels[category] : "전체"} 분류에서 검색 · {options.length}개 결과. 다른 분류의 선택도 유지됩니다.</p>
+      <HelpNote summary={`${category ? labels[category] : "전체"} 분류 · ${options.length}개 결과`}>검색은 선택한 분류 안에서만 적용됩니다. 다른 분류의 선택도 유지됩니다.</HelpNote>
       <fieldset className="prompt-choices" aria-describedby="selection-errors" aria-invalid={compositionSupported && compositionIssues.some((issue) => issue.field === "selections")}><legend>사전 항목 선택</legend>
         {options.length ? options.map((item) => {
           const mapping = family ? item.mappings[family as keyof typeof item.mappings] : undefined;
@@ -172,11 +182,11 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
             </div>;
           })}</div></div>;
         })}
-        <p className="prompt-hint">선택할 때 저장한 {state.scene.targetFamily} 계열 표현입니다. 칩의 “표현”을 열면 영어 대응을 볼 수 있습니다.</p>
+        <HelpNote summary="칩 표현 안내">선택할 때 저장한 {state.scene.targetFamily} 계열 표현입니다. 칩의 “표현”을 열면 영어 대응을 볼 수 있습니다.</HelpNote>
       </section>}
       <label>추가 설명 (원문)<textarea aria-invalid={compositionSupported && freeIssues.length > 0} aria-describedby="free-text-help" rows={3} value={state.scene.freeTextKo} onChange={(event) => setScene((scene) => ({ ...scene, freeTextKo: event.target.value }))} placeholder="원하는 장면을 입력하세요. 자동으로 번역되지는 않습니다." /></label>
-      <div id="free-text-help" className="prompt-hint">
-        <p>{characterCount(state.scene.freeTextKo)}/4000자 · 원문은 그대로 보존하며 자동 번역하지 않습니다.</p>
+      <div id="free-text-help">
+        <HelpNote summary={`${characterCount(state.scene.freeTextKo)}/4000자`}>원문은 그대로 보존하며 자동 번역하지 않습니다.</HelpNote>
         {freeIssues.map((issue, index) => <p className="prompt-warning" key={index}>{issue.message}{!compositionSupported && " 구성 이력 미저장: 직접 생성은 계속 가능합니다."}</p>)}
       </div>
       <div className="prompt-proposals">
@@ -185,7 +195,7 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
           onClick={() => setHintsOpen(!hintsOpen)}>
           {hintsOpen ? "제안 닫기" : "원문에서 사전 항목 찾기"}
         </button>
-        <p className="prompt-hint">입력한 원문에서 사전 항목을 찾아 제안합니다. 원문은 바뀌지 않고, 추가는 직접 눌러야 반영됩니다.</p>
+        <HelpNote summary="제안 동작 안내">입력한 원문에서 사전 항목을 찾아 제안합니다. 원문은 바뀌지 않고, 추가는 직접 눌러야 반영됩니다.</HelpNote>
         {hintsOpen && <div id="prompt-proposals" className="prompt-proposal-list" role="group" aria-label="사전 항목 제안">
           {hints.length === 0
             ? <p className="prompt-hint">원문에서 사전 항목을 찾지 못했습니다. 직접 선택하거나 원문을 그대로 사용하세요.</p>
@@ -205,11 +215,11 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
         <option value="separate">별도 보관 · 최종 프롬프트는 직접 편집</option>
         <option value="verbatim">원문 그대로 초안과 최종 프롬프트에 반영</option>
       </select></label>
-      <p className="prompt-hint">방식은 이 화면에서만 관리됩니다. 저장 이력에는 원문과 실제 적용 초안을 남기며, 방식 자체는 별도로 기록하지 않습니다.</p>
+      <HelpNote summary="반영 방식 저장 안내">방식은 이 화면에서만 관리됩니다. 저장 이력에는 원문과 실제 적용 초안을 남기며, 방식 자체는 별도로 기록하지 않습니다.</HelpNote>
       {controls.showGenerate && <button type="button" className="quiet" onClick={generate}>{controls.generateLabel}</button>}
       {state.result && <section className="prompt-result" aria-label="프롬프트 초안">
-        {state.provenance === "saved" && <p className="prompt-hint">저장된 초안과 미변환 목록입니다. 당시 경고·출처는 기록 없음입니다. 다시 만들기는 저장된 선택 표현에 현재 컴파일 규칙을 적용합니다.</p>}
-        {controls.autoPreview && !dirty && <p className="prompt-hint">현재 선택 기준 최신 미리보기입니다. 최종 프롬프트는 적용할 때만 바뀝니다.</p>}
+        {state.provenance === "saved" && <HelpNote summary="저장된 초안 안내">저장된 초안과 미변환 목록입니다. 당시 경고·출처는 기록 없음입니다. 다시 만들기는 저장된 선택 표현에 현재 컴파일 규칙을 적용합니다.</HelpNote>}
+        {controls.autoPreview && !dirty && <HelpNote summary="최신 미리보기">현재 선택 기준 최신 미리보기입니다. 최종 프롬프트는 적용할 때만 바뀝니다.</HelpNote>}
         {dirty && <p className="prompt-warning">선택 또는 설명이 바뀌었습니다. 초안을 다시 만들어 주세요. 현재 최종 프롬프트는 유지됩니다.</p>}
         {inclusion && <p className="prompt-inclusion" data-included={inclusion.included || undefined} data-unknown={inclusion.unknown || undefined}>{inclusion.text}</p>}
         <label>프롬프트 미리보기<textarea aria-invalid={blocked} aria-describedby="draft-errors" readOnly value={state.result.draft} rows={3} placeholder="표현을 만들 수 없습니다." /></label>
