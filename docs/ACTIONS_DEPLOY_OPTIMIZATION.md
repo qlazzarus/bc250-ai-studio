@@ -1,6 +1,6 @@
 # GitHub Actions 변경 영역별 배포 최적화 검토
 
-검토일: 2026-11-15 · 기준: `.github/workflows/deploy.yml`, `deploy/deploy-release.sh`, `scripts/package-release.py` 로컬 소스. 실제 운영 서버 상태·Actions 실행 시간은 이번에 측정하지 않았다. [현재 배포 절차](ACTIONS_DEPLOYMENT.md) 및 [P5 후속 검증](PROMPT_COMPOSER_FOLLOWUP.md)은 유지한다.
+검토일: 2026-11-15 · 기준: `.github/workflows/deploy.yml`, `deploy/deploy-release.sh`, `scripts/package-release.py` 로컬 소스. 실제 운영 서버 상태·Actions 실행 시간은 이번에 측정하지 않았다. [현재 배포 절차](ACTIONS_DEPLOYMENT.md) 및 [P5 후속 검증](PROMPT_COMPOSER_EXECUTION_TASKS.md)은 유지한다.
 
 ## 현재 동작
 

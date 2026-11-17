@@ -1,12 +1,12 @@
-> Archive · 2026-11-16 보관 · 기준 소스 `730e077`. 아래 상태/테스트 수는 당시 기록이며 현재 현황은 [현재 구현](../../../PROMPT_COMPOSER_CURRENT.md), 남은 작업은 [추적 목록](../../../PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
+> Archive · 2026-11-16 보관 · 기준 소스 `730e077`. 아래 상태/테스트 수는 당시 기록이며 현재 현황은 [현재 구현](../../../PROMPT_COMPOSER_CURRENT.md), 남은 작업은 [추적 목록](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
 
 # 사전 프롬프트 현재 구현과 개선 기준
 
-현재 남은 작업과 회귀 수정 상태는 [후속 작업 추적](../../../PROMPT_COMPOSER_FOLLOWUP.md)에서 관리한다. capability 설정 누락 회귀(P5-R01)와 원래 129건 범위 재실행(P5-R02)은 통과했고, P5-C01/C02/C03 브라우저 검증·P6-UX 화면 검증·TEST-D01(httpx2)도 로컬에서 완료했다. 운영 배포·롤백과 GPU 품질 검증은 별도 미완료다.
+현재 남은 작업과 회귀 수정 상태는 [후속 작업 추적](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md)에서 관리한다. capability 설정 누락 회귀(P5-R01)와 원래 129건 범위 재실행(P5-R02)은 통과했고, P5-C01/C02/C03 브라우저 검증·P6-UX 화면 검증·TEST-D01(httpx2)도 로컬에서 완료했다. 운영 배포·롤백과 GPU 품질 검증은 별도 미완료다.
 
-검토일: 2026-11-15 · 기준: `12ee5ea` 및 P5 로컬 변경. [P5 상세 설계·검증 절차](../../../PROMPT_COMPOSER_P5.md). 이번 검토는 구현과 문서의 대조이며 운영 서버 재점검이나 GPU 품질 평가가 아니다. 작업 순서는 **현재 구현 확인 → 문서 동기화 → 기능 개선**이다. 이 문서는 현재 동작의 기준이고, [작업 계획](../../../PROMPT_COMPOSER_TASKS.md)의 P0–P4 설명과 배포 기록은 단계별 이력이다.
+검토일: 2026-11-15 · 기준: `12ee5ea` 및 P5 로컬 변경. [P5 상세 설계·검증 절차](../../../PROMPT_COMPOSER_P5.md). 이번 검토는 구현과 문서의 대조이며 운영 서버 재점검이나 GPU 품질 평가가 아니다. 작업 순서는 **현재 구현 확인 → 문서 동기화 → 기능 개선**이다. 이 문서는 현재 동작의 기준이고, [작업 계획](../2026-11-17/PROMPT_COMPOSER_TASKS.md)의 P0–P4 설명과 배포 기록은 단계별 이력이다.
 
-P6-UX에서는 카테고리 버튼·그룹별 선택/표현과 편집 시 자동 미리보기를 도입했다. 저장된 과거 초안은 복원 시 유지하며 편집 또는 재생성 시 현재 규칙을 적용한다. 브라우저 검증 상태는 [후속 추적](../../../PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
+P6-UX에서는 카테고리 버튼·그룹별 선택/표현과 편집 시 자동 미리보기를 도입했다. 저장된 과거 초안은 복원 시 유지하며 편집 또는 재생성 시 현재 규칙을 적용한다. 브라우저 검증 상태는 [후속 추적](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
 
 ## 구성과 데이터 흐름
 
@@ -78,7 +78,7 @@ P6-UX에서는 카테고리 버튼·그룹별 선택/표현과 편집 시 자동
 
 ## P5 진행과 다음 순서
 
-P5-A 제출 전 검증·적용 상태, P5-B 자유 입력·과거 사실 복원은 로컬 구현했다. P5-C 브라우저 검증은 2026-11-15 로컬 Chromium에서 검색·분류·칩·비우기·덮어쓰기·자유 입력 반복·직접 수정·계열 전환·capability 실패·한도·retry·과거 재사용·키보드·360/390px·200% 근사를 확인해 완료했다. 상세 문제·파일·계약·호환성·완료 조건·잔여 위험·수동 절차는 [P5 문서](../../../PROMPT_COMPOSER_P5.md)에, 실행 결과는 [후속 추적](../../../PROMPT_COMPOSER_FOLLOWUP.md)에 기록한다. 남은 것은 운영 배포·롤백(P5-L01)과 GPU 품질 검증이다.
+P5-A 제출 전 검증·적용 상태, P5-B 자유 입력·과거 사실 복원은 로컬 구현했다. P5-C 브라우저 검증은 2026-11-15 로컬 Chromium에서 검색·분류·칩·비우기·덮어쓰기·자유 입력 반복·직접 수정·계열 전환·capability 실패·한도·retry·과거 재사용·키보드·360/390px·200% 근사를 확인해 완료했다. 상세 문제·파일·계약·호환성·완료 조건·잔여 위험·수동 절차는 [P5 문서](../../../PROMPT_COMPOSER_P5.md)에, 실행 결과는 [후속 추적](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md)에 기록한다. 남은 것은 운영 배포·롤백(P5-L01)과 GPU 품질 검증이다.
 
 그다음은 P6 모델별 renderer/복수 시드 평가, P7 Scene v2·캐릭터 귀속, P8 선택적 LLM이다. 이번에는 설계만 수행했으며 새 저장 스키마·Scene v2·GPU 최적화는 구현하지 않았다.
 
@@ -98,7 +98,7 @@ P5-A 제출 전 검증·적용 상태, P5-B 자유 입력·과거 사실 복원�
 - `.venv/bin/python -m pytest -q` (P5 관련 8개 파일): 94건 통과.
 - `.venv/bin/ruff check backend`: 통과. `git diff --check`: 통과.
 - `node --experimental-strip-types --test frontend/tests/*.test.mjs`: 29건 통과. `npm run lint && npm run build`: 통과.
-- 실제 Chromium(Playwright, 로컬 캐시)으로 P5-C01/C02/C03 + P6-UX 시나리오 25항목 통과. 상세 표는 [후속 추적](../../../PROMPT_COMPOSER_FOLLOWUP.md).
+- 실제 Chromium(Playwright, 로컬 캐시)으로 P5-C01/C02/C03 + P6-UX 시나리오 25항목 통과. 상세 표는 [후속 추적](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md).
 - `uv sync --locked --extra dev`로 httpx2 도입 후에도 Studio suite·ruff 통과.
 
-이전 세션 기준 기록: 브라우저 도구는 `The browser access host is unavailable`로 연결하지 못했다. 2026-11-15 후속 턴에서 로컬 캐시 Chromium으로 실제 클릭·키보드·좁은 화면 검증을 수행했고, 운영 배포/롤백, GPU 생성·품질, 전체 저장소 회귀는 여전히 미검증이다. 전체 저장소 pytest는 macOS에서 GNU chmod/소켓 의존 테스트가 실패하는 기존 문제가 있어 48 failed / 273 passed / 6 skipped이며, [TERRA_STUDIO_CLOSEOUT_PLAN](../../../TERRA_STUDIO_CLOSEOUT_PLAN.md)에 기록된 플랫폼 한계와 같다. 최초 구현 대조 단계에서는 프런트 20건/백엔드 38건을 확인했으며, P5 추가 검증과 구분한다. 과거 테스트 수와 배포 관찰은 [작업 계획의 기록](../../../PROMPT_COMPOSER_TASKS.md)에 남긴다.
+이전 세션 기준 기록: 브라우저 도구는 `The browser access host is unavailable`로 연결하지 못했다. 2026-11-15 후속 턴에서 로컬 캐시 Chromium으로 실제 클릭·키보드·좁은 화면 검증을 수행했고, 운영 배포/롤백, GPU 생성·품질, 전체 저장소 회귀는 여전히 미검증이다. 전체 저장소 pytest는 macOS에서 GNU chmod/소켓 의존 테스트가 실패하는 기존 문제가 있어 48 failed / 273 passed / 6 skipped이며, [TERRA_STUDIO_CLOSEOUT_PLAN](../../../TERRA_STUDIO_CLOSEOUT_PLAN.md)에 기록된 플랫폼 한계와 같다. 최초 구현 대조 단계에서는 프런트 20건/백엔드 38건을 확인했으며, P5 추가 검증과 구분한다. 과거 테스트 수와 배포 관찰은 [작업 계획의 기록](../2026-11-17/PROMPT_COMPOSER_TASKS.md)에 남긴다.

@@ -1,0 +1,233 @@
+models:
+- display_name: Fake sd15 (gap4 fixture)
+  family: sd15
+  engine: fake
+  model_path: null
+  text_encoder_path: null
+  vae_path: null
+  quantization: ''
+  supported_resolutions:
+  - - 64
+    - 64
+  - - 512
+    - 512
+  - - 768
+    - 768
+  supported_parameters:
+  - width
+  - height
+  - steps
+  - seed
+  - cfg_scale
+  - negative_prompt
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+    balanced:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+    quality:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+  generation_options:
+    cfg_scale:
+      mode: verified
+      default: 1.0
+      allowed_values: []
+      minimum: 0.0
+      maximum: 30.0
+    negative_prompt:
+      mode: verified
+    sampling_method:
+      mode: fixed
+      default: null
+      allowed_values: []
+    scheduler:
+      mode: fixed
+      default: null
+      allowed_values: []
+  enabled: true
+  validation_status: tested
+  cli_args: []
+  model_id: fake-sd15
+- display_name: Fake sd15 ALT (gap4 fixture)
+  family: sd15
+  engine: fake
+  model_path: null
+  text_encoder_path: null
+  vae_path: null
+  quantization: ''
+  supported_resolutions:
+  - - 64
+    - 64
+  - - 512
+    - 512
+  - - 768
+    - 768
+  supported_parameters:
+  - width
+  - height
+  - steps
+  - seed
+  - cfg_scale
+  - negative_prompt
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+    balanced:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+    quality:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+  generation_options:
+    cfg_scale:
+      mode: verified
+      default: 1.0
+      allowed_values: []
+      minimum: 0.0
+      maximum: 30.0
+    negative_prompt:
+      mode: verified
+    sampling_method:
+      mode: fixed
+      default: null
+      allowed_values: []
+    scheduler:
+      mode: fixed
+      default: null
+      allowed_values: []
+  enabled: true
+  validation_status: tested
+  cli_args: []
+  model_id: fake-sd15-alt
+- display_name: Fake flux2 (gap4 fixture)
+  family: flux2
+  engine: fake
+  model_path: null
+  text_encoder_path: null
+  vae_path: null
+  quantization: ''
+  supported_resolutions:
+  - - 64
+    - 64
+  - - 512
+    - 512
+  - - 768
+    - 768
+  supported_parameters:
+  - width
+  - height
+  - steps
+  - seed
+  - cfg_scale
+  - negative_prompt
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+    balanced:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+    quality:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+  generation_options:
+    cfg_scale:
+      mode: verified
+      default: 1.0
+      allowed_values: []
+      minimum: 0.0
+      maximum: 30.0
+    negative_prompt:
+      mode: verified
+    sampling_method:
+      mode: fixed
+      default: null
+      allowed_values: []
+    scheduler:
+      mode: fixed
+      default: null
+      allowed_values: []
+  enabled: true
+  validation_status: tested
+  cli_args: []
+  model_id: fake-flux2
+- display_name: Fake unknown-family (gap4 fixture)
+  family: unknown-family
+  engine: fake
+  model_path: null
+  text_encoder_path: null
+  vae_path: null
+  quantization: ''
+  supported_resolutions:
+  - - 64
+    - 64
+  - - 512
+    - 512
+  - - 768
+    - 768
+  supported_parameters:
+  - width
+  - height
+  - steps
+  - seed
+  - cfg_scale
+  - negative_prompt
+  presets:
+    fast:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+    balanced:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+    quality:
+      width: 512
+      height: 512
+      steps: 1
+      cfg_scale: 1.0
+  generation_options:
+    cfg_scale:
+      mode: verified
+      default: 1.0
+      allowed_values: []
+      minimum: 0.0
+      maximum: 30.0
+    negative_prompt:
+      mode: verified
+    sampling_method:
+      mode: fixed
+      default: null
+      allowed_values: []
+    scheduler:
+      mode: fixed
+      default: null
+      allowed_values: []
+  enabled: true
+  validation_status: tested
+  cli_args: []
+  model_id: fake-unknown

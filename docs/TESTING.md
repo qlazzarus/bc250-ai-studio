@@ -1,6 +1,6 @@
 # Phase 0 / Phase 1 validation record
 
-Latest Prompt Composer regression record: [P5 follow-up tracking](PROMPT_COMPOSER_FOLLOWUP.md) — missing HTTP-limit capability metadata fixed; 94 related backend tests passed on 2026-11-15. The original 129-test Studio scope now passes 131 tests, and the Starlette/httpx2 warning was removed by adding `httpx2` as a dev dependency (TEST-D01). Historical counts below describe their original runs.
+Latest Prompt Composer regression record: [P5 follow-up tracking](PROMPT_COMPOSER_EXECUTION_TASKS.md) — missing HTTP-limit capability metadata fixed; 94 related backend tests passed on 2026-11-15. The original 129-test Studio scope now passes 131 tests, and the Starlette/httpx2 warning was removed by adding `httpx2` as a dev dependency (TEST-D01). Historical counts below describe their original runs.
 
 Date: 2026-10-24 (Asia/Seoul).
 Host: macOS Darwin ARM64, not the Fedora BC-250 target.

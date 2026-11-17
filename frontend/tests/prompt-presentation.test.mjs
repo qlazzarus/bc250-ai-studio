@@ -9,6 +9,7 @@ import { selectEntry } from '../src/prompt/scene.ts';
 import {
   activeGroups, filterOptions, groupOf, selectionCounts, recoveryActions,
   previewControls, inclusionNotice, appliedStatus, GROUP_ORDER,
+  chipGroups, nextFocusAfterRemoval, unresolvedSelections, advisoryWarnings,
 } from '../src/prompt/presentation.ts';
 
 const entry = (id) => DICTIONARY.find((e) => e.id === id);
@@ -19,6 +20,53 @@ const sceneWith = (ids, family = 'sd15', freeTextKo = '') => ({
 });
 const snapshot = (overrides = {}) => ({ schema_version: 1, compiler_version: '1.2.0', target_family: 'sd15',
   selections: [], free_text_ko: '', draft_prompt: 'draft', unresolved: [], ...overrides });
+
+test('chip render order and focus order share one grouping function', () => {
+  const selections = [
+    { category: 'lighting' }, { category: 'action' }, { category: 'subject' },
+    { category: 'action' }, { category: 'custom' },
+  ];
+  const groups = chipGroups(selections);
+  assert.deepEqual(groups.map((group) => group.group), ['subject', 'pose', 'lighting', 'custom']);
+  assert.equal(groups[1].items.length, 2);
+  // Flat group-first order is the DOM order the remove buttons appear in.
+  assert.deepEqual(groups.flatMap((group) => group.items), [
+    selections[2], selections[1], selections[3], selections[0], selections[4],
+  ]);
+  assert.deepEqual(chipGroups([]), []);
+});
+
+test('focus after removal walks forward, then backward, then leaves the chips', () => {
+  const ids = ['a', 'b', 'c'];
+  assert.equal(nextFocusAfterRemoval(ids, 'b'), 'c');
+  assert.equal(nextFocusAfterRemoval(ids, 'c'), 'b');
+  assert.equal(nextFocusAfterRemoval(ids, 'a'), 'b');
+  // Last remaining chip: null means the caller returns to the search input.
+  assert.equal(nextFocusAfterRemoval(['a'], 'a'), null);
+  assert.equal(nextFocusAfterRemoval([], 'a'), null);
+  assert.equal(nextFocusAfterRemoval(ids, 'missing'), 'a');
+});
+
+test('unresolved free text is reported once, by the inclusion notice', () => {
+  // Only the unsupported family leaves selections untranslated, so it is the case
+  // where both a selection and the free text appear in `unresolved`.
+  const scene = sceneWith(['subject.person'], 'fake', '비 오는 거리');
+  const state = withGeneratedDraft({ ...structuredClone(initialBuilderState), freeTextMode: 'separate', scene }, compileScene(scene));
+  assert.deepEqual(unresolvedSelections(state.result).map((item) => item.id), ['subject.person']);
+  // The compilation still holds the free-text entry; it is only hidden from the warning list.
+  assert.ok(state.result.unresolved.some((item) => item.kind === 'free_text'));
+  assert.deepEqual(unresolvedSelections(null), []);
+});
+
+test('compiler warnings split into advisory and blocking classes', () => {
+  const warnings = [
+    { code: 'empty', ids: [] }, { code: 'over_limit', ids: [] },
+    { code: 'token_budget', ids: [], detail: '~90/77' }, { code: 'duplicate', ids: ['a', 'b'] },
+  ];
+  // Hard limits are re-reported as blocking errors elsewhere, so they are not repeated here.
+  assert.deepEqual(advisoryWarnings({ warnings }).map((item) => item.code), ['token_budget', 'duplicate']);
+  assert.deepEqual(advisoryWarnings(null), []);
+});
 
 test('legacy categories keep their display alias without changing stored values', () => {
   assert.equal(groupOf('action'), 'pose');
@@ -143,10 +191,44 @@ test('background guidance stays collapsed and state text stays visible', () => {
   // Contract and safety text must never hide behind a disclosure.
   assert.ok(!/<HelpNote[^>]*>\{inclusion/.test(source) && !/inclusion\.text\}<\/HelpNote>/.test(source));
   assert.ok(source.includes('<p className="prompt-inclusion"'));
-  assert.ok(source.includes('className="prompt-warning"'));
+  // Free-text translation is reported by the inclusion notice only, and the three
+  // message classes stay visible instead of sharing one warning style.
+  assert.ok(source.includes('unresolvedSelections(state.result)'));
+  assert.ok(!source.includes('state.result.unresolved.length > 0 &&'));
   // The counter itself is always on screen; only its explanation collapses.
   assert.match(source, /<HelpNote summary=\{`\$\{characterCount\(state\.scene\.freeTextKo\)\}\/4000자`\}>/);
   assert.ok(source.includes('id="free-text-help"'));
+});
+
+test('the three message classes are rendered and stay outside disclosures', () => {
+  const source = readFileSync(fileURLToPath(new URL('../src/components/PromptBuilder.tsx', import.meta.url)), 'utf8');
+  const css = readFileSync(fileURLToPath(new URL('../src/styles.css', import.meta.url)), 'utf8');
+  // Explanation (coverage), advisory (duplicate/conflict/stale) and blocking
+  // (validation) must be visually distinguishable, not one shared color.
+  assert.ok(source.includes('className="prompt-notice" data-tone="info"'));
+  assert.ok(source.includes('className="prompt-notice" data-tone="caution"'));
+  assert.ok(source.includes('className="prompt-error"'));
+  assert.ok(css.includes('.prompt-notice[data-tone="caution"]') && css.includes('.prompt-notice[data-tone="error"]'));
+  // No advisory or blocking row may sit inside a collapsed disclosure.
+  for (const line of source.split('\n')) {
+    if (!/prompt-notice|prompt-error/.test(line)) continue;
+    assert.ok(!/<HelpNote/.test(line), `message must stay visible: ${line.trim()}`);
+  }
+});
+
+test('each chip remove button restores focus instead of dropping it', () => {
+  const source = readFileSync(fileURLToPath(new URL('../src/components/PromptBuilder.tsx', import.meta.url)), 'utf8');
+  // The target is chosen before removal and applied after the render that unmounts
+  // the button, so the removed element is never the focus target.
+  assert.match(source, /pendingFocusRef\.current = \{ target: nextFocusAfterRemoval/);
+  assert.match(source, /useEffect\(\(\) => \{[\s\S]*?removeRefs\.current\.get\(pending\.target\)/);
+  assert.ok(source.includes('searchRef.current?.focus()'));
+  // Clearing or bulk-removing every chip also lands on the search input.
+  assert.match(source, /function clearScene\(\)[\s\S]*?pendingFocusRef\.current = \{ target: null \}/);
+  // Chip render order and focus order read the same grouping result.
+  assert.ok(source.includes('const groups = chipGroups(state.scene.selections);'));
+  assert.ok(source.includes('const chipOrder = groups.flatMap((group) => group.items.map((item) => item.id));'));
+  assert.ok(!source.includes('groupOrder'));
 });
 
 test('selecting entries through the shared path still yields sorted compiler output', () => {

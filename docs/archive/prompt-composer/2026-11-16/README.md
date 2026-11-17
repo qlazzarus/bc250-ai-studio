@@ -1,6 +1,6 @@
 # Prompt Composer 완료 기록 archive
 
-보관일 2026-11-16 · 기준 소스 `730e077`. 완료된 작업의 증거와 과거 설계를 보존한다. 스냅샷에는 완료 당시 함께 추적하던 미완료 항목도 포함되어 있으므로 현재 할 일은 [활성 목록](../../../PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
+보관일 2026-11-16 · 기준 소스 `730e077`. 완료된 작업의 증거와 과거 설계를 보존한다. 스냅샷에는 완료 당시 함께 추적하던 미완료 항목도 포함되어 있으므로 현재 할 일은 [활성 목록](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
 
 - [P0–P4·Seed·1.2.0 작업 계획과 배포 관찰](PROMPT_COMPOSER_TASKS.md)
 - [P5 회귀·브라우저·P6-UX·httpx2·A5/A7 완료 기록](PROMPT_COMPOSER_FOLLOWUP.md)

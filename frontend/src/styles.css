@@ -299,6 +299,16 @@
 .prompt-result { margin-top: 14px; padding: 12px; border: 1px solid #41444f; border-radius: 8px; }
 .prompt-warning { color: #f4cb84; font-size: .78rem; line-height: 1.5; overflow-wrap: anywhere; }
 .prompt-warning ul { padding-left: 20px; white-space: pre-wrap; }
+/* GAP02: three message classes must not look alike. Explanation (info) is neutral,
+   advisory (caution) is amber, a blocking condition (error) is red and is never
+   collapsed behind a disclosure. */
+.prompt-notice, .prompt-error { font-size: .78rem; line-height: 1.5; overflow-wrap: anywhere; padding: 6px 9px; border-radius: 6px; border: 1px solid #3b4450; background: #1d232c; color: #b9c6d4; }
+.prompt-notice strong { display: block; margin-bottom: 2px; }
+.prompt-notice ul { padding-left: 20px; white-space: pre-wrap; margin: 4px 0; }
+.prompt-notice > span { display: block; margin-top: 4px; }
+.prompt-notice[data-tone="caution"] { color: #f4cb84; background: #2a2418; border-color: #6b5a33; }
+.prompt-notice[data-tone="error"], .prompt-error { color: #ffb6b6; background: #2e1d20; border-color: #7f4048; }
+.prompt-error { margin: 4px 0; }
 .prompt-builder button:focus-visible, .prompt-choice input:focus-visible { outline: 2px solid #d1adff; outline-offset: 3px; }
 .prompt-builder button:disabled { opacity: .5; cursor: not-allowed; }
 .prompt-selected { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 14px; }
@@ -339,6 +349,8 @@
 .prompt-proposal > .quiet { padding: 5px 9px; font-size: .74rem; white-space: nowrap; }
 .prompt-warning--action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
 .prompt-warning--action > .quiet { padding: 3px 8px; font-size: .72rem; white-space: nowrap; }
+.prompt-notice--action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
+.prompt-notice--action > .quiet { padding: 3px 8px; font-size: .72rem; white-space: nowrap; }
 /* The count stays on the pill's single line; a second line cost 26–39px of
    height at 360px and pushed the apply control further away (U11 measurement). */
 .prompt-category-count { display: inline; margin-left: 4px; font-size: .68rem; font-weight: 700; opacity: .72; letter-spacing: .02em; }

@@ -1,10 +1,10 @@
-> Archive · 2026-11-16 보관 · 기준 소스 `730e077`. 아래 상태/테스트 수는 당시 기록이며 현재 현황은 [현재 구현](../../../PROMPT_COMPOSER_CURRENT.md), 남은 작업은 [추적 목록](../../../PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
+> Archive · 2026-11-16 보관 · 기준 소스 `730e077`. 아래 상태/테스트 수는 당시 기록이며 현재 현황은 [현재 구현](../../../PROMPT_COMPOSER_CURRENT.md), 남은 작업은 [추적 목록](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
 
 # Prompt Composer P5 개선과 후속 설계
 
-현재 남은 작업과 회귀 수정 상태는 [후속 작업 추적](../../../PROMPT_COMPOSER_FOLLOWUP.md)에서 관리한다. capability 설정 누락 회귀(P5-R01)와 원래 129건 범위 재실행(P5-R02)은 통과했고, P5-C01/C02/C03 브라우저 검증과 P6-UX 화면 검증도 로컬 Chromium에서 완료했다. 운영 배포·롤백과 GPU 품질 검증은 여전히 미완료다.
+현재 남은 작업과 회귀 수정 상태는 [후속 작업 추적](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md)에서 관리한다. capability 설정 누락 회귀(P5-R01)와 원래 129건 범위 재실행(P5-R02)은 통과했고, P5-C01/C02/C03 브라우저 검증과 P6-UX 화면 검증도 로컬 Chromium에서 완료했다. 운영 배포·롤백과 GPU 품질 검증은 여전히 미완료다.
 
-작성일: 2026-11-15. 기준 커밋 `12ee5ea`와 기존 문서 변경을 보존하고 적용한 로컬 변경이다. Scene v1·prompt_composition v1·최종 prompt 실행 기준·retry 복사를 유지한다. 사전은 1.2.0, 컴파일러는 1.3.0이다. P0–P4 기록은 [기존 작업 계획](../../../PROMPT_COMPOSER_TASKS.md)에 보존한다.
+작성일: 2026-11-15. 기준 커밋 `12ee5ea`와 기존 문서 변경을 보존하고 적용한 로컬 변경이다. Scene v1·prompt_composition v1·최종 prompt 실행 기준·retry 복사를 유지한다. 사전은 1.2.0, 컴파일러는 1.3.0이다. P0–P4 기록은 [기존 작업 계획](../2026-11-17/PROMPT_COMPOSER_TASKS.md)에 보존한다.
 
 ## 대조 결과와 위험
 
@@ -44,7 +44,7 @@
 
 ## P5-C — 브라우저 통합 검증 절차
 
-**상태: 로컬 브라우저 검증 완료 (2026-11-15).** 이전 세션에서는 브라우저 도구가 `The browser access host is unavailable`을 반환했으나, 이번에는 로컬 캐시 Chromium과 Playwright로 실제 조작을 수행했다. 채워진 결과는 [후속 추적의 P5-C 기록](../../../PROMPT_COMPOSER_FOLLOWUP.md)에 있다. 실제 보조기기/스크린리더 낭독은 여전히 미검증이다.
+**상태: 로컬 브라우저 검증 완료 (2026-11-15).** 이전 세션에서는 브라우저 도구가 `The browser access host is unavailable`을 반환했으나, 이번에는 로컬 캐시 Chromium과 Playwright로 실제 조작을 수행했다. 채워진 결과는 [후속 추적의 P5-C 기록](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md)에 있다. 실제 보조기기/스크린리더 낭독은 여전히 미검증이다.
 
 운영 GPU 대신 별도 로컬 Fake 환경을 사용한다. 아래 키는 로컬 시험용 예시이며 운영에 사용하지 않는다. 서버 data_dir를 새 임시 경로로 지정한다.
 
@@ -101,7 +101,7 @@ models:
 | 키보드 | Tab/Shift+Tab으로 입력·선택·칩·생성·적용 이동, Space/Enter, 오류 연결과 포커스 확인 | 통과 (Enter 열기, Space 선택, 2px 포커스 링, aria 연결) |
 | 좁은 화면 | DevTools 360px·390px·200% 확대 → 텍스트/버튼 겹침·가로 넘침·접근 가능성 확인 | 통과 (360/390px·640×450 근사) |
 
-완료 조건은 각 행에 실행 환경·스크린샷/관찰 결과·실패 이슈를 남기는 것이다. 실행 환경과 관찰 결과는 [후속 추적의 P5-C01/C02/C03 표](../../../PROMPT_COMPOSER_FOLLOWUP.md)에 있다. 로컬 브라우저 검증이 끝났어도 운영 배포·롤백 검증과 GPU 품질 검증은 별도이며, P5-L01 전까지 릴리스 준비 완료로 표시하지 않는다.
+완료 조건은 각 행에 실행 환경·스크린샷/관찰 결과·실패 이슈를 남기는 것이다. 실행 환경과 관찰 결과는 [후속 추적의 P5-C01/C02/C03 표](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md)에 있다. 로컬 브라우저 검증이 끝났어도 운영 배포·롤백 검증과 GPU 품질 검증은 별도이며, P5-L01 전까지 릴리스 준비 완료로 표시하지 않는다.
 
 ## P6 — 모델별 렌더러 설계와 평가 (구현하지 않음)
 
@@ -125,7 +125,7 @@ ControlNet Pose/IP-Adapter/img2img는 텍스트 renderer 외에 자산 업로드
 
 이 단계의 구체적 자동화 후보는 [LLM 자동화 제안](../../../PROMPT_COMPOSER_LLM_AUTOMATION.md)에 8개(오프라인 배치 A1–A4, 온라인 제안 A5–A7, 평가 보조 A8)로 정리했다. 그 문서는 우선순위·계약 초안·GPU 경합 규칙·측정 지표·위험을 다룬다. 사전 스키마·Scene v2·제안 API·운영 GPU 사용은 승인 전 수행하지 않는다.
 
-2026-11-15에 A5(원문→사전 후보)와 A7(경고 해설)을 **LLM 없이 결정론으로 선행 구현**했다(`frontend/src/prompt/proposals.ts`, `PromptBuilder.tsx`). 타이핑 중에는 호출하지 않고 버튼을 눌렀을 때만 제안을 계산하며, 수락은 기존 `selectEntry()`를 재사용한다. 충돌 경고는 문장 설명만 하고 자동 해제하지 않는다. 이 구현은 서버·스키마·GPU·CI를 건드리지 않으므로 P8 승인 경계에 해당하지 않는다. LLM 교체는 `ProposalRequest`/`SelectionHint` 타입을 유지한 채 구현만 바꾸면 된다. 상세는 [후속 추적의 LLM 기록](../../../PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
+2026-11-15에 A5(원문→사전 후보)와 A7(경고 해설)을 **LLM 없이 결정론으로 선행 구현**했다(`frontend/src/prompt/proposals.ts`, `PromptBuilder.tsx`). 타이핑 중에는 호출하지 않고 버튼을 눌렀을 때만 제안을 계산하며, 수락은 기존 `selectEntry()`를 재사용한다. 충돌 경고는 문장 설명만 하고 자동 해제하지 않는다. 이 구현은 서버·스키마·GPU·CI를 건드리지 않으므로 P8 승인 경계에 해당하지 않는다. LLM 교체는 `ProposalRequest`/`SelectionHint` 타입을 유지한 채 구현만 바꾸면 된다. 상세는 [후속 추적의 LLM 기록](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
 
 ## 검증 기록과 승인 경계
 

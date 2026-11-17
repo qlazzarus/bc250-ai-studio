@@ -31,6 +31,30 @@ export function selectionCounts(selections: { category: string }[]): Record<stri
   return counts;
 }
 
+/**
+ * Chips render group-first, and that flat order is also the DOM/focus order.
+ * Rendering and focus restoration read the same function so they cannot drift.
+ */
+export type ChipGroup<T> = { group: string; items: T[] };
+
+export function chipGroups<T extends { category: string }>(selections: T[]): ChipGroup<T>[] {
+  const groups = [...GROUP_ORDER,
+    ...new Set(selections.map((item) => groupOf(item.category)).filter((group) => !GROUP_ORDER.includes(group)))];
+  return groups
+    .map((group) => ({ group, items: selections.filter((item) => groupOf(item.category) === group) }))
+    .filter((entry) => entry.items.length > 0);
+}
+
+/**
+ * After a removal, focus goes to the next rendered chip's remove button, then the
+ * previous one. `null` means no chip is left, so the caller returns to the search input.
+ */
+export function nextFocusAfterRemoval(ids: string[], removedId: string): string | null {
+  const index = ids.indexOf(removedId);
+  if (index < 0) return ids[0] ?? null;
+  return ids[index + 1] ?? ids[index - 1] ?? null;
+}
+
 /** Zero-result recovery keeps the other axis so no filtering work is lost. */
 export type RecoveryAction = { kind: "widen" | "clearQuery"; label: string; nextCategory: string; nextQuery: string };
 
@@ -77,10 +101,36 @@ export function previewControls(
 /** Whether the current preview carries the free text. Never inferred from strings. */
 export type InclusionNotice = { included: boolean; text: string; unknown: boolean };
 
+/**
+ * One tone per message class so a blocking condition never looks like a hint:
+ * `info` = explanation, `caution` = advisory, `error` = this blocks applying.
+ */
+export type NoticeTone = "info" | "caution" | "error";
+
+/**
+ * Compiler warnings are advisory. The hard limits are re-reported by
+ * `validateComposition`/`validateText` as blocking errors, so `over_limit` is
+ * dropped here instead of appearing twice in two different colours.
+ */
+export function advisoryWarnings(result: CompileResult | null) {
+  return (result?.warnings ?? []).filter((item) => item.code !== "empty" && item.code !== "over_limit");
+}
+
+/**
+ * Unresolved selections are translation failures; the free text is reported once by
+ * the inclusion notice, so it must not also appear as a warning.
+ */
+export function unresolvedSelections(result: CompileResult | null): { id: string | null; text: string }[] {
+  return (result?.unresolved ?? [])
+    .filter((item) => item.kind === "selection")
+    .map((item) => ({ id: item.id ?? null, text: item.text }));
+}
+
+
 export function inclusionNotice(state: PromptBuilderState, result: CompileResult | null): InclusionNotice | null {
   if (!result) return null;
   if (state.provenance === "saved") {
-    return { included: false, unknown: true, text: "과거 복원 · 당시 반영 방식은 기록에 없습니다." };
+    return { included: false, unknown: true, text: "과거 복원 · 미리보기 기준이 아닙니다. 당시 반영 방식은 기록에 없습니다." };
   }
   if (!state.scene.freeTextKo.trim()) return null;
   return state.freeTextMode === "verbatim"

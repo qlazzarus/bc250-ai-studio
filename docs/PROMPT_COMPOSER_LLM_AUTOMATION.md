@@ -1,6 +1,6 @@
 # Prompt Composer LLM 자동화 제안 설계
 
-작성일: 2026-11-15 · 상태: **제안 설계 + A5/A7 결정론 선행 구현** · 상위: [P5 문서의 P8](PROMPT_COMPOSER_P5.md) · 진행 추적: [후속 작업 추적](PROMPT_COMPOSER_FOLLOWUP.md)
+작성일: 2026-11-15 · 상태: **제안 설계 + A5/A7 결정론 선행 구현** · 상위: [P5 문서의 P8](PROMPT_COMPOSER_P5.md) · 진행 추적: [후속 작업 추적](PROMPT_COMPOSER_EXECUTION_TASKS.md)
 
 이 문서는 Prompt Composer에서 LLM으로 자동화할 수 있는 지점을 우선순위와 계약 경계까지 정리한 제안이다. A5(원문 → 사전 후보)와 A7(경고 해설)은 **LLM 없이 결정론적 규칙으로 먼저 구현**해 UI와 계약을 고정했고, 나머지는 여전히 `설계만`이다. LLM 호출·제안 API·스키마·CI·운영 설정은 변경하지 않았다. 승인 전까지 나머지 항목은 완료로 표시하지 않는다.
 

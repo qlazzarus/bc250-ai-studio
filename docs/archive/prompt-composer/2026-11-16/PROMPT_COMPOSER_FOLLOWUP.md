@@ -1,9 +1,9 @@
-> Archive · 2026-11-16 보관 · 기준 소스 `730e077`. 아래 상태/테스트 수는 당시 기록이며 현재 현황은 [현재 구현](../../../PROMPT_COMPOSER_CURRENT.md), 남은 작업은 [추적 목록](../../../PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
+> Archive · 2026-11-16 보관 · 기준 소스 `730e077`. 아래 상태/테스트 수는 당시 기록이며 현재 현황은 [현재 구현](../../../PROMPT_COMPOSER_CURRENT.md), 남은 작업은 [추적 목록](../2026-11-17/PROMPT_COMPOSER_FOLLOWUP.md)을 따른다.
 
 # Prompt Composer 남은 작업과 회귀 추적
 
 갱신일: 2026-11-15 · 기준: `e85d8dc` + TEST-D01 의존성 변경 + LLM A5/A7 결정론 선행 구현. P5-R02·P5-C01/C02/C03·P6-UX·TEST-D01·LLM-A5/A7 로컬 완료.
-현재 상태를 이 문서에서 추적한다. 설계와 수동 절차는 [P5 상세](../../../PROMPT_COMPOSER_P5.md), 실제 동작은 [현재 구현](../../../PROMPT_COMPOSER_CURRENT.md), P0–P4 이력은 [작업 계획](../../../PROMPT_COMPOSER_TASKS.md)을 따른다.
+현재 상태를 이 문서에서 추적한다. 설계와 수동 절차는 [P5 상세](../../../PROMPT_COMPOSER_P5.md), 실제 동작은 [현재 구현](../../../PROMPT_COMPOSER_CURRENT.md), P0–P4 이력은 [작업 계획](../2026-11-17/PROMPT_COMPOSER_TASKS.md)을 따른다.
 
 상태는 `미착수`, `진행`, `환경 대기`, `설계만`, `로컬 검증 완료`로 구분한다. 로컬 테스트 통과를 브라우저·운영·GPU 완료로 바꾸지 않는다. 항목을 완료 처리할 때 실행 명령, 대상 커밋/환경, 결과와 증거를 추가한다.
 

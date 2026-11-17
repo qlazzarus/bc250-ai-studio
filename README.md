@@ -50,7 +50,7 @@ API 기본 주소: `http://127.0.0.1:8090`. 데이터 기본 위치:
 
 ## 문서
 
-Prompt Composer의 [현재 구현](docs/PROMPT_COMPOSER_CURRENT.md), [남은 작업](docs/PROMPT_COMPOSER_FOLLOWUP.md), [완료 기록 archive](docs/archive/prompt-composer/2026-11-16/README.md)를 구분해 관리합니다.
+Prompt Composer의 [현재 구현](docs/PROMPT_COMPOSER_CURRENT.md), [남은 작업](docs/PROMPT_COMPOSER_EXECUTION_TASKS.md), [완료 기록 archive](docs/archive/prompt-composer/2026-11-16/README.md)를 구분해 관리합니다.
 
 - [AI Studio 개발·배포 재개 및 LLM 작업 분리 검토](docs/STUDIO_RESUME_REVIEW.md) — Studio 수동 배포를 검증했으며 모델 전환 작업은 Client로 인계합니다.
 - [LLM 모델 전환: Client 통합 계획과 기존 자료 안내](docs/LLM_MODEL_SWITCH.md) — UI/API의 구현 주체는 `bc250-llm-client`입니다.
@@ -60,10 +60,10 @@ Prompt Composer의 [현재 구현](docs/PROMPT_COMPOSER_CURRENT.md), [남은 작
 - [실행·서버 조사·배포·복구](docs/DEPLOYMENT.md)
 - [단계별 구현 범위](docs/ROADMAP.md)
 - [사전 프롬프트 현재 구현과 다음 개선 순서](docs/PROMPT_COMPOSER_CURRENT.md)
-- [Prompt Composer 남은 작업 추적과 활성 항목 코드 대조 보고](docs/PROMPT_COMPOSER_FOLLOWUP.md)
+- [Prompt Composer 남은 작업 추적과 활성 항목 코드 대조 보고](docs/PROMPT_COMPOSER_EXECUTION_TASKS.md)
 - [Prompt Composer LLM 자동화 제안 설계 (A5/A7 결정론 선행 구현 포함)](docs/PROMPT_COMPOSER_LLM_AUTOMATION.md)
 - [프롬프트 구성·포즈 생성 모드 발전 계획](docs/GENERATION_MODES_DESIGN.md)
-- [프롬프트 구성 작업 계획과 1.2.0 고도화·배포 점검 기록](docs/PROMPT_COMPOSER_TASKS.md)
+- [프롬프트 구성 작업 계획과 1.2.0 고도화·배포 점검 기록](docs/PROMPT_COMPOSER_EXECUTION_TASKS.md)
 - [테스트 결과와 한계](docs/TESTING.md)
 - [다음 프로젝트 LLM 클라이언트 인계 문서](docs/NEXT_PROJECT_LLM_CLIENT.md)
 - [Pixel Studio 설계·API·후속 범위](docs/PIXEL_STUDIO.md)

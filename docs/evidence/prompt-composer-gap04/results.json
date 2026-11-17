@@ -1,0 +1,435 @@
+[
+  {
+    "name": "환경",
+    "pass": null,
+    "detail": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36 · 1280x900"
+  },
+  {
+    "name": "GAP03 · 초기 목록은 전체",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP03 · 빈 상태에 시작 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP03 · 대상 분류로 좁힘",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP03 · 좁힌 뒤 검색 입력 포커스",
+    "pass": true,
+    "expected": "INPUT",
+    "actual": "\"INPUT\""
+  },
+  {
+    "name": "선택 3개 · 칩 3개",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "칩 그룹 순서 고정",
+    "pass": true,
+    "expected": "[\"대상\",\"조명\",\"분위기\"]",
+    "actual": "\"[\\\"대상\\\",\\\"조명\\\",\\\"분위기\\\"]\""
+  },
+  {
+    "name": "GAP01 · 중간 제거 후 다음 칩으로 포커스",
+    "pass": true,
+    "expected": "차분한 분위기 선택 해제",
+    "actual": "\"차분한 분위기 선택 해제\""
+  },
+  {
+    "name": "GAP01 중간 제거",
+    "pass": null,
+    "detail": "제거 부드러운 조명 선택 해제 → 포커스 차분한 분위기 선택 해제"
+  },
+  {
+    "name": "GAP01 · 전체 마지막 칩 제거 후 이전 칩으로",
+    "pass": true,
+    "expected": "인물 선택 해제",
+    "actual": "\"인물 선택 해제\""
+  },
+  {
+    "name": "GAP01 · 마지막 칩 제거 후 탐색 입력으로",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "전체 비우기 · 취소 시 유지",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "전체 비우기 · 확인창 호출",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "전체 비우기 · 마지막 포커스는 탐색 입력",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 별도 보관 포함 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 원문 미변환은 주의로 중복 표시하지 않음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 메시지는 접힌 상세에 숨지 않음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 별도 보관 메시지",
+    "pass": null,
+    "detail": "[]"
+  },
+  {
+    "name": "GAP02 · 원문 포함 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 원문 1회 포함",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "GAP02 · 미변환 선택은 주의 등급",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 미변환은 오류가 아닌 주의",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "GAP02 · 미변환 목록은 접힌 상세 밖",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 미지원 계열",
+    "pass": null,
+    "detail": "{\"total\":3,\"caution\":[\"이 모델로 번역되지 않은 선택 항목인물부드러운 조명선택한 항목의 unknown-family 표현이 사전에 없어 초안에서 빠졌습니다. 다른 항목을 고르거나 최종 프롬프트에 직접 입력하세요.\",\"이 모델 계열의 사전 변환은 아직 제공되지 않습니다.\"],\"hasSelectionWarning\":true,\"errors\":0}"
+  },
+  {
+    "name": "계열 복귀 · 초안 재생성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "계열 복귀 상태",
+    "pass": null,
+    "detail": "{\"chips\":2,\"hasResult\":true}"
+  },
+  {
+    "name": "GAP02 · 한도 초과는 오류 등급",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 오류는 접힌 상세 밖",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "GAP02 · 오류 시 생성 차단",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 오류 표시",
+    "pass": null,
+    "detail": "{\"exists\":true,\"text\":\"8001/8000자: 내용을 줄여 주세요.\",\"inDisclosure\":false,\"generateDisabled\":true}"
+  },
+  {
+    "name": "키보드 Tab 순회",
+    "pass": null,
+    "detail": "[{\"tag\":\"SUMMARY\",\"className\":null,\"label\":null,\"text\":\"저장 범위 안내\"},{\"tag\":\"INPUT\",\"className\":null,\"label\":null,\"text\":\"\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"전체선택 2\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"대상선택 1\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"외형선택 0\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"의상선택 0\"}]"
+  },
+  {
+    "name": "키보드 Shift+Tab 순회",
+    "pass": null,
+    "detail": "[{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"외형선택 0\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"대상선택 1\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"전체선택 2\"}]"
+  },
+  {
+    "name": "키보드 · 검색 입력 도달",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 분류 버튼 도달",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · Shift+Tab로 되돌아옴",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · Space로 분류 전환",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 표현 상세 열기",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 표현 상세 닫기",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "상세 토글 · 선택 불변",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "제거 버튼 터치 크기 ≥26px",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "제거 버튼 크기",
+    "pass": null,
+    "detail": "{\"w\":26,\"h\":26}"
+  },
+  {
+    "name": "적용 후 초안 영역 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "390px · 세로 1열",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "390px · 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "390px · 적용 버튼",
+    "pass": null,
+    "detail": "{\"w\":314,\"h\":36}"
+  },
+  {
+    "name": "390px · 적용 버튼 노출",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "360px · 세로 1열",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "360px · 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "360px · 적용 버튼",
+    "pass": null,
+    "detail": "{\"w\":284,\"h\":36}"
+  },
+  {
+    "name": "360px · 적용 버튼 노출",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "적용 · 최종 프롬프트 일치",
+    "pass": true,
+    "expected": "a person, soft lighting\n비 오는 네온 거리, 두 사람",
+    "actual": "\"a person, soft lighting\\n비 오는 네온 거리, 두 사람\""
+  },
+  {
+    "name": "적용 · 상태 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "덮어쓰기 · 취소 시 최종 유지",
+    "pass": true,
+    "expected": "직접 쓴 프롬프트",
+    "actual": "\"직접 쓴 프롬프트\""
+  },
+  {
+    "name": "덮어쓰기 · 확인창 호출",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "적용 후 수정 · 상태 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "생성 결과 상태",
+    "pass": null,
+    "detail": "completed"
+  },
+  {
+    "name": "직접 생성 · 작업 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "결과 정보 · 구성 이력 항목",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "과거 복원 · 반영 방식 기록 없음 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "과거 복원 상태",
+    "pass": null,
+    "detail": "{\"inclusion\":\"과거 복원 · 미리보기 기준이 아닙니다. 당시 반영 방식은 기록에 없습니다.\",\"unknown\":true,\"status\":\"과거 복원 · 적용 정보 기록 없음\"}"
+  },
+  {
+    "name": "HTTP 422 · 오류 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "HTTP 422 · 입력 보존",
+    "pass": true,
+    "expected": "kept prompt after rejection",
+    "actual": "\"kept prompt after rejection\""
+  },
+  {
+    "name": "HTTP 422 · 재시도 가능",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "HTTP 422",
+    "pass": null,
+    "detail": "{\"message\":\"프롬프트 형식이 올바르지 않습니다.닫기\",\"prompt\":\"kept prompt after rejection\",\"enabled\":true}"
+  },
+  {
+    "name": "HTTP 413 · 오류 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "HTTP 413 · 입력 보존",
+    "pass": true,
+    "expected": "kept prompt after rejection",
+    "actual": "\"kept prompt after rejection\""
+  },
+  {
+    "name": "HTTP 413 · 재시도 가능",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "HTTP 413",
+    "pass": null,
+    "detail": "{\"message\":\"요청 본문이 너무 큽니다.닫기\",\"prompt\":\"kept prompt after rejection\",\"enabled\":true}"
+  },
+  {
+    "name": "계열 전환 · 최종 프롬프트 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "계열 전환 · 재생성 경로 제공",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "계열 전환 상태",
+    "pass": null,
+    "detail": "{\"prompt\":27,\"hasResult\":false,\"regenerate\":true,\"applyDisabled\":null}"
+  },
+  {
+    "name": "capability 미지원 · 안내 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "capability 미지원 · 화면 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "capability 미지원 · 직접 입력 가능",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "capability 미지원",
+    "pass": null,
+    "detail": "{\"notice\":true,\"builder\":true,\"canStillType\":true}"
+  }
+]
