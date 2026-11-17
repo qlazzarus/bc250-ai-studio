@@ -49,6 +49,21 @@ const main = async () => {
   const page = pageClient(browser.sendTo, sessionId);
   await page.call("Page.enable");
   await page.call("Runtime.enable");
+  // The app holds its bearer token in the bundle/env, not in a readable global, so
+  // tests that need to call the API directly capture the header the app itself
+  // sends. Without it a bare fetch returns 401 and the check would silently pass as
+  // "unverified" rather than proving the retry path.
+  await page.call("Page.addScriptToEvaluateOnNewDocument", { source: `(() => {
+    const real = window.fetch;
+    window.fetch = (input, init) => {
+      try {
+        const headers = (init && init.headers) || {};
+        const auth = headers.Authorization || headers.authorization;
+        if (auth) window.__authHeader = auth;
+      } catch { /* ignore */ }
+      return real(input, init);
+    };
+  })();` });
   await page.viewport(1280, 900);
   await page.call("Page.navigate", { url: APP });
   await page.waitFor("!!document.querySelector('.prompt-builder > .quiet')", { label: "app mount" });

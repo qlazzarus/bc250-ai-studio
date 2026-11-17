@@ -9,8 +9,11 @@ import { selectEntry } from '../src/prompt/scene.ts';
 import {
   activeGroups, filterOptions, groupOf, selectionCounts, recoveryActions,
   previewControls, inclusionNotice, appliedStatus, GROUP_ORDER,
-  chipGroups, nextFocusAfterRemoval, unresolvedSelections, advisoryWarnings,
+  nextFocusAfterRemoval, unresolvedSelections, advisoryWarnings,
+  SUMMARY_ROWS, sceneSummary, summaryIsEmpty,
 } from '../src/prompt/presentation.ts';
+import { SCENE_EXAMPLES, applyExample, exampleNeedsConfirm } from '../src/prompt/examples.ts';
+import { queueCounts, queueDefaultExpanded, queueExpanded, queueSummary } from '../src/lib/queue.ts';
 
 const entry = (id) => DICTIONARY.find((e) => e.id === id);
 const sceneWith = (ids, family = 'sd15', freeTextKo = '') => ({
@@ -21,19 +24,91 @@ const sceneWith = (ids, family = 'sd15', freeTextKo = '') => ({
 const snapshot = (overrides = {}) => ({ schema_version: 1, compiler_version: '1.2.0', target_family: 'sd15',
   selections: [], free_text_ko: '', draft_prompt: 'draft', unresolved: [], ...overrides });
 
-test('chip render order and focus order share one grouping function', () => {
+test('chip render order and focus order share one summary row list', () => {
   const selections = [
     { category: 'lighting' }, { category: 'action' }, { category: 'subject' },
     { category: 'action' }, { category: 'custom' },
   ];
-  const groups = chipGroups(selections);
-  assert.deepEqual(groups.map((group) => group.group), ['subject', 'pose', 'lighting', 'custom']);
-  assert.equal(groups[1].items.length, 2);
-  // Flat group-first order is the DOM order the remove buttons appear in.
-  assert.deepEqual(groups.flatMap((group) => group.items), [
+  const rows = sceneSummary(selections);
+  // Rows are fixed display groups plus one fallback row for unknown stored values.
+  assert.deepEqual(rows.map((row) => row.key), [...SUMMARY_ROWS.map((row) => row.key), 'other']);
+  assert.deepEqual(rows.map((row) => row.label).slice(-1), ['기타']);
+  assert.equal(rows.find((row) => row.key === 'pose').items.length, 2);
+  // Flat row order is the DOM order the remove buttons appear in.
+  assert.deepEqual(rows.flatMap((row) => row.items), [
     selections[2], selections[1], selections[3], selections[0], selections[4],
   ]);
-  assert.deepEqual(chipGroups([]), []);
+  assert.deepEqual(sceneSummary([]).flatMap((row) => row.items), []);
+  assert.equal(sceneSummary([]).length, SUMMARY_ROWS.length);
+});
+
+test('merged display groups keep their rows contiguous and the order stable', () => {
+  const selections = [
+    { category: 'clothing' }, { category: 'appearance' }, { category: 'style' }, { category: 'lighting' },
+  ];
+  const rows = sceneSummary(selections).filter((row) => row.items.length > 0);
+  assert.deepEqual(rows.map((row) => row.label), ['외형·의상', '조명·스타일']);
+  // Within a merged row the stored selection order is preserved, never re-sorted.
+  assert.deepEqual(rows[0].items, [selections[0], selections[1]]);
+  assert.deepEqual(rows[1].items, [selections[2], selections[3]]);
+  // Legacy category aliases land in the row that owns their display group.
+  const legacy = sceneSummary([{ category: 'action' }, { category: 'location' }, { category: 'composition' }]);
+  assert.deepEqual(legacy.filter((row) => row.items.length).map((row) => row.label), ['표정·행동', '장소·시간', '구도']);
+});
+
+test('an empty summary is reported without inventing content from the free text', () => {
+  const rows = sceneSummary([]);
+  assert.equal(summaryIsEmpty(rows), true);
+  assert.ok(rows.every((row) => row.items.length === 0));
+  assert.equal(summaryIsEmpty(sceneSummary([{ category: 'mood' }])), false);
+  // The helper only reads selections; a free text argument is never consulted.
+  assert.equal(sceneSummary.length, 1);
+});
+
+test('examples fill only the free text and never replace it without consent', () => {
+  assert.deepEqual(SCENE_EXAMPLES.map((item) => item.id), ['daily', 'product', 'landscape']);
+  assert.deepEqual(SCENE_EXAMPLES.map((item) => item.title), ['일상', '제품', '풍경']);
+  assert.ok(SCENE_EXAMPLES.every((item) => item.text.trim().length > 0));
+  // No user text or log is used as an example; each one is project-authored Korean.
+  assert.ok(SCENE_EXAMPLES.every((item) => /[가-힣]/.test(item.text)));
+
+  assert.equal(exampleNeedsConfirm(''), false);
+  assert.equal(exampleNeedsConfirm('   \n'), false);
+  assert.equal(exampleNeedsConfirm('내가 쓴 설명'), true);
+
+  let asked = 0;
+  assert.equal(applyExample('', SCENE_EXAMPLES[0], () => { asked += 1; return true; }), SCENE_EXAMPLES[0].text);
+  // An empty field is filled silently, so nobody is asked to confirm nothing.
+  assert.equal(asked, 0);
+  assert.equal(applyExample('내가 쓴 설명', SCENE_EXAMPLES[1], () => { asked += 1; return true; }), SCENE_EXAMPLES[1].text);
+  assert.equal(asked, 1);
+  // Cancelling returns null so the caller can leave every field untouched.
+  assert.equal(applyExample('내가 쓴 설명', SCENE_EXAMPLES[2], () => false), null);
+});
+
+test('the queue header derives its counts and keeps a user choice across polls', () => {
+  const jobs = [
+    { status: 'running' }, { status: 'queued' }, { status: 'waiting_for_gpu' },
+    { status: 'failed' }, { status: 'interrupted' }, { status: 'completed' }, { status: 'cancelled' },
+  ];
+  const counts = queueCounts(jobs);
+  assert.deepEqual(counts, { running: 1, queued: 2, failed: 2, completed: 1, total: 7 });
+  assert.equal(queueSummary(jobs), '진행 1 · 대기 2 · 실패 2');
+  // Only non-zero facts are named, so the folded header stays one short line.
+  assert.equal(queueSummary([{ status: 'completed' }]), '진행 0 · 대기 0');
+  assert.equal(queueSummary([]), '최근 작업이 없습니다');
+
+  assert.equal(queueDefaultExpanded([]), false);
+  assert.equal(queueDefaultExpanded(jobs), true);
+  // A stored choice wins, so a poll that adds or clears jobs cannot reopen it.
+  assert.equal(queueExpanded(null, []), false);
+  assert.equal(queueExpanded(null, jobs), true);
+  assert.equal(queueExpanded(false, jobs), false);
+  assert.equal(queueExpanded(true, []), true);
+  // The input list is never mutated.
+  const before = JSON.stringify(jobs);
+  queueCounts(jobs); queueSummary(jobs);
+  assert.equal(JSON.stringify(jobs), before);
 });
 
 test('focus after removal walks forward, then backward, then leaves the chips', () => {
@@ -225,9 +300,9 @@ test('each chip remove button restores focus instead of dropping it', () => {
   assert.ok(source.includes('searchRef.current?.focus()'));
   // Clearing or bulk-removing every chip also lands on the search input.
   assert.match(source, /function clearScene\(\)[\s\S]*?pendingFocusRef\.current = \{ target: null \}/);
-  // Chip render order and focus order read the same grouping result.
-  assert.ok(source.includes('const groups = chipGroups(state.scene.selections);'));
-  assert.ok(source.includes('const chipOrder = groups.flatMap((group) => group.items.map((item) => item.id));'));
+  // Chip render order and focus order read the same summary rows.
+  assert.ok(source.includes('const summaries = sceneSummary(state.scene.selections);'));
+  assert.ok(source.includes('const chipOrder = summaries.flatMap((row) => row.items.map((item) => item.id));'));
   assert.ok(!source.includes('groupOrder'));
 });
 

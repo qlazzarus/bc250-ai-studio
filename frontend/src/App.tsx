@@ -16,6 +16,7 @@ import { initialBuilderState, appliedForFamily, restoreComposition } from "./pro
 import { changeSceneFamily } from "./prompt/scene";
 import { DICTIONARY, DICTIONARY_VERSION } from "./prompt/dictionary";
 import { characterCount, validateSubmission } from "./prompt/validation";
+import { queueCounts, queueExpanded, queueSummary } from "./lib/queue";
 
 const initialSettings: Settings = {
   modelId: "", prompt: "", negativePrompt: "", preset: "balanced", resolution: "512x512",
@@ -27,6 +28,11 @@ function App() {
   const [models, setModels] = useState<StudioModel[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobPage, setJobPage] = useState(0);
+  /**
+   * UX03: `null` means the user has not chosen yet, so the polled list decides the
+   * default. Once they click, the choice is kept and polling never resets it.
+   */
+  const [jobsExpanded, setJobsExpanded] = useState<boolean | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [assetPage, setAssetPage] = useState(0);
@@ -48,6 +54,10 @@ function App() {
 
   const api = useMemo(() => new StudioApi("/api/v1", API_KEY), []);
   const activeModel = models.find((model) => model.model_id === settings.modelId);
+  /** UX03: counts are derived from the polled list, so the header text never goes stale. */
+  const queue = useMemo(() => queueCounts(jobs), [jobs]);
+  const queueLine = useMemo(() => queueSummary(jobs), [jobs]);
+  const queueOpen = queueExpanded(jobsExpanded, jobs);
   const generationOptions = activeModel?.generation_options;
   const cfgOption = generationOptions?.cfg_scale;
   const negativeOption = generationOptions?.negative_prompt;
@@ -323,7 +333,18 @@ function App() {
           <button className="generate" disabled={submitting || !activeModel?.execution_enabled || submissionIssues.length > 0}>{submitting ? "접수 중…" : settings.batchCount > 1 ? `${settings.batchCount}개 생성` : "이미지 생성"}</button>
         </form>
       </section>
-      <section className="panel jobs"><div className="section-title"><h2>작업 큐</h2><button className="quiet" onClick={() => void refresh()}>새로고침</button></div>{api && jobs.length ? <>{jobs.map((job) => <JobCard key={job.job_id} job={job} api={api} refresh={refresh} />)}<Pagination page={jobPage} hasNext={jobs.length === JOBS_PER_PAGE} onPage={setJobPage} /></> : <p className="empty">최근 작업이 없습니다.</p>}</section>
+      <section className="panel jobs" data-collapsed={queueOpen ? undefined : "true"}><div className="section-title jobs-title"><h2>작업 큐</h2>
+        <span className="jobs-counts" role="status">{queueLine}</span>
+        <div className="jobs-actions">
+          <button className="quiet" aria-expanded={queueOpen} aria-controls="jobs-body" onClick={() => setJobsExpanded(!queueOpen)}>{queueOpen ? "접기" : "펼치기"}</button>
+          <button className="quiet" onClick={() => void refresh()}>새로고침</button>
+        </div>
+      </div>
+      <div id="jobs-body" className="jobs-body" hidden={!queueOpen}>
+        {api && jobs.length ? <>{jobs.map((job) => <JobCard key={job.job_id} job={job} api={api} refresh={refresh} />)}<Pagination page={jobPage} hasNext={jobs.length === JOBS_PER_PAGE} onPage={setJobPage} /></> : <p className="empty">최근 작업이 없습니다.</p>}
+      </div>
+      <p className="jobs-footnote" role="note">실행 {queue.running} · 대기 {queue.queued} · 완료 {queue.completed} · 실패 {queue.failed}</p>
+      </section>
     </div>
     <section className="panel gallery"><div className="section-title"><h2>{showArchived ? "NSFW 보관함" : "NSFW 갤러리"}</h2><span>{assets.length} assets</span><button className="quiet" onClick={toggleArchived}>{showArchived ? "갤러리" : "보관함"}</button></div>{assets.length ? <><div className="asset-grid">{assets.map((asset) => <div className="asset" key={asset.asset_id}><button className="asset-image" onClick={() => setViewedId(asset.asset_id)} aria-label="이미지 보기">{assetUrls[asset.asset_id] ? <img src={assetUrls[asset.asset_id]} alt="생성 결과" /> : missingAssetIds[asset.asset_id] ? <span>이미지를 찾을 수 없음</span> : <span>불러오는 중…</span>}</button><div className="asset-footer"><small>{asset.asset_id.slice(0, 8)} · {date(asset.created_at)}</small><button className="quiet" onClick={() => void inspect(asset)}>정보</button></div></div>)}</div><Pagination page={assetPage} hasNext={assets.length === ASSETS_PER_PAGE} onPage={changeAssetPage} /></> : <p className="empty">{showArchived ? "보관된 이미지가 없습니다." : "아직 저장된 NSFW 결과가 없습니다."}</p>}</section>
     {viewedId && <ImageViewer api={api} initialAssets={assets} initialPage={assetPage} initialId={viewedId} archived={showArchived} close={() => setViewedId(null)} />}

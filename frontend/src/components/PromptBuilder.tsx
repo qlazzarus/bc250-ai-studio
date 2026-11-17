@@ -5,11 +5,11 @@ import { DICTIONARY, DICTIONARY_VERSION, familyCoverage } from "../prompt/dictio
 import { changeSceneFamily, removeEntry, selectEntry, type SceneSpecification } from "../prompt/scene";
 import { explainWarning, suggestSelections } from "../prompt/proposals";
 import {
-  DISPLAY_GROUP as displayGroup, activeGroups, filterOptions, chipGroups, nextFocusAfterRemoval,
+  DISPLAY_GROUP as displayGroup, activeGroups, filterOptions, nextFocusAfterRemoval,
   selectionCounts, recoveryActions, previewControls, inclusionNotice, appliedStatus,
-  advisoryWarnings, unresolvedSelections,
+  advisoryWarnings, unresolvedSelections, sceneSummary, summaryIsEmpty,
 } from "../prompt/presentation";
-
+import { SCENE_EXAMPLES, applyExample, type SceneExample } from "../prompt/examples";
 import { characterCount, validateComposition, validateText } from "../prompt/validation";
 
 const labels: Record<string, string> = {
@@ -38,9 +38,13 @@ function HelpNote({ summary, children }: { summary: string; children: ReactNode 
 
 export default function PromptBuilder({ family, compositionSupported, value, onChange, state, setState }: Props) {
   const [open, setOpen] = useState(false);
+  /** UX02: the dictionary picker is the detail step, so it starts folded. */
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [notice, setNotice] = useState("");
+  /** Incremented whenever focus should land in the search input after the commit. */
+  const [focusTick, setFocusTick] = useState(0);
   /** Hints stay hidden until the user asks; nothing is proposed while typing. */
   const [hintsOpen, setHintsOpen] = useState(false);
   /** Set before the render that removes a chip; consumed after that render. */
@@ -64,9 +68,15 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
   const controls = previewControls(state, family, { blocked, separateOnly, prompt: value, dirty });
   const inclusion = inclusionNotice(state, state.result);
   const status = appliedStatus(state, value);
-  const groups = chipGroups(state.scene.selections);
-  /** Flat DOM order of the remove buttons, used only for focus restoration. */
-  const chipOrder = groups.flatMap((group) => group.items.map((item) => item.id));
+  /**
+   * UX04: the Korean summary and the chips read the same rows, so the flat DOM order
+   * of the remove buttons (and therefore focus restoration) cannot drift. Summary rows
+   * are contiguous over display groups, which keeps that promise across the merge of
+   * 외형/의상, 표정/행동 and 조명/스타일.
+   */
+  const summaries = sceneSummary(state.scene.selections);
+  const chipOrder = summaries.flatMap((row) => row.items.map((item) => item.id));
+  const empty = summaryIsEmpty(summaries);
   const unresolved = unresolvedSelections(state.result);
   const advisories = advisoryWarnings(state.result);
   // Recomputed from the immutable free text only when the user opens the panel.
@@ -74,16 +84,39 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
     ? suggestSelections({ freeTextKo: state.scene.freeTextKo, family, dictionary: DICTIONARY, selectedIds: selectedKey.split("\u0000") })
     : []), [hintsOpen, family, state.scene.freeTextKo, selectedKey]);
 
-  // Removing a chip unmounts the button that had focus. Restore it to the next
-  // rendered chip, then the previous one, and finally the search input.
+  /**
+   * Focus that must wait for the commit runs here, not in the click handler: the
+   * disclosure is a prop-driven `details`, so the search input is only reachable
+   * once React has written `open`. A rAF flushed before the commit focuses a hidden
+   * element and the entry-point regression looks like a keyboard trap.
+   */
+  useEffect(() => {
+    if (!focusTick) return;
+    const frame = window.requestAnimationFrame(() => searchRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusTick]);
+
+  /**
+   * Removing a chip unmounts the button that had focus. Restore it to the next
+   * rendered chip, then the previous one, and finally the search input. The search
+   * input lives inside the folded detail step, so the disclosure is opened first
+   * (UX02: focus never lands on a hidden control).
+   *
+   * The dependency is the chip count: every caller of `pendingFocusRef` changes it
+   * by removing at least one chip, so the effect runs exactly once per removal and
+   * never in a loop.
+   */
   useEffect(() => {
     const pending = pendingFocusRef.current;
     if (!pending) return;
     pendingFocusRef.current = null;
     const target = pending.target !== null ? removeRefs.current.get(pending.target) : undefined;
     if (target) { target.focus(); return; }
-    if (!pending.target && chipOrder.length === 0) searchRef.current?.focus();
-  });
+    if (!pending.target && chipOrder.length === 0) {
+      setAdjustOpen(true);
+      setFocusTick((tick) => tick + 1);
+    }
+  }, [chipOrder.length]);
 
   function setScene(update: (scene: SceneSpecification) => SceneSpecification) {
     setState((current) => {
@@ -91,6 +124,23 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
       const next = { ...current, scene: update(scene) };
       return family ? withGeneratedDraft(next, compileScene(next.scene)) : next;
     });
+  }
+
+  function setFreeText(freeTextKo: string) {
+    setScene((scene) => ({ ...scene, freeTextKo }));
+  }
+
+  /**
+   * UX05: an example only replaces the free text. The final prompt is untouched and
+   * the regular stale/apply policy decides whether the draft may still be applied.
+   * Cancelling leaves every field, including the draft, exactly as it was.
+   */
+  function insertExample(example: SceneExample) {
+    const next = applyExample(state.scene.freeTextKo, example,
+      () => window.confirm("입력한 설명을 예시로 바꿉니다. 최종 프롬프트는 그대로입니다. 계속할까요?"));
+    if (next === null) { setNotice("예시 적용을 취소했습니다. 입력한 설명은 그대로입니다."); return; }
+    setFreeText(next);
+    setNotice(`“${example.title}” 예시를 넣었습니다. 필요한 부분을 고쳐 쓰세요.`);
   }
 
   /** Decides the focus target before the removal so the render can restore it. */
@@ -146,16 +196,20 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
    * GAP03 decision: the picker opens on the whole dictionary. The narrowing step is
    * offered only where it is needed (empty scene) and only as one click, so a
    * subject-first start never hides the other groups or adds an entry screen.
+   * UX02: the picker now lives behind a disclosure, so the disclosure opens first;
+   * focusing a control inside a closed `details` would be a no-op. The focus itself
+   * runs in the `focusTick` effect, after the open state is committed.
    */
   function startWithSubject() {
+    setAdjustOpen(true);
     setCategory("subject");
     setQuery("");
-    searchRef.current?.focus();
+    setFocusTick((tick) => tick + 1);
   }
 
   return <div className="prompt-builder">
     <button type="button" className="quiet" aria-expanded={open} aria-controls="prompt-builder-panel" onClick={() => setOpen(!open)}>
-      {open ? "사전 구성 닫기" : "사전으로 프롬프트 구성"}
+      {open ? "프롬프트 구성 닫기" : "프롬프트 구성 열기"}
     </button>
     <HelpNote summary="저장 범위 안내">초안을 적용하면 서버 지원 여부에 따라 선택 사항과 초안이 생성 결과에 함께 저장됩니다. 새로고침 전 입력은 저장되지 않습니다.</HelpNote>
     {state.applied && <div role="status" className="prompt-status">
@@ -177,63 +231,31 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
         현재 모델 계열에서 사전 표현 {coverage.mapped}/{coverage.total}개를 변환할 수 있습니다. 나머지는 선택해도 미변환으로 표시됩니다.
       </p>}
       <div className="prompt-stage">
-      <section className="prompt-explore" aria-label="사전 항목 탐색">
-      <h3 className="prompt-section-heading">항목 탐색</h3>
-      <label>사전 검색<input ref={searchRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="예: 인물, 조명, 전신" /></label>
-      <div className="prompt-categories" role="group" aria-label="사전 분류">
-        {["", ...categories].map((item) => <button type="button" key={item || "all"} aria-pressed={category === item} onClick={() => setCategory(item)}>{item ? labels[item] ?? item : "전체"}<span className="prompt-category-count">{item ? `선택 ${counts[item] ?? 0}` : `선택 ${selected.size}`}</span></button>)}
-      </div>
-      <HelpNote summary={`${category ? labels[category] : "전체"} 분류 · ${options.length}개 결과`}>검색은 선택한 분류 안에서만 적용됩니다. 다른 분류의 선택도 유지됩니다.</HelpNote>
-      <fieldset className="prompt-choices" aria-describedby="selection-errors" aria-invalid={compositionSupported && compositionIssues.some((issue) => issue.field === "selections")}><legend>사전 항목 선택</legend>
-        {options.length ? options.map((item) => {
-          const mapping = family ? item.mappings[family as keyof typeof item.mappings] : undefined;
-          const status = mapping && mapping.status !== "mapped" ? " · 이 모델은 미변환" : "";
-          return <label className="prompt-choice" key={item.id}>
-            <input type="checkbox" checked={selected.has(item.id)} onChange={(event) => { const checked = event.target.checked; setScene((scene) => checked ? selectEntry(scene, item, DICTIONARY_VERSION) : removeEntry(scene, item.id)); }} />
-            <span>{item.labelKo} <small>· {labels[displayGroup[item.category] ?? item.category] ?? item.category}{status}</small></span>
-          </label>;
-        }) : <div className="prompt-empty">
-          <p className="prompt-hint">검색 결과가 없습니다.</p>
-          <div className="prompt-empty__actions">{recoveryActions(query, category).map((action) => <button
-            type="button" className="quiet" key={action.kind}
-            onClick={() => { setCategory(action.nextCategory); setQuery(action.nextQuery); }}>{action.label}</button>)}</div>
-        </div>}
-      </fieldset>
-      <div id="selection-errors">{compositionSupported && compositionIssues.filter((issue) => issue.field === "selections").map((issue, index) => <p className="prompt-error" key={index}>{issue.message}</p>)}</div>
-      <p className="prompt-hint">선택 {selected.size}개{category || query ? " · 필터 밖의 선택도 유지됩니다." : ""}</p>
-      </section>
-      <section className="prompt-scene" aria-label="선택한 장면과 미리보기">
-      <h3 className="prompt-section-heading">장면과 미리보기</h3>
-      {state.scene.selections.length === 0
-        ? <div className="prompt-empty"><p className="prompt-hint">선택한 항목이 없습니다. 위의 항목 탐색에서 대상부터 골라 보세요. 사전을 쓰지 않고 원문만으로 구성할 수도 있습니다.</p>
-          <div className="prompt-empty__actions"><button type="button" className="quiet" onClick={startWithSubject}>대상부터 고르기</button></div>
-        </div>
-        : <section className="prompt-groups" aria-label="선택한 장면 구성">
-        <div className="prompt-group-heading"><strong>선택한 항목</strong><button type="button" className="quiet" onClick={clearScene}>선택 비우기</button></div>
-        {groups.map((group) => <div className="prompt-group" key={group.group}><strong>{labels[group.group] ?? group.group}</strong><div className="prompt-selected">{group.items.map((item) => {
-          const mapped = item.mapping.status === "mapped";
-          const text = item.mapping.status === "mapped" ? item.mapping.text : null;
-          return <div className="prompt-chip" key={item.id} data-unmapped={!mapped || undefined}>
-            <span className="prompt-chip__label">{item.labelKo}</span>
-            {text !== null ? <details className="prompt-chip__detail">
-              <summary aria-label={`${item.labelKo} 표현 보기`}>표현</summary>
-              <span>{text}</span>
-            </details> : <span className="prompt-chip__unmapped">미변환</span>}
-            <button type="button" aria-label={`${item.labelKo} 선택 해제`}
-              ref={(node) => { if (node) removeRefs.current.set(item.id, node); else removeRefs.current.delete(item.id); }}
-              onClick={() => removeChip(item.id)}>×</button>
-          </div>;
-        })}</div></div>)}
-        <HelpNote summary="칩 표현 안내">선택할 때 저장한 {state.scene.targetFamily} 계열 표현입니다. 칩의 “표현”을 열면 영어 대응을 볼 수 있습니다.</HelpNote>
-      </section>}
-      <label>추가 설명 (원문)<textarea aria-invalid={compositionSupported && freeIssues.length > 0} aria-describedby="free-text-help" rows={3} value={state.scene.freeTextKo} onChange={(event) => setScene((scene) => ({ ...scene, freeTextKo: event.target.value }))} placeholder="원하는 장면을 입력하세요. 자동으로 번역되지는 않습니다." /></label>
+
+      {/* UX01: the description is the first thing in the composer. One field only;
+          the dictionary below is an optional way to refine it. */}
+      <section className="prompt-brief" aria-label="장면 설명">
+      <h3 className="prompt-section-heading">어떤 장면을 만들까요?</h3>
+      <label className="prompt-brief__field">한국어 설명
+        <textarea id="free-text-ko" aria-invalid={compositionSupported && freeIssues.length > 0} aria-describedby="free-text-help" rows={4}
+          value={state.scene.freeTextKo} onChange={(event) => setFreeText(event.target.value)}
+          placeholder="예: 비 오는 밤, 편의점 앞에서 우산을 접으며 친구를 기다리는 사람" />
+      </label>
       <div id="free-text-help">
-        <HelpNote summary={`${characterCount(state.scene.freeTextKo)}/4000자`}>원문은 그대로 보존하며 자동 번역하지 않습니다.</HelpNote>
         {/* When composition support is on, `validateComposition` already reports the
             same limit in `#draft-errors`; showing it twice would make one problem
             look like two. Without composition support this is the only report. */}
         {!compositionSupported && freeIssues.map((issue, index) => <p className="prompt-error" key={index}>{issue.message} 구성 이력 미저장: 직접 생성은 계속 가능합니다.</p>)}
+        <HelpNote summary={`${characterCount(state.scene.freeTextKo)}/4000자`}>원문은 그대로 보존하며 자동 번역하지 않습니다.</HelpNote>
       </div>
+
+      {/* UX05: project-authored examples. Filling the field calls nothing. */}
+      <div className="prompt-examples" role="group" aria-label="설명 예시">
+        {SCENE_EXAMPLES.map((example) => <button type="button" key={example.id} className="quiet"
+          onClick={() => insertExample(example)}>{example.title}</button>)}
+      </div>
+      <p className="prompt-hint">예시는 입력을 채울 뿐이며 생성하지 않습니다. 이미 입력한 내용이 있으면 바꾸기 전에 확인합니다.</p>
+
       <div className="prompt-proposals">
         <button type="button" className="quiet" aria-expanded={hintsOpen} aria-controls="prompt-proposals"
           disabled={!family || !state.scene.freeTextKo.trim()}
@@ -256,21 +278,106 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
             </div>)}
         </div>}
       </div>
-      <label>{state.provenance === "saved" ? "재생성 시 추가 설명 반영 방식 (과거 방식은 기록 없음)" : "추가 설명 반영 방식"}<select value={state.freeTextMode} onChange={(event) => setState((current) => { const next = { ...current, freeTextMode: event.target.value as "separate" | "verbatim" }; return family && next.scene.targetFamily === family ? withGeneratedDraft(next, compileScene(next.scene)) : next; })}>
+      <label>추가 설명 반영 방식<select id="free-text-mode" value={state.freeTextMode} onChange={(event) => setState((current) => { const next = { ...current, freeTextMode: event.target.value as "separate" | "verbatim" }; return family && next.scene.targetFamily === family ? withGeneratedDraft(next, compileScene(next.scene)) : next; })}>
         <option value="separate">별도 보관 · 최종 프롬프트는 직접 편집</option>
         <option value="verbatim">원문 그대로 초안과 최종 프롬프트에 반영</option>
       </select></label>
       <HelpNote summary="반영 방식 저장 안내">방식은 이 화면에서만 관리됩니다. 저장 이력에는 원문과 실제 적용 초안을 남기며, 방식 자체는 별도로 기록하지 않습니다.</HelpNote>
-      {controls.showGenerate && <button type="button" className="quiet" onClick={generate}>{controls.generateLabel}</button>}
-      {state.result && <section className="prompt-result" aria-label="프롬프트 초안">
+      </section>
+
+      {/* UX04: Korean summary of the selected labels only. A row without a
+          selection reads "지정 안 함" so an empty summary never suggests the free
+          text was understood. The original text sits next to it, unchanged. */}
+      <section className="prompt-scene" aria-label="장면 구성과 미리보기">
+      <h3 className="prompt-section-heading">장면 구성</h3>
+      <section className="prompt-groups" aria-label="선택한 장면 구성">
+        <div className="prompt-group-heading">
+          <strong>장면 요약</strong>
+          <span className="prompt-summary-count">선택 {selected.size}개</span>
+          {state.scene.selections.length > 0 && <button type="button" className="quiet" onClick={clearScene}>선택 비우기</button>}
+        </div>
+        {summaries.map((row) => <div className="prompt-group" key={row.key} data-empty={row.items.length === 0 || undefined}>
+          <strong>{row.label}</strong>
+          {row.items.length
+            ? <div className="prompt-selected">{row.items.map((item) => {
+              const mapped = item.mapping.status === "mapped";
+              const text = item.mapping.status === "mapped" ? item.mapping.text : null;
+              return <div className="prompt-chip" key={item.id} data-unmapped={!mapped || undefined}>
+                <span className="prompt-chip__label">{item.labelKo}</span>
+                {text !== null ? <details className="prompt-chip__detail">
+                  <summary aria-label={`${item.labelKo} 표현 보기`}>표현</summary>
+                  <span>{text}</span>
+                </details> : <span className="prompt-chip__unmapped">미변환</span>}
+                <button type="button" aria-label={`${item.labelKo} 선택 해제`}
+                  ref={(node) => { if (node) removeRefs.current.set(item.id, node); else removeRefs.current.delete(item.id); }}
+                  onClick={() => removeChip(item.id)}>×</button>
+              </div>;
+            })}</div>
+            : <p className="prompt-summary-empty">지정 안 함</p>}
+        </div>)}
+        <HelpNote summary="칩 표현 안내">선택할 때 저장한 {state.scene.targetFamily} 계열 표현입니다. 칩의 “표현”을 열면 영어 대응을 볼 수 있습니다.</HelpNote>
+      </section>
+
+      <div className="prompt-origin" aria-label="원문">
+        <strong>원문</strong>
+        {state.scene.freeTextKo.trim()
+          ? <p className="prompt-origin__text">{state.scene.freeTextKo}</p>
+          : <p className="prompt-summary-empty">입력한 설명 없음</p>}
+        <small>요약은 선택한 항목의 한국어 라벨만 모읍니다. 설명에만 있는 내용은 번역하지 않고 이 원문에 그대로 남습니다.</small>
+      </div>
+
+      {empty && <div className="prompt-empty">
+        <p className="prompt-hint">선택한 항목이 없습니다. 사전에서 대상부터 골라 보세요. 사전을 쓰지 않고 원문만으로 구성할 수도 있습니다.</p>
+        <div className="prompt-empty__actions"><button type="button" className="quiet" onClick={startWithSubject}>대상부터 고르기</button></div>
+      </div>}
+      </section>
+
+      {/* UX02: search, categories and checkboxes are the refinement step, folded by
+          default. Nothing required hides here: the summary above already shows what
+          is selected, and generation works from the text alone. */}
+      <details className="prompt-adjust" open={adjustOpen} onToggle={(event) => setAdjustOpen(event.currentTarget.open)}>
+        <summary>세부 조정 <span className="prompt-adjust__hint">사전에서 항목 고르기</span></summary>
+        <section className="prompt-explore" aria-label="사전 항목 탐색">
+        <label>사전 검색<input ref={searchRef} id="prompt-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="예: 인물, 조명, 전신" /></label>
+        <div className="prompt-categories" role="group" aria-label="사전 분류">
+          {["", ...categories].map((item) => <button type="button" key={item || "all"} aria-pressed={category === item} onClick={() => setCategory(item)}>{item ? labels[item] ?? item : "전체"}<span className="prompt-category-count">{item ? `선택 ${counts[item] ?? 0}` : `선택 ${selected.size}`}</span></button>)}
+        </div>
+        <HelpNote summary={`${category ? labels[category] : "전체"} 분류 · ${options.length}개 결과`}>검색은 선택한 분류 안에서만 적용됩니다. 다른 분류의 선택도 유지됩니다.</HelpNote>
+        <fieldset className="prompt-choices" aria-describedby="selection-errors" aria-invalid={compositionSupported && compositionIssues.some((issue) => issue.field === "selections")}><legend>사전 항목 선택</legend>
+          {options.length ? options.map((item) => {
+            const mapping = family ? item.mappings[family as keyof typeof item.mappings] : undefined;
+            const status = mapping && mapping.status !== "mapped" ? " · 이 모델은 미변환" : "";
+            return <label className="prompt-choice" key={item.id}>
+              <input type="checkbox" checked={selected.has(item.id)} onChange={(event) => { const checked = event.target.checked; setScene((scene) => checked ? selectEntry(scene, item, DICTIONARY_VERSION) : removeEntry(scene, item.id)); }} />
+              <span>{item.labelKo} <small>· {labels[displayGroup[item.category] ?? item.category] ?? item.category}{status}</small></span>
+            </label>;
+          }) : <div className="prompt-empty">
+            <p className="prompt-hint">검색 결과가 없습니다.</p>
+            <div className="prompt-empty__actions">{recoveryActions(query, category).map((action) => <button
+              type="button" className="quiet" key={action.kind}
+              onClick={() => { setCategory(action.nextCategory); setQuery(action.nextQuery); }}>{action.label}</button>)}</div>
+          </div>}
+        </fieldset>
+        <div id="selection-errors">{compositionSupported && compositionIssues.filter((issue) => issue.field === "selections").map((issue, index) => <p className="prompt-error" key={index}>{issue.message}</p>)}</div>
+        <p className="prompt-hint">선택 {selected.size}개{category || query ? " · 필터 밖의 선택도 유지됩니다." : ""}</p>
+        </section>
+      </details>
+
+      {/* UX04: the English draft is a detail. Applying, warnings, errors and the
+          inclusion state never hide behind it. */}
+      <section className="prompt-result" aria-label="프롬프트 확인" data-has-draft={state.result ? "true" : undefined}>
+        <h3 className="prompt-section-heading">프롬프트 확인</h3>
+        {controls.showGenerate && <button type="button" className="quiet" onClick={generate}>{controls.generateLabel}</button>}
+        {!state.result && <p className="prompt-hint">선택하거나 설명을 입력하면 영어 초안이 만들어집니다. 초안은 최종 프롬프트에 적용하기 전까지 그대로 남습니다.</p>}
+        {state.result && <>
         {state.provenance === "saved" && <HelpNote summary="저장된 초안 안내">저장된 초안과 미변환 목록입니다. 당시 경고·출처는 기록 없음입니다. 다시 만들기는 저장된 선택 표현에 현재 컴파일 규칙을 적용합니다.</HelpNote>}
         {controls.autoPreview && !dirty && <HelpNote summary="최신 미리보기">현재 선택 기준 최신 미리보기입니다. 최종 프롬프트는 적용할 때만 바뀝니다.</HelpNote>}
         {dirty && <p className="prompt-notice" data-tone="caution">선택 또는 설명이 바뀌었습니다. 초안을 다시 만들어 주세요. 현재 최종 프롬프트는 유지됩니다.</p>}
         {inclusion && <p className="prompt-inclusion" data-included={inclusion.included || undefined} data-unknown={inclusion.unknown || undefined}>{inclusion.text}</p>}
-        <label>프롬프트 미리보기<textarea aria-invalid={blocked} aria-describedby="draft-errors" readOnly value={state.result.draft} rows={3} placeholder="표현을 만들 수 없습니다." /></label>
-        <details className="prompt-meta">
-          <summary>미리보기 상세</summary>
-          <p className="prompt-hint">{characterCount(state.result.draft)}자 · 컴파일러 {state.result.compilerVersion}</p>
+        <details className="prompt-draft">
+          <summary>영어 초안 펼치기 <span className="prompt-draft__hint">{characterCount(state.result.draft)}자</span></summary>
+          <label>프롬프트 미리보기<textarea aria-invalid={blocked} aria-describedby="draft-errors" readOnly value={state.result.draft} rows={4} placeholder="표현을 만들 수 없습니다." /></label>
+          <p className="prompt-hint">컴파일러 {state.result.compilerVersion} · 영어 초안은 참고용이며 그대로 쓰지 않아도 됩니다.</p>
         </details>
         {unresolved.length > 0 && <div className="prompt-notice" data-tone="caution">
           <strong>이 모델로 번역되지 않은 선택 항목</strong>
@@ -288,7 +395,7 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
         {state.result.warnings.some((item) => item.code === "empty") && <p className="prompt-hint">사전 항목을 선택하거나 설명을 입력하면 미리보기가 만들어집니다.</p>}
         <div id="draft-errors" role="status">{issues.map((issue, index) => <p className="prompt-error" key={index}>{issue.field}: {issue.message}</p>)}</div>
         <button type="button" className="quiet" disabled={!controls.canApply} onClick={applyDraft}>{controls.applyLabel}</button>
-      </section>}
+        </>}
       </section>
       </div>
       <p className="prompt-hint" role="status">{notice}</p>

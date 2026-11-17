@@ -283,13 +283,13 @@
    stacked; the grid is kept so a future wider layout is a one-line change.
    See docs/PROMPT_COMPOSER_UX_LAYOUT.md §4. */
 .prompt-builder { container-type: inline-size; container-name: prompt-composer; }
+/* UX01–UX04 rebuilt the stage as a reading order: description → Korean summary vs.
+   original text → folded picker → draft. A split column would separate the summary
+   from the original text it is checked against, and the composer never exceeds
+   ~638px in this workspace anyway, so the stage stays one column. */
 .prompt-stage { display: grid; gap: 14px 18px; align-items: start; grid-template-columns: minmax(0, 1fr); }
-.prompt-explore, .prompt-scene { min-width: 0; }
+.prompt-explore, .prompt-scene, .prompt-brief, .prompt-result { min-width: 0; }
 .prompt-section-heading { margin: 0 0 8px; font-size: .72rem; font-weight: 800; letter-spacing: .1em; color: #8f95a1; text-transform: uppercase; }
-/* Guard rail: only a composer that genuinely spans a wide screen splits in two. */
-@container prompt-composer (min-width: 900px) {
-  .prompt-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
-}
 .prompt-builder > .quiet { width: 100%; text-align: left; }
 .prompt-hint { color: #aeb4c1; font-size: .75rem; line-height: 1.5; margin: 8px 0 12px; }
 .prompt-choices { border: 1px solid #41444f; border-radius: 8px; padding: 10px; max-height: 230px; overflow-y: auto; margin: 0; }
@@ -337,6 +337,32 @@
 .prompt-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .prompt-group { margin-top: 10px; }
 .prompt-group > strong { display: block; font-size: .78rem; color: #c6aaff; margin-bottom: 5px; }
+/* UX04: an empty row states "지정 안 함" instead of disappearing, so the summary
+   never looks like it understood the whole description. */
+.prompt-group[data-empty] > strong { color: #8f95a1; }
+.prompt-summary-empty { margin: 0; color: #7f858f; font-size: .74rem; font-style: italic; }
+.prompt-summary-count { margin-left: auto; color: #9aa1ad; font-size: .72rem; font-weight: 700; }
+.prompt-origin { margin: 12px 0; padding: 10px 12px; border: 1px solid #3a3d47; border-left: 3px solid #5c5f6b; border-radius: 8px; background: #1b1d24; }
+.prompt-origin > strong { display: block; font-size: .78rem; color: #b9bfcb; margin-bottom: 5px; }
+.prompt-origin__text { margin: 0 0 6px; color: #dfe2ea; font-size: .8rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prompt-origin > small { display: block; color: #858b98; line-height: 1.45; }
+/* UX01/UX05: one description field, then tappable examples under it. */
+.prompt-brief__field { margin-bottom: 4px; }
+.prompt-examples { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 4px; }
+.prompt-examples .quiet { padding: 6px 11px; font-size: .76rem; }
+/* UX02: the picker is a disclosure; its summary line is the only thing on screen. */
+.prompt-adjust { margin: 12px 0; border: 1px solid #41444f; border-radius: 8px; padding: 10px 12px; }
+.prompt-adjust > summary { cursor: pointer; font-size: .8rem; font-weight: 700; color: #cfd4e0; }
+.prompt-adjust > summary::marker { color: #8f95a1; }
+.prompt-adjust__hint { margin-left: 6px; color: #8f95a1; font-size: .72rem; font-weight: 400; }
+.prompt-adjust[open] > summary { margin-bottom: 8px; }
+.prompt-adjust > .prompt-explore > label { margin-bottom: 10px; }
+/* UX04: the English draft is reference-only; apply/warnings/errors stay outside. */
+.prompt-draft { margin: 10px 0 6px; }
+.prompt-draft > summary { cursor: pointer; font-size: .8rem; font-weight: 700; color: #b9bfcb; }
+.prompt-draft__hint { margin-left: 6px; color: #8f95a1; font-size: .72rem; font-weight: 400; }
+.prompt-draft[open] > summary { margin-bottom: 8px; }
+.prompt-adjust > summary:focus-visible, .prompt-draft > summary:focus-visible { outline: 2px solid #d1adff; outline-offset: 2px; }
 .prompt-chip small { color: #b9bdc8; font-weight: 400; overflow-wrap: anywhere; }
 .prompt-proposals { margin: 4px 0 12px; }
 .prompt-proposals > .quiet { padding: 6px 10px; font-size: .78rem; }
@@ -392,4 +418,20 @@
   .prompt-category-count { font-size: .64rem; }
   .prompt-proposal { grid-template-columns: minmax(0, 1fr) auto; }
   .prompt-proposal > .quiet { grid-column: 1 / -1; text-align: center; }
+}
+
+/* UX03: the queue folds so the composer gets the space back. A collapsed queue may
+   not keep the 360px floor, and the counts stay on screen in the header. */
+.jobs[data-collapsed] { min-height: 0; }
+.jobs-title { flex-wrap: wrap; gap: 8px 10px; }
+.jobs-title h2 { margin-right: auto; }
+.jobs-counts { color: #9aa1ad; font-size: .76rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.jobs-actions { display: flex; gap: 6px; }
+.jobs-actions .quiet { padding: 5px 9px; font-size: .74rem; }
+.jobs-body[hidden] { display: none; }
+.jobs-footnote { margin: 10px 0 0; color: #858b98; font-size: .72rem; font-variant-numeric: tabular-nums; }
+/* A folded queue must not push the form sideways on narrow screens. */
+@media (max-width: 420px) {
+  .jobs-title { align-items: flex-start; }
+  .jobs-counts { order: 3; width: 100%; }
 }

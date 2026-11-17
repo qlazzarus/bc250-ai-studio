@@ -20,7 +20,9 @@ DATA_DIR=""
 cd "$ROOT"
 if [ -z "${APP_URL:-}" ]; then
   DATA_DIR=$(mktemp -d "${TMPDIR:-/tmp}/pc-gap4-data.XXXXXX")
-  STUDIO_DATA_DIR="$DATA_DIR" STUDIO_ENGINE=fake STUDIO_POLICY=image_priority \
+  # A slightly longer fake delay keeps a purpose-made job cancellable long enough for
+  # the retry-path check to observe a terminal cancelled card instead of racing it.
+  STUDIO_DATA_DIR="$DATA_DIR" STUDIO_ENGINE=fake STUDIO_POLICY=image_priority STUDIO_FAKE_DELAY="${STUDIO_FAKE_DELAY:-2}" \
   STUDIO_REGISTRY_PATH="$ROOT/scripts/prompt-composer-browser/models.fixture.yaml" \
   STUDIO_API_KEY="$API_KEY" STUDIO_ADMIN_KEY="${STUDIO_ADMIN_KEY:-test-admin-key-0123456789abc}" \
     "$ROOT/.venv/bin/uvicorn" app.main:create_app --factory \

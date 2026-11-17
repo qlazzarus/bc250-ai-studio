@@ -126,7 +126,7 @@ export function pageClient(sendTo, sessionId) {
   const activeInfo = () => evaluate(`(() => {
     const node = document.activeElement;
     if (!node) return null;
-    return { tag: node.tagName, className: node.className || null,
+    return { tag: node.tagName, id: node.id || null, className: node.className || null,
       label: node.getAttribute ? node.getAttribute("aria-label") : null,
       text: (node.textContent || "").trim().slice(0, 40) };
   })()`);

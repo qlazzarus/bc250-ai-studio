@@ -5,6 +5,94 @@
     "detail": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36 · 1280x900"
   },
   {
+    "name": "UX01 · 설명 → 요약 → 세부 조정 → 초안 순서",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX01 단계 위치",
+    "pass": null,
+    "detail": "[376,774,1429,1507]"
+  },
+  {
+    "name": "UX01 · 첫 입력은 한국어 설명",
+    "pass": true,
+    "expected": "free-text-ko",
+    "actual": "\"free-text-ko\""
+  },
+  {
+    "name": "UX01 · 사전 탐색은 기본 접힘",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UX02 · 접힌 탐색은 닫힌 details 안",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX01 · 설명 제목 노출",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX05 · 예시 3개 노출",
+    "pass": true,
+    "expected": "[\"일상\",\"제품\",\"풍경\"]",
+    "actual": "\"[\\\"일상\\\",\\\"제품\\\",\\\"풍경\\\"]\""
+  },
+  {
+    "name": "UX05 · 기존 입력이 있으면 확인",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UX05 · 취소 시 입력 유지",
+    "pass": true,
+    "expected": "직접 쓴 장면 설명",
+    "actual": "\"직접 쓴 장면 설명\""
+  },
+  {
+    "name": "UX05 · 취소 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX05 · 예시가 설명을 채움",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX04 · 원문 영역이 같은 문자열을 보여줌",
+    "pass": true,
+    "expected": "비 오는 밤, 편의점 앞에서 우산을 접으며 친구를 기다리는 사람. 네온 조명이 젖은 바닥에 반사된다.",
+    "actual": "\"비 오는 밤, 편의점 앞에서 우산을 접으며 친구를 기다리는 사람. 네온 조명이 젖은 바닥에 반사된다.\""
+  },
+  {
+    "name": "UX05 · 예시 적용 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX05 · 예시는 생성을 호출하지 않음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UX05 예시 적용",
+    "pass": null,
+    "detail": "{\"length\":56,\"notice\":\"“일상” 예시를 넣었습니다. 필요한 부분을 고쳐 쓰세요.\"}"
+  },
+  {
     "name": "GAP03 · 초기 목록은 전체",
     "pass": true,
     "expected": "true",
@@ -12,6 +100,12 @@
   },
   {
     "name": "GAP03 · 빈 상태에 시작 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX02 · 시작 버튼이 세부 조정을 엶",
     "pass": true,
     "expected": "true",
     "actual": "true"
@@ -25,8 +119,8 @@
   {
     "name": "GAP03 · 좁힌 뒤 검색 입력 포커스",
     "pass": true,
-    "expected": "INPUT",
-    "actual": "\"INPUT\""
+    "expected": "true",
+    "actual": "true"
   },
   {
     "name": "선택 3개 · 칩 3개",
@@ -37,8 +131,37 @@
   {
     "name": "칩 그룹 순서 고정",
     "pass": true,
-    "expected": "[\"대상\",\"조명\",\"분위기\"]",
-    "actual": "\"[\\\"대상\\\",\\\"조명\\\",\\\"분위기\\\"]\""
+    "expected": "[\"대상\",\"조명·스타일\",\"분위기\"]",
+    "actual": "\"[\\\"대상\\\",\\\"조명·스타일\\\",\\\"분위기\\\"]\""
+  },
+  {
+    "name": "UX04 · 요약 행 7개",
+    "pass": true,
+    "expected": "7",
+    "actual": "7"
+  },
+  {
+    "name": "UX04 · 선택 없는 행은 지정 안 함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX04 · 선택한 세 행만 칩을 가짐",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX04 · 요약은 원문을 바꾸지 않음",
+    "pass": true,
+    "expected": "비 오는 밤, 편의점 앞에서 우산을 접으며 친구를 기다리는 사람. 네온 조명이 젖은 바닥에 반사된다.",
+    "actual": "\"비 오는 밤, 편의점 앞에서 우산을 접으며 친구를 기다리는 사람. 네온 조명이 젖은 바닥에 반사된다.\""
+  },
+  {
+    "name": "UX04 요약",
+    "pass": null,
+    "detail": "[\"대상:1\",\"외형·의상:0\",\"표정·행동:0\",\"장소·시간:0\",\"구도:0\",\"조명·스타일:1\",\"분위기:1\"]"
   },
   {
     "name": "GAP01 · 중간 제거 후 다음 칩으로 포커스",
@@ -59,6 +182,18 @@
   },
   {
     "name": "GAP01 · 마지막 칩 제거 후 탐색 입력으로",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX02 · 마지막 칩 제거 시 접힌 세부 조정을 엶",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX02 · 열린 뒤 검색 입력으로 포커스",
     "pass": true,
     "expected": "true",
     "actual": "true"
@@ -105,6 +240,18 @@
     "detail": "[]"
   },
   {
+    "name": "UX04 · 설명만으로는 요약이 채워지지 않음",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "UX04 · 원문은 설명 그대로",
+    "pass": true,
+    "expected": "비 오는 네온 거리, 두 사람",
+    "actual": "\"비 오는 네온 거리, 두 사람\""
+  },
+  {
     "name": "GAP02 · 원문 포함 안내",
     "pass": true,
     "expected": "true",
@@ -115,6 +262,41 @@
     "pass": true,
     "expected": "1",
     "actual": "1"
+  },
+  {
+    "name": "UX04 · 영어 초안은 기본 접힘",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UX04 · 적용 버튼은 접힘 밖",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX04 · 초안 펼치기",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "stale 초안 · 재생성 또는 적용 차단",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "stale 초안 상태",
+    "pass": null,
+    "detail": "{\"regenerated\":true,\"disabled\":false,\"caution\":false}"
+  },
+  {
+    "name": "stale 초안 · 옛 초안으로 덮어쓰지 않음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
   },
   {
     "name": "GAP02 · 미변환 선택은 주의 등급",
@@ -129,7 +311,7 @@
     "actual": "0"
   },
   {
-    "name": "GAP02 · 미변환 목록은 접힌 상세 밖",
+    "name": "GAP02 · 미변환 목록은 접힘 밖에서 보임",
     "pass": true,
     "expected": "true",
     "actual": "true"
@@ -137,7 +319,7 @@
   {
     "name": "GAP02 미지원 계열",
     "pass": null,
-    "detail": "{\"total\":3,\"caution\":[\"이 모델로 번역되지 않은 선택 항목인물부드러운 조명선택한 항목의 unknown-family 표현이 사전에 없어 초안에서 빠졌습니다. 다른 항목을 고르거나 최종 프롬프트에 직접 입력하세요.\",\"이 모델 계열의 사전 변환은 아직 제공되지 않습니다.\"],\"hasSelectionWarning\":true,\"errors\":0}"
+    "detail": "{\"total\":3,\"caution\":[\"이 모델로 번역되지 않은 선택 항목인물부드러운 조명선택한 항목의 unknown-family 표현이 사전에 없어 초안에서 빠졌습니다. 다른 항목을 고르거나 최종 프롬프트에 직접 입력하세요.\",\"이 모델 계열의 사전 변환은 아직 제공되지 않습니다.\"],\"hasSelectionWarning\":true,\"errors\":0,\"listVisible\":true,\"listInDisclosure\":false}"
   },
   {
     "name": "계열 복귀 · 초안 재생성",
@@ -148,7 +330,7 @@
   {
     "name": "계열 복귀 상태",
     "pass": null,
-    "detail": "{\"chips\":2,\"hasResult\":true}"
+    "detail": "{\"chips\":2,\"hasDraft\":true}"
   },
   {
     "name": "GAP02 · 한도 초과는 오류 등급",
@@ -176,27 +358,51 @@
   {
     "name": "키보드 Tab 순회",
     "pass": null,
-    "detail": "[{\"tag\":\"SUMMARY\",\"className\":null,\"label\":null,\"text\":\"저장 범위 안내\"},{\"tag\":\"INPUT\",\"className\":null,\"label\":null,\"text\":\"\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"전체선택 2\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"대상선택 1\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"외형선택 0\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"의상선택 0\"}]"
+    "detail": "[{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"저장 범위 안내\"},{\"tag\":\"TEXTAREA\",\"id\":\"free-text-ko\",\"className\":null,\"label\":null,\"text\":\"비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"29/4000자\"},{\"tag\":\"BUTTON\",\"id\":null,\"className\":\"quiet\",\"label\":null,\"text\":\"일상\"}]"
   },
   {
     "name": "키보드 Shift+Tab 순회",
     "pass": null,
-    "detail": "[{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"외형선택 0\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"대상선택 1\"},{\"tag\":\"BUTTON\",\"className\":null,\"label\":null,\"text\":\"전체선택 2\"}]"
+    "detail": "[{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"29/4000자\"},{\"tag\":\"TEXTAREA\",\"id\":\"free-text-ko\",\"className\":null,\"label\":null,\"text\":\"비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"저장 범위 안내\"},{\"tag\":\"BUTTON\",\"id\":null,\"className\":\"quiet\",\"label\":null,\"text\":\"프롬프트 구성 닫기\"}]"
   },
   {
-    "name": "키보드 · 검색 입력 도달",
+    "name": "키보드 · 설명 입력이 첫 입력",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 접힌 세부 조정 내부는 순회 밖",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 역순 정확히 일치",
+    "pass": true,
+    "expected": "[\"SUMMARY::29/4000자\",\"TEXTAREA:free-text-ko:비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\",\"SUMMARY::저장 범위 안내\",\"BUTTON::프롬프트 구성 닫기\"]",
+    "actual": "\"[\\\"SUMMARY::29/4000자\\\",\\\"TEXTAREA:free-text-ko:비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\\\",\\\"SUMMARY::저장 범위 안내\\\",\\\"BUTTON::프롬프트 구성 닫기\\\"]\""
+  },
+  {
+    "name": "키보드 · Enter로 세부 조정 열기",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 열린 탐색의 검색 입력 도달",
+    "pass": true,
+    "expected": "search",
+    "actual": "\"search\""
+  },
+  {
+    "name": "키보드 · 검색 입력 포커스",
     "pass": true,
     "expected": "true",
     "actual": "true"
   },
   {
     "name": "키보드 · 분류 버튼 도달",
-    "pass": true,
-    "expected": "true",
-    "actual": "true"
-  },
-  {
-    "name": "키보드 · Shift+Tab로 되돌아옴",
     "pass": true,
     "expected": "true",
     "actual": "true"
@@ -243,7 +449,7 @@
     "actual": "true"
   },
   {
-    "name": "390px · 세로 1열",
+    "name": "390px · 설명 → 요약 → 세부 조정 → 초안 1열",
     "pass": true,
     "expected": "true",
     "actual": "true"
@@ -266,7 +472,7 @@
     "actual": "true"
   },
   {
-    "name": "360px · 세로 1열",
+    "name": "360px · 설명 → 요약 → 세부 조정 → 초안 1열",
     "pass": true,
     "expected": "true",
     "actual": "true"
@@ -291,8 +497,8 @@
   {
     "name": "적용 · 최종 프롬프트 일치",
     "pass": true,
-    "expected": "a person, soft lighting\n비 오는 네온 거리, 두 사람",
-    "actual": "\"a person, soft lighting\\n비 오는 네온 거리, 두 사람\""
+    "expected": "a person, soft lighting\n비 오는 네온 거리, 두 사람, 그리고 세 번째 사람",
+    "actual": "\"a person, soft lighting\\n비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\""
   },
   {
     "name": "적용 · 상태 문구",
@@ -319,6 +525,11 @@
     "actual": "true"
   },
   {
+    "name": "작업 큐 초기 상태",
+    "pass": null,
+    "detail": "{\"toggle\":\"펼치기\",\"counts\":\"최근 작업이 없습니다\",\"footnote\":\"실행 0 · 대기 0 · 완료 0 · 실패 0\",\"cards\":0}"
+  },
+  {
     "name": "생성 결과 상태",
     "pass": null,
     "detail": "completed"
@@ -328,6 +539,18 @@
     "pass": true,
     "expected": "true",
     "actual": "true"
+  },
+  {
+    "name": "작업 큐 · 첫 작업 후 펼쳐짐",
+    "pass": true,
+    "expected": "true",
+    "actual": "\"true\""
+  },
+  {
+    "name": "작업 큐 · aria-controls 연결",
+    "pass": true,
+    "expected": "jobs-body",
+    "actual": "\"jobs-body\""
   },
   {
     "name": "결과 정보 · 구성 이력 항목",
@@ -393,10 +616,10 @@
     "detail": "{\"message\":\"요청 본문이 너무 큽니다.닫기\",\"prompt\":\"kept prompt after rejection\",\"enabled\":true}"
   },
   {
-    "name": "계열 전환 · 최종 프롬프트 유지",
+    "name": "계열 전환 · 최종 프롬프트 문자열 동일",
     "pass": true,
-    "expected": "true",
-    "actual": "true"
+    "expected": "kept prompt after rejection",
+    "actual": "\"kept prompt after rejection\""
   },
   {
     "name": "계열 전환 · 재생성 경로 제공",
@@ -405,9 +628,101 @@
     "actual": "true"
   },
   {
+    "name": "계열 전환 · 적용 불가 상태",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
     "name": "계열 전환 상태",
     "pass": null,
-    "detail": "{\"prompt\":27,\"hasResult\":false,\"regenerate\":true,\"applyDisabled\":null}"
+    "detail": "{\"prompt\":27,\"hasResult\":true,\"regenerate\":true,\"applyDisabled\":null}"
+  },
+  {
+    "name": "같은 계열 전환 · 모델 변경됨",
+    "pass": true,
+    "expected": "fake-sd15-alt",
+    "actual": "\"fake-sd15-alt\""
+  },
+  {
+    "name": "같은 계열 전환 · 최종 프롬프트 동일",
+    "pass": true,
+    "expected": "kept prompt after rejection",
+    "actual": "\"kept prompt after rejection\""
+  },
+  {
+    "name": "같은 계열 전환 · 선택 유지",
+    "pass": true,
+    "expected": "[\"인물\",\"부드러운 조명\"]",
+    "actual": "\"[\\\"인물\\\",\\\"부드러운 조명\\\"]\""
+  },
+  {
+    "name": "같은 계열 전환 · 초안 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "같은 계열 전환",
+    "pass": null,
+    "detail": "{\"before\":null,\"chips\":2,\"maybeCleared\":false}"
+  },
+  {
+    "name": "재시도 준비",
+    "pass": null,
+    "detail": "{\"created\":202,\"cancel\":200,\"terminal\":\"cancelled\"}"
+  },
+  {
+    "name": "재시도 · 종료된 작업 카드",
+    "pass": true,
+    "expected": "cancelled",
+    "actual": "\"cancelled\""
+  },
+  {
+    "name": "재시도 · 카드에 재시도 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "재시도 · 카드 버튼으로 새 작업 생성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "재시도 · 구성 보존",
+    "pass": true,
+    "expected": "retry probe",
+    "actual": "\"retry probe\""
+  },
+  {
+    "name": "재시도 · 모델 보존",
+    "pass": true,
+    "expected": "fake-sd15",
+    "actual": "\"fake-sd15\""
+  },
+  {
+    "name": "재시도 결과",
+    "pass": null,
+    "detail": "{\"job_id\":\"1e3757090654445690fb794ff46be840\",\"prompt\":\"retry probe\",\"model_id\":\"fake-sd15\",\"status\":\"running\"}"
+  },
+  {
+    "name": "capability 실패 · 안내 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "capability 실패 · 화면 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "capability 네트워크 실패",
+    "pass": null,
+    "detail": "{\"notice\":true,\"builder\":true,\"probe\":true}"
   },
   {
     "name": "capability 미지원 · 안내 표시",

@@ -9,6 +9,42 @@ export const GROUP_ORDER = ["subject", "appearance", "clothing", "expression", "
 
 export const groupOf = (category: string): string => DISPLAY_GROUP[category] ?? category;
 
+/**
+ * Korean scene summary rows. Each row owns contiguous display groups so the flat
+ * chip order stays the DOM/focus order the removal focus rule relies on.
+ */
+export const SUMMARY_ROWS: { key: string; label: string; groups: string[] }[] = [
+  { key: "subject", label: "대상", groups: ["subject"] },
+  { key: "appearance", label: "외형·의상", groups: ["appearance", "clothing"] },
+  { key: "pose", label: "표정·행동", groups: ["expression", "pose"] },
+  { key: "setting", label: "장소·시간", groups: ["setting"] },
+  { key: "camera", label: "구도", groups: ["camera"] },
+  { key: "lighting", label: "조명·스타일", groups: ["lighting", "style"] },
+  { key: "mood", label: "분위기", groups: ["mood"] },
+];
+
+export type SummaryRow<T> = { key: string; label: string; items: T[] };
+
+/**
+ * Korean labels only. Nothing is inferred from the free text: a row without a
+ * selection reads "지정 안 함" instead of pretending the text was understood.
+ */
+export function sceneSummary<T extends { category: string }>(selections: T[]): SummaryRow<T>[] {
+  const known = new Set(SUMMARY_ROWS.flatMap((row) => row.groups));
+  const rows: SummaryRow<T>[] = SUMMARY_ROWS.map((row) => ({
+    key: row.key, label: row.label,
+    items: selections.filter((item) => row.groups.includes(groupOf(item.category))),
+  }));
+  // A stored category outside the display vocabulary must still be visible.
+  const extra = selections.filter((item) => !known.has(groupOf(item.category)));
+  if (extra.length) rows.push({ key: "other", label: "기타", items: extra });
+  return rows;
+}
+
+export function summaryIsEmpty(rows: SummaryRow<unknown>[]): boolean {
+  return rows.every((row) => row.items.length === 0);
+}
+
 export function activeGroups(dictionary: DictionaryEntry[]): string[] {
   return GROUP_ORDER.filter((group) => dictionary.some((item) => item.active && groupOf(item.category) === group));
 }
@@ -32,19 +68,9 @@ export function selectionCounts(selections: { category: string }[]): Record<stri
 }
 
 /**
- * Chips render group-first, and that flat order is also the DOM/focus order.
- * Rendering and focus restoration read the same function so they cannot drift.
+ * Chips render in `sceneSummary` row order, and that flat order is also the
+ * DOM/focus order, so rendering and focus restoration read one list.
  */
-export type ChipGroup<T> = { group: string; items: T[] };
-
-export function chipGroups<T extends { category: string }>(selections: T[]): ChipGroup<T>[] {
-  const groups = [...GROUP_ORDER,
-    ...new Set(selections.map((item) => groupOf(item.category)).filter((group) => !GROUP_ORDER.includes(group)))];
-  return groups
-    .map((group) => ({ group, items: selections.filter((item) => groupOf(item.category) === group) }))
-    .filter((entry) => entry.items.length > 0);
-}
-
 /**
  * After a removal, focus goes to the next rendered chip's remove button, then the
  * previous one. `null` means no chip is left, so the caller returns to the search input.
