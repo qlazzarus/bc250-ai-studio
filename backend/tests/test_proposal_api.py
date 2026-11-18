@@ -570,8 +570,8 @@ def test_groups_in_use_are_derived_from_the_dictionary_not_hardcoded():
     `target_groups` speak `pose`/`setting`/`camera`. Deriving the set keeps the two
     vocabularies from silently diverging when a category is added.
     """
-    from app.services.prompt_proposals import display_group, groups_in_use
     from app.services.prompt_proposals import DictionaryEntryRef as Ref
+    from app.services.prompt_proposals import display_group, groups_in_use
 
     assert display_group("action") == "pose"
     assert display_group("location") == "setting"

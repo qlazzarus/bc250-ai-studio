@@ -8,7 +8,13 @@ import subprocess
 import sys
 import tempfile
 
+import pytest
 from app.services.model_control_bridge import ModelControlClient
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="socket activation and SO_PEERCRED peer credentials are Linux-only",
+)
 
 CHILD = r'''
 import asyncio

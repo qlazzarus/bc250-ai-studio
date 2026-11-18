@@ -2,6 +2,7 @@ import json
 import os
 import socket
 import stat
+import sys
 from types import SimpleNamespace
 
 import httpx
@@ -15,6 +16,11 @@ from app.services.model_control import (
     serve_connection,
 )
 from app.services.systemd_model import SystemdModelService
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="the control socket authenticates peers with SO_PEERCRED, which only Linux exposes",
+)
 
 
 @pytest.fixture

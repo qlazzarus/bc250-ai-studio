@@ -14,6 +14,11 @@ from app.services.model_switch import StudioSwitchBarrier, SwitchJournal, Switch
 from conftest import HEADERS, submit, wait_job
 from fastapi.testclient import TestClient
 
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="the barrier journal preserves SELinux/ACL xattrs, which only Linux provides",
+)
+
 
 @pytest.fixture
 def barrier(tmp_path, monkeypatch):

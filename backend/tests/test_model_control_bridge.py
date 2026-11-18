@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 import tempfile
 
 import httpx
@@ -10,6 +11,11 @@ from app.services.model_control_bridge import ModelControlBridge, ModelControlCl
 from app.services.model_switch import ModelSwitch, SwitchJournal
 from app.services.switch_operations import SwitchOperations
 from app.services.switch_worker import SwitchWorker
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="the management socket relies on SO_PEERCRED, which only Linux exposes",
+)
 
 KEY = "dedicated-management-key-for-testing"
 AUTH = {"Authorization": "Bearer " + KEY}

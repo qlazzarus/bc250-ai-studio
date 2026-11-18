@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -20,6 +21,11 @@ from app.services.model_switch import (
 )
 from app.services.switch_adapters import AsyncGPULock, SwitchGate
 from app.services.systemd_model import SystemdModelService
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="journals and active-model configs need Linux xattr preservation",
+)
 
 KEY = "test-gate-key-at-least-24-characters"
 

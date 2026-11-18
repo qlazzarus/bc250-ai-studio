@@ -1,4 +1,5 @@
 import asyncio
+import sys
 
 import pytest
 from app.services.model_switch import (
@@ -8,6 +9,11 @@ from app.services.model_switch import (
     SwitchJournal,
     SwitchOutcomeUnknown,
     SwitchRecoveryRequired,
+)
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="journal writes preserve SELinux/ACL xattrs, which only Linux provides",
 )
 
 

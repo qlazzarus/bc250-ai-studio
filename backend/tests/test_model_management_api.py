@@ -1,5 +1,6 @@
 import asyncio
 import sqlite3
+import sys
 
 import httpx
 import pytest
@@ -8,6 +9,11 @@ from app.core.studio_files import FileLock
 from app.services.model_switch import ModelSwitch, SwitchJournal
 from app.services.switch_operations import SwitchOperations
 from app.services.switch_worker import SwitchWorker
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="the assembled candidates persist journals through Linux-only xattrs",
+)
 
 KEY = "model-management-test-key-1234567890"
 AUTH = {"Authorization": f"Bearer {KEY}"}

@@ -2,9 +2,15 @@
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="the candidate swaps files with GNU `chmod --reference`, which BSD lacks",
+)
 
 
 @pytest.fixture

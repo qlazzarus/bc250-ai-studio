@@ -9,6 +9,11 @@ from app.services.switch_adapters import AsyncGPULock
 from app.services.switch_operations import OperationConflict, SwitchOperations
 from app.services.switch_worker import ReconciliationError, SwitchWorker
 
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="switch worker persists the journal through SELinux/ACL xattrs that only Linux provides",
+)
+
 
 class Crash(BaseException):
     pass

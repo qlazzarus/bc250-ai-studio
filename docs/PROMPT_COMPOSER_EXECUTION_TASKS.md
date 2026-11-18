@@ -52,7 +52,7 @@ Scene v1/API/저장 데이터/컴파일 출력 의미, 직접 생성, applied �
 
 기존 건수는 기준선이지 고정 성공 조건이 아니다. 실패 시 실패 이름·명령·환경·원인을 남긴다. 문서만 바꾼 태스크는 링크/명세 검증과 D로 충분하다. 코드 수정 시 해당 동작을 검증하는 테스트를 추가하되 JSX 문자열 검사나 구현 복사 테스트로 UI 검증을 대체하지 않는다.
 
-**알려진 기준선 실패 (2026-11-18, LLM-R01–R07과 무관)**: `backend/tests/test_switch_worker.py`가 11건 실패한다(전체 `backend/tests` 실행 시 48건). 원인은 `run()`이 `recovery_required`를 돌려주는 워커 상태 복구 경로이며, 모델 스위치 워커 테스트 모듈에 국한된다. 이 작업의 4개 백엔드 파일을 `git stash`로 되돌린 상태에서도 **같은 11건이 실패**함을 확인했으므로 §0 변경의 회귀가 아니다. 별도 태스크로 분리해 추적하며, LLM-R01–R07의 완료 판정 근거로는 쓰지 않는다.
+**플랫폼 전용 테스트 (2026-11-18 갱신)**: `backend/tests/test_switch_worker.py` 외 8개 model-switch 모듈은 Linux 커널 API(`os.listxattr` 기반 SELinux/ACL 보존, `socket.SO_PEERCRED` peer 자격증명)와 GNU `chmod --reference`에 의존한다. macOS 개발 머신에서는 이 기능이 없어 48건이 실패했고, 원인이 "코드 결함"이 아니라 "플랫폼 부재"임을 확인한 뒤 `test_root_namespace.py`와 같은 `pytestmark = pytest.mark.skipif(sys.platform != "linux", ...)` 규약으로 9개 모듈에 가드를 넣었다. 결과: 로컬(darwin) `337 passed / 96 skipped / 0 failed`, Linux에서는 가드가 풀려 그대로 실행된다. 스킵 사유는 `pytest -rs`에 모듈별로 찍히므로 조용한 누락이 아니다.
 
 각 태스크 끝에 아래 인계를 추가한다.
 
@@ -413,7 +413,8 @@ ID / 상태 / 날짜 / 기준 HEAD: METRIC01 / 구현 완료(로컬 검증) / 20
   - `L`: `.venv/bin/python -m pytest backend/tests/test_prompt_proposals.py backend/tests/test_proposal_provider.py backend/tests/test_proposal_api.py -q` → **106 passed**(리뷰 기준선 91).
   - `F`: `node --experimental-strip-types --test frontend/tests/*.test.mjs` → **133 pass / 0 fail**(기준선 131).
   - `D`: `git diff --check` → 위반 0.
-  - 전체 `backend/tests` → 48 failed / 379 passed / 6 skipped. 실패는 모두 `test_switch_worker.py` 계열이며 내 변경분을 stash한 상태에서도 동일하게 재현된다(위 "알려진 기준선 실패").
+  - `.venv/bin/python -m ruff check backend` → **All checks passed**.
+  - 전체 `backend/tests` → **337 passed / 96 skipped / 0 failed**. 스킵 96건은 Linux 전용 model-switch 9개 모듈 + 기존 `test_root_namespace.py`이며 `sys.platform` 가드로 처리했다(위 "플랫폼 전용 테스트").
 - **실측 payload**: 실제 mirror 기준으로 렌더된 시스템 프롬프트 카탈로그가 5,717B. 요청 본문은 실제 `proposalBody`로 측정해 선택 100개·범위 없음·한글 1자에서 **5,143B**, 선택 60+잠금 60+한글 1,000자에서 **7,519B**. `selections`·`locked_ids`가 8 KiB 예산을 실제로 소모한다.
 - **실측 여유**: 8 KiB에서 남는 한글 문자 수는 선택/잠금 100+100에서 **361자**, 100+0에서 1,017자, 60+60에서 1,224자, 20+20에서 2,144자, 선택 1개에서 2,582자.
 - **R03의 바이트 영향 = 0**: 브라우저는 이미 `selections`를 보내고 있었고 서버 `build_payload`가 그 필드를 복사하지 않았을 뿐이다. 따라서 R03은 정보 누락을 고친 것이지 요청을 키운 것이 아니다.
