@@ -1,6 +1,8 @@
+> 2026-11-18 보관본 (`03a2fa5`). 완료 표시는 당시 검증 범위에 한정한다. 현재 활성 상태는 [단일 실행 태스크](../../../PROMPT_COMPOSER_EXECUTION_TASKS.md)를 따른다.
+
 # EVAL-UX01 — 설명 작업의 효율·의도 보존 평가
 
-작성일: 2026-11-18 · 상태: **실행 완료(규칙 모드 기준, 실제 LLM 미연결)** · 상위: [실행 태스크](PROMPT_COMPOSER_EXECUTION_TASKS.md) · 현재 구현: [PROMPT_COMPOSER_CURRENT.md](PROMPT_COMPOSER_CURRENT.md)
+작성일: 2026-11-18 · 상태: **실행 완료(규칙 모드 기준, 실제 LLM 미연결)** · 상위: [실행 태스크](../../../PROMPT_COMPOSER_EXECUTION_TASKS.md) · 현재 구현: [PROMPT_COMPOSER_CURRENT.md](../../../PROMPT_COMPOSER_CURRENT.md)
 
 이 문서는 설명 → 초안 승인 경로를 **측정한 값**과 **측정하지 않은 값**을 구분해 기록한다. 숫자는 모두 `scripts/eval-ux01/`의 스크립트가 현재 코드로 다시 계산할 수 있다.
 

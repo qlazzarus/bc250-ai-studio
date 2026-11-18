@@ -1,8 +1,8 @@
 # 사전 프롬프트 현재 구현
 
-갱신일: 2026-11-17 · `eb5664c` + 현재 미커밋 구현 기준. 이 문서는 코드와 데이터 계약 설명이다. **작업 상태·순서·완료 기준은 [단일 실행 태스크](PROMPT_COMPOSER_EXECUTION_TASKS.md)에서만 관리한다.** 과거 진행표와 검증 기록은 [archive](archive/prompt-composer/2026-11-17/README.md)에 보존했다.
+갱신일: 2026-11-18 · HEAD `03a2fa5` 기준. 이 문서는 코드와 데이터 계약 설명이다. **작업 상태·순서·완료 기준은 [단일 실행 태스크](PROMPT_COMPOSER_EXECUTION_TASKS.md)에서만 관리한다.** 과거 진행표와 검증 기록은 [archive](archive/prompt-composer/2026-11-17/README.md)에 보존했다.
 
-현재 UI에는 분류·검색 복구, 그룹별 선택 칩과 영어 상세, 자동 미리보기·명시적 적용, 칩 제거 후 포커스 복귀, 정보/주의/오류 구분이 있다. 전체 목록으로 진입하며 빈 장면의 `대상부터 고르기`로 대상 분류와 검색 포커스를 선택한다. 이는 저장 Scene 순서와 API 계약을 변경하지 않는다. 최근 브라우저 증거의 남은 범위는 VERIFY01/VERIFY02를 따른다.
+현재 UI에는 분류·검색 복구, 그룹별 선택 칩과 영어 상세, 자동 미리보기·명시적 적용, 칩 제거 후 포커스 복귀, 정보/주의/오류 구분이 있다. 전체 목록으로 진입하며 빈 장면의 `대상부터 고르기`로 대상 분류와 검색 포커스를 선택한다. 이는 저장 Scene 순서와 API 계약을 변경하지 않는다. 로컬 UI/API와 실제 LLM 연결·품질의 검증 범위는 단일 실행 태스크를 따른다.
 
 ## 구성과 데이터 흐름
 
@@ -107,6 +107,6 @@ LLM-I04는 이 패널 옆에 `POST /api/v1/prompt/proposals`(LLM-I03)를 호출�
 
 ## 설명 작업 평가 (EVAL-UX01)
 
-규칙 모드 기준선을 12개 손수 작성 장면으로 측정한 기록은 [PROMPT_COMPOSER_EVAL_UX01.md](PROMPT_COMPOSER_EVAL_UX01.md)에 있다. recall 76.3 %, precision 91.2 %, 사전 밖 표현 23개, 실제 UI 클릭 43회이며, **사람의 시간과 실제 LLM 응답 품질은 측정하지 않았다**. 측정 스크립트는 `scripts/eval-ux01/`에 있고 제품 모듈만 실행한다(네트워크·생성 호출 없음). 이 평가는 화면·계약·사전을 바꾸지 않았다.
+규칙 모드 기준선을 12개 손수 작성 장면으로 측정한 기록은 [PROMPT_COMPOSER_EVAL_UX01.md](archive/prompt-composer/2026-11-18/PROMPT_COMPOSER_EVAL_UX01.md)에 있다. 기존 보고의 recall은 76.3%이며, precision 91.2%는 미분류 2개를 정답에 포함한 값이라 METRIC01에서 정정한다. 사전 밖 표현 23개, 자동 UI 경로 클릭 43회가 기록됐으며, **사람의 시간과 실제 LLM 응답 품질은 측정하지 않았다**. 측정 스크립트는 `scripts/eval-ux01/`에 있고 제품 모듈만 실행한다(네트워크·생성 호출 없음). 이 평가는 화면·계약·사전을 바꾸지 않았다.
 
 Actions는 Python/Node 검증·전체 빌드·전체 패키징을 계속 실행한다. 변경 영역별 skip은 [설계 문서](ACTIONS_DEPLOY_OPTIMIZATION.md) 단계다. 미완료 작업은 [추적 목록](PROMPT_COMPOSER_EXECUTION_TASKS.md)에서 관리한다.

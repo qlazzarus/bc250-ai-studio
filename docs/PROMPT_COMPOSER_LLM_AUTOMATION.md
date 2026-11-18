@@ -204,7 +204,7 @@ POST /api/v1/prompt/proposals/{id}/accept   (수락 → selections 반영은 클
 
 A1–A4·A8은 대화형 API가 아니라 **오프라인 배치 산출물**이다. 파일(JSON/CSV)로 리포트만 남기며 위 엔드포인트를 쓰지 않는다.
 
-> **계약 확정 위치(2026-11-17).** 위 초안은 [실행 태스크의 LLM-C01](PROMPT_COMPOSER_EXECUTION_TASKS.md#llm-c01--제안과-미반영-의미의-계약-결정--완료)에서 확정본으로 대체됐다. 확정된 요청/응답 필드(`basis`, `polarity`, `actor`, `unresolved_spans`, `ambiguities`, `request_id`, `revisions`), 거절·보류 결정표, 상한(**응답 16 KiB**, 제안 8개, `unresolved_spans` 8개·각 200자, `rejected` 12개)은 그 절이 단일 출처이며, 이 절의 "32 KiB" 예시보다 우선한다. `kind`에서 `translation`·`attribute_split`은 v1 미지원(`status: "unsupported_v1"`)으로 거절한다.
+> **계약 확정 위치(2026-11-17).** 위 초안은 [실행 태스크의 LLM-C01](archive/prompt-composer/2026-11-18/PROMPT_COMPOSER_EXECUTION_TASKS.md#llm-c01--제안과-미반영-의미의-계약-결정--완료)에서 확정본으로 대체됐다. 확정된 요청/응답 필드(`basis`, `polarity`, `actor`, `unresolved_spans`, `ambiguities`, `request_id`, `revisions`), 거절·보류 결정표, 상한(**응답 16 KiB**, 제안 8개, `unresolved_spans` 8개·각 200자, `rejected` 12개)은 그 절이 단일 출처이며, 이 절의 "32 KiB" 예시보다 우선한다. `kind`에서 `translation`·`attribute_split`은 v1 미지원(`status: "unsupported_v1"`)으로 거절한다.
 >
 > **운반 경로·인증·저장 경계(LLM-C02).** 같은 문서의 C02 절이 확정본이다. 핵심: ① gate 데이터 경로에는 자체 인증이 없으므로 **Studio가 유일한 인증 경계**다. ② timeout 20초·세션당 1건·전역 2건·자동 재시도 없음·스트리밍 없음. ③ `POST /api/v1/prompt/proposals`를 기존 router 인증으로 추가하고, capability는 `prompt_proposals` 필드 하나만 추가한다(`fake`·gate 미설정 시 생략). ④ v1은 `jobs.spec`을 확장하지 않으므로 제안 이력은 저장되지 않는다. ⑤ 이 절 5절의 GPU 정책표는 C02-3의 상태별 결정표로 대체된다.
 >
