@@ -163,7 +163,29 @@ export class StudioApi {
     return response.json() as Promise<T>;
   }
 
-  capabilities(signal?: AbortSignal) { return this.request<{ prompt_composition?: { schema_versions?: number[] }; request_limits?: { max_body_bytes?: number } }>("/system/capabilities", { signal }); }
+  capabilities(signal?: AbortSignal) {
+    return this.request<{
+      prompt_composition?: { schema_versions?: number[] };
+      /** Absent when this server cannot serve an LLM proposal (LLM-I03/I04). */
+      prompt_proposals?: {
+        schema_versions?: number[];
+        max_response_bytes?: number;
+        timeout_ms?: number;
+        dictionary_version?: string;
+      };
+      request_limits?: { max_body_bytes?: number };
+    }>("/system/capabilities", { signal });
+  }
+  /**
+   * One explicit proposal attempt (LLM-I03 contract). The reply is 200 even when the
+   * server cannot answer, so callers must read `status`, not `response.ok`.
+   * `signal` aborts the call; the server then also drops its own work.
+   */
+  proposals(body: unknown, signal?: AbortSignal) {
+    return this.request<unknown>("/prompt/proposals", {
+      method: "POST", body: JSON.stringify(body), signal,
+    });
+  }
   status(signal?: AbortSignal) { return this.request<SystemStatus>("/system/status", { signal }); }
   models(signal?: AbortSignal) { return this.request<StudioModel[]>("/models", { signal }); }
   jobs(limit = 20, offset = 0, signal?: AbortSignal) { return this.request<Job[]>(`/jobs?limit=${limit}&offset=${offset}`, { signal }); }

@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from starlette.responses import JSONResponse
 
+from app.api.proposals import router as proposals_router
 from app.api.routes import authenticate, router
 from app.core.middleware import BodyLimit
 from app.core.studio_config import Settings
@@ -75,6 +76,7 @@ def create_app(settings=None, engine=None, llm=None):
         allow_headers=["Authorization", "Content-Type", "Last-Event-ID"],
     )
     app.include_router(router)
+    app.include_router(proposals_router)
 
     @app.get("/internal/model-switch/coordination", include_in_schema=False)
     async def coordination(authorization: str | None = Header(default=None)):

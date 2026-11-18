@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     systemctl: Path = Path("/usr/bin/systemctl")
     llm_url: str = "http://127.0.0.1:8080"
     llm_api_key: str = ""
+    # LLM-I03: the chat ``model`` field for proposal calls. llama-server serves one
+    # loaded model, but a request still has to name it; an empty value would make
+    # every proposal fail, so the capability is not advertised without it.
+    llm_model: str = ""
+    # Generated mirror of frontend/src/prompt/dictionary.ts (see the loader).
+    prompt_dictionary_path: Path = ROOT / "config/prompt_dictionary.json"
     admission_url: str = ""
     admission_key: str = ""
     admission_owned_holds: bool = False

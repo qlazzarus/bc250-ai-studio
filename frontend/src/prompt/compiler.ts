@@ -47,6 +47,25 @@ const exclusiveGroups = [
 const naturalLanguageFamilies = ["z-image", "flux2", "moss-image"];
 const knownFamilies = ["sd15", ...naturalLanguageFamilies];
 
+/**
+ * Every id group among `ids` that `compileScene` would report as `conflict`.
+ *
+ * Exported for LLM-I05: a proposal card must be able to say "this collides with what
+ * you already chose" without a second copy of the twelve pairs, which would drift.
+ */
+export function conflictsAmong(ids: Iterable<string>): string[][] {
+  const present = new Set(ids);
+  const groups: string[][] = [];
+  for (const [left, right] of conflictPairs) {
+    if (present.has(left) && present.has(right)) groups.push([left, right]);
+  }
+  for (const group of exclusiveGroups) {
+    const found = group.filter((id) => present.has(id));
+    if (found.length > 1) groups.push(found);
+  }
+  return groups;
+}
+
 function order(selection: SelectionSnapshot): number {
   const category = categoryAliases[selection.category] ?? selection.category;
   const index = categories.indexOf(category);
@@ -81,12 +100,8 @@ export function compileScene(scene: SceneSpecification): CompileResult {
     }
     result.sources.push({ id: item.id, labelKo: item.labelKo, dictionaryVersion: item.dictionaryVersion, text: item.mapping.text.trim() });
   }
-  for (const [left, right] of conflictPairs) {
-    if (seen.has(left) && seen.has(right)) result.warnings.push({ code: "conflict", ids: [left, right] });
-  }
-  for (const group of exclusiveGroups) {
-    const ids = group.filter((id) => seen.has(id));
-    if (ids.length > 1) result.warnings.push({ code: "conflict", ids });
+  for (const ids of conflictsAmong(seen)) {
+    result.warnings.push({ code: "conflict", ids });
   }
   // Distinct IDs can freeze the same rendered phrase. Emitting it twice spends
   // tokens without adding meaning, so the duplicate is reported and dropped.

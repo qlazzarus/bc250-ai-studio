@@ -13,7 +13,7 @@
   {
     "name": "UX01 단계 위치",
     "pass": null,
-    "detail": "[376,774,1429,1507]"
+    "detail": "[376,810,1465,1543]"
   },
   {
     "name": "UX01 · 첫 입력은 한국어 설명",
@@ -705,7 +705,7 @@
   {
     "name": "재시도 결과",
     "pass": null,
-    "detail": "{\"job_id\":\"1e3757090654445690fb794ff46be840\",\"prompt\":\"retry probe\",\"model_id\":\"fake-sd15\",\"status\":\"running\"}"
+    "detail": "{\"job_id\":\"59973dd521d2425b8d60522efccc140e\",\"prompt\":\"retry probe\",\"model_id\":\"fake-sd15\",\"status\":\"running\"}"
   },
   {
     "name": "capability 실패 · 안내 표시",
@@ -723,6 +723,29 @@
     "name": "capability 네트워크 실패",
     "pass": null,
     "detail": "{\"notice\":true,\"builder\":true,\"probe\":true}"
+  },
+  {
+    "name": "LLM-I04 · capability 없음 · AI 버튼 없음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "LLM-I04 · capability 없음 · 규칙 제안 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I04 · capability 없음 · 폴백 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I04 폴백",
+    "pass": null,
+    "detail": "{\"panel\":true,\"ai\":false,\"aiDisabled\":null,\"rule\":true,\"fallback\":\"이 서버에서는 AI 제안을 사용할 수 없습니다. 지금은 원문에서 사전 항목만 찾습니다.\"}"
   },
   {
     "name": "capability 미지원 · 안내 표시",
@@ -746,5 +769,757 @@
     "name": "capability 미지원",
     "pass": null,
     "detail": "{\"notice\":true,\"builder\":true,\"canStillType\":true}"
+  },
+  {
+    "name": "LLM-I04 · capability 있음 · AI 버튼 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I04 · capability 있음 · 버튼 이름",
+    "pass": true,
+    "expected": "장면 정리하기",
+    "actual": "\"장면 정리하기\""
+  },
+  {
+    "name": "LLM-I04 · capability 있음 · 폴백 문구 없음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "LLM-I04 · 자동 호출 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I04 · 입력만으로 호출 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I04 · 버튼 한 번에 요청 한 번",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "LLM-I04 · 요청 kind",
+    "pass": true,
+    "expected": "selection_hint",
+    "actual": "\"selection_hint\""
+  },
+  {
+    "name": "LLM-I04 · 원문 그대로 전송",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람",
+    "actual": "\"네온이 비치는 골목에 선 사람\""
+  },
+  {
+    "name": "LLM-I04 · revisions 3개",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "LLM-I04 · 응답 상태 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I04 · 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람",
+    "actual": "\"네온이 비치는 골목에 선 사람\""
+  },
+  {
+    "name": "LLM-I04 응답",
+    "pass": null,
+    "detail": "{\"calls\":1,\"kind\":\"selection_hint\",\"family\":\"sd15\",\"text\":\"네온이 비치는 골목에 선 사람\",\"hasRevisions\":3,\"status\":\"제안 1개를 받았습니다. 아직 선택에 반영하지 않았습니다.\",\"freeText\":\"네온이 비치는 골목에 선 사람\",\"chips\":0}"
+  },
+  {
+    "name": "LLM-I04 · 두 번째 요청",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "LLM-I04 · 오래된 응답 폐기 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I04 · 편집한 원문 유지",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람, 그리고 개",
+    "actual": "\"네온이 비치는 골목에 선 사람, 그리고 개\""
+  },
+  {
+    "name": "LLM-I04 · 선택 불변",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I04 오래된 응답",
+    "pass": null,
+    "detail": "{\"calls\":2,\"status\":\"원문이나 선택이 바뀌어 이전 제안을 버렸습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"freeText\":\"네온이 비치는 골목에 선 사람, 그리고 개\",\"chips\":0,\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "LLM-I05 · 카드 4개",
+    "pass": true,
+    "expected": "4",
+    "actual": "4"
+  },
+  {
+    "name": "LLM-I05 · 유형 구분",
+    "pass": true,
+    "expected": "quoted,inferred,unresolved,ambiguous",
+    "actual": "\"quoted,inferred,unresolved,ambiguous\""
+  },
+  {
+    "name": "LLM-I05 · 미표현 구절 원문",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 수락 버튼은 2개",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "LLM-I05 · AI 추가도 개별 수락",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 구절은 수락 불가",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "LLM-I05 · 일괄 문구는 원문 근거만",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 닫기 제공",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 수락 전 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I05 · 수락 전 선택 불변",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I05 · 수락 전 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "LLM-I05 카드",
+    "pass": null,
+    "detail": "{\"count\":4,\"kinds\":[\"quoted\",\"inferred\",\"unresolved\",\"ambiguous\"],\"labels\":[\"네온 조명\",\"개\",\"골목에 선\",\"그 사람\"],\"acceptButtons\":2,\"inferredAccepts\":true,\"spanAccepts\":false,\"batchLabel\":\"원문 근거 1개 선택에 추가\",\"dismiss\":true,\"status\":\"제안 2개를 받았습니다. 아직 선택에 반영하지 않았습니다.\",\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"chips\":0,\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "LLM-I05 · 수락 시 선택 추가",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 수락 시 원문 유지",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I05 · 수락은 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "LLM-I05 · 수락 후 상태 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 수락 후 포커스 유지",
+    "pass": true,
+    "expected": "BUTTON",
+    "actual": "\"BUTTON\""
+  },
+  {
+    "name": "LLM-I05 수락",
+    "pass": null,
+    "detail": "{\"chips\":[\"네온 조명\"],\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"finalPrompt\":\"\",\"status\":\"제안 1개를 선택에 반영했습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"focused\":true,\"focusTag\":\"BUTTON\",\"focusText\":\"선택에 추가\",\"cards\":4}"
+  },
+  {
+    "name": "LLM-I05 · 거절 시 카드 제거",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I05 · 거절 시 선택 불변",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "LLM-I05 · 거절 시 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I05 · 거절 안내 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 거절",
+    "pass": null,
+    "detail": "{\"cards\":0,\"chips\":1,\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"notice\":\"AI 제안을 닫았습니다. 원문과 선택은 그대로입니다.\"}"
+  },
+  {
+    "name": "LLM-I05 · 편집 후 카드 철회",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I05 · 편집 후 철회 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 철회",
+    "pass": null,
+    "detail": "{\"cards\":0,\"status\":\"원문이나 선택이 바뀌어 이전 제안을 버렸습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"chips\":1}"
+  },
+  {
+    "name": "LLM-I06 · 범위 문구에 고정 개수",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 범위 버튼 눌림 표시",
+    "pass": true,
+    "expected": "배경",
+    "actual": "\"배경\""
+  },
+  {
+    "name": "LLM-I06 · 버튼 이름이 부분 변경으로",
+    "pass": true,
+    "expected": "선택한 그룹만 정리",
+    "actual": "\"선택한 그룹만 정리\""
+  },
+  {
+    "name": "LLM-I06 · 고정은 동일 인물 보장이 아님",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 범위",
+    "pass": null,
+    "detail": "{\"label\":\"부분 변경 범위 배경만 변경 · 고정 1개\",\"pressed\":[\"배경\"],\"aiLabel\":\"선택한 그룹만 정리\",\"lockNote\":\"고른 그룹만 바꾸는 제안을 요청합니다. 나머지 선택 1개는 잠금으로 보내고, 잠긴 값을 바꾸는 제안은 표시하지 않습니다. 고정은 선택 값의 유지를 뜻하며 생성 이미지의 동일 인물을 보장하지 않습니다.\"}"
+  },
+  {
+    "name": "LLM-I06 · 부분 변경 요청 1회",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "LLM-I06 · 요청 kind",
+    "pass": true,
+    "expected": "partial_change",
+    "actual": "\"partial_change\""
+  },
+  {
+    "name": "LLM-I06 · 요청 target_groups",
+    "pass": true,
+    "expected": "[\"setting\"]",
+    "actual": "\"[\\\"setting\\\"]\""
+  },
+  {
+    "name": "LLM-I06 · 요청 locked_ids",
+    "pass": true,
+    "expected": "[\"subject.person\"]",
+    "actual": "\"[\\\"subject.person\\\"]\""
+  },
+  {
+    "name": "LLM-I06 · 제목이 부분 변경",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 범위 밖·고정 카드 차단",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "LLM-I06 · 수락 가능 카드는 1개",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "LLM-I06 · diff 머리글",
+    "pass": true,
+    "expected": "고정 1 · 추가 1 · 적용 불가 1",
+    "actual": "\"고정 1 · 추가 1 · 적용 불가 1\""
+  },
+  {
+    "name": "LLM-I06 · diff 행 구분",
+    "pass": true,
+    "expected": "kept:인물,change:단색 배경,blocked:네온 조명",
+    "actual": "\"kept:인물,change:단색 배경,blocked:네온 조명\""
+  },
+  {
+    "name": "LLM-I06 · diff 고정 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 수락 전 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I06 · 수락 전 선택 불변",
+    "pass": true,
+    "expected": "인물",
+    "actual": "\"인물\""
+  },
+  {
+    "name": "LLM-I06 부분 변경",
+    "pass": null,
+    "detail": "{\"calls\":1,\"kind\":\"partial_change\",\"groups\":[\"setting\"],\"locked\":[\"subject.person\"],\"cards\":3,\"acceptButtons\":1,\"blocked\":2,\"heading\":\"부분 변경 제안 3개\",\"diffCounts\":\"고정 1 · 추가 1 · 적용 불가 1\",\"diffRows\":[\"kept:인물\",\"change:단색 배경\",\"blocked:네온 조명\"],\"lockNote\":\"고정은 선택 값의 유지를 뜻하며 생성 이미지의 동일 인물을 보장하지 않습니다.\",\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"chips\":[\"인물\"]}"
+  },
+  {
+    "name": "LLM-I06 · 수락 시 대상 항목만 추가",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 수락해도 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I06 · 수락해도 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "LLM-I06 · 되돌리기 버튼 노출",
+    "pass": true,
+    "expected": "“단색 배경” 추가 되돌리기",
+    "actual": "\"“단색 배경” 추가 되돌리기\""
+  },
+  {
+    "name": "LLM-I06 · 되돌리기 사용 가능",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "LLM-I06 수락",
+    "pass": null,
+    "detail": "{\"chips\":[\"인물\",\"단색 배경\"],\"undo\":\"“단색 배경” 추가 되돌리기\",\"undoDisabled\":false,\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "LLM-I06 · 되돌리면 선택 복원",
+    "pass": true,
+    "expected": "인물",
+    "actual": "\"인물\""
+  },
+  {
+    "name": "LLM-I06 · 되돌리기 후 버튼 사라짐",
+    "pass": true,
+    "expected": "null",
+    "actual": "null"
+  },
+  {
+    "name": "LLM-I06 · 되돌리기 안내 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 되돌려도 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I06 · 되돌려도 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "LLM-I06 되돌리기",
+    "pass": null,
+    "detail": "{\"chips\":[\"인물\"],\"undo\":null,\"notice\":\"제안 3개를 받았습니다. 아직 선택에 반영하지 않았습니다. | 방금 추가한 \\\"단색 배경\\\"을(를) 되돌렸습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "LLM-I06 · 편집 후 카드 철회",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I06 · 편집 후 되돌리기 차단",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 차단 사유 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 되돌리기 차단",
+    "pass": null,
+    "detail": "{\"cards\":0,\"undo\":\"되돌리기 사용 불가\",\"disabled\":true,\"hint\":\"수락 이후 선택이나 원문이 바뀌어 되돌릴 수 없습니다. 필요한 항목만 직접 해제하세요. 직접 바꾼 선택은 덮어쓰지 않습니다.\",\"notice\":\"원문이나 선택이 바뀌어 이전 제안을 버렸습니다. 원문과 최종 프롬프트는 그대로입니다. | \\\"단색 배경\\\"을(를) 선택에 추가했습니다. 원문과 최종 프롬프트는 그대로입니다.\"}"
+  },
+  {
+    "name": "VAR02 · 기준 선택 4개",
+    "pass": true,
+    "expected": "4",
+    "actual": "4"
+  },
+  {
+    "name": "VAR02 · 상황 요청 1회",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "VAR02 · 요청 kind",
+    "pass": true,
+    "expected": "situation_variants",
+    "actual": "\"situation_variants\""
+  },
+  {
+    "name": "VAR02 · 요청 target_groups",
+    "pass": true,
+    "expected": "[\"pose\",\"setting\"]",
+    "actual": "\"[\\\"pose\\\",\\\"setting\\\"]\""
+  },
+  {
+    "name": "VAR02 · 인물·의상은 잠금",
+    "pass": true,
+    "expected": "[\"subject.person\",\"clothing.white_shirt\"]",
+    "actual": "\"[\\\"subject.person\\\",\\\"clothing.white_shirt\\\"]\""
+  },
+  {
+    "name": "VAR02 · 후보 3장",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "VAR02 · 머리글에 표시 불가 1",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 후보 순서 유지",
+    "pass": true,
+    "expected": "공원에서 걷기,카페에 앉기,개와 함께",
+    "actual": "\"공원에서 걷기,카페에 앉기,개와 함께\""
+  },
+  {
+    "name": "VAR02 · 범위 밖 후보 차단",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "VAR02 · 적용 버튼은 2개",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "VAR02 · 차단 사유 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 바뀌는 항목 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 사전 밖 표현은 원문 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 후보 표시만으로 선택 불변",
+    "pass": true,
+    "expected": "인물,흰 셔츠,서 있기,거리",
+    "actual": "\"인물,흰 셔츠,서 있기,거리\""
+  },
+  {
+    "name": "VAR02 · 후보 표시만으로 원문 불변",
+    "pass": true,
+    "expected": "같은 인물과 의상으로 다른 상황",
+    "actual": "\"같은 인물과 의상으로 다른 상황\""
+  },
+  {
+    "name": "VAR02 · 후보 표시만으로 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "VAR02 · 아직 반영 전 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 후보",
+    "pass": null,
+    "detail": "{\"calls\":1,\"kind\":\"situation_variants\",\"groups\":[\"pose\",\"setting\"],\"locked\":[\"subject.person\",\"clothing.white_shirt\"],\"count\":3,\"headline\":\"상황 후보 3개 · 표시 불가 1\",\"labels\":[\"공원에서 걷기\",\"카페에 앉기\",\"개와 함께\"],\"blocked\":1,\"applyButtons\":2,\"changes\":[\"add:배경 · 공원 추가|add:포즈 · 걷기 추가|remove:배경 · 거리 제거|remove:포즈 · 서 있기 제거\",\"add:배경 · 카페 추가|add:포즈 · 앉기 추가|remove:배경 · 거리 제거|remove:포즈 · 서 있기 제거\",\"add:대상 · 개 추가\"],\"blocks\":[\"사용할 수 없음 · 이번 요청의 변경 대상이 아닙니다\"],\"unresolved\":\"사전 밖 표현: 우산을 접으며\",\"status\":\"상황 후보 3개를 받았습니다. 아직 선택에 반영하지 않았습니다.\",\"freeText\":\"같은 인물과 의상으로 다른 상황\",\"chips\":[\"인물\",\"흰 셔츠\",\"서 있기\",\"거리\"],\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "VAR02 360px · 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 360px · 카드가 화면 안",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 360px · 적용 버튼 화면 안",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 360px · 적용 버튼은 문장 아래",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 360px",
+    "pass": null,
+    "detail": "{\"overflow\":true,\"stacked\":true,\"buttonInside\":true,\"buttonWidth\":272,\"buttonBelow\":true}"
+  },
+  {
+    "name": "VAR02 · 적용 시 장소·행동 교체",
+    "pass": true,
+    "expected": "인물,흰 셔츠,앉기,카페",
+    "actual": "\"인물,흰 셔츠,앉기,카페\""
+  },
+  {
+    "name": "VAR02 · 적용한 카드 표시",
+    "pass": true,
+    "expected": "카페에 앉기",
+    "actual": "\"카페에 앉기\""
+  },
+  {
+    "name": "VAR02 · 적용 표시 문구",
+    "pass": true,
+    "expected": "· 지금 선택에 반영됨",
+    "actual": "\"· 지금 선택에 반영됨\""
+  },
+  {
+    "name": "VAR02 · 적용 후 머리글 유지",
+    "pass": true,
+    "expected": "상황 후보 3개 · 표시 불가 1",
+    "actual": "\"상황 후보 3개 · 표시 불가 1\""
+  },
+  {
+    "name": "VAR02 · 적용 후 남은 적용 버튼 1개",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "VAR02 · 미반영 표현 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 적용해도 원문 불변",
+    "pass": true,
+    "expected": "같은 인물과 의상으로 다른 상황",
+    "actual": "\"같은 인물과 의상으로 다른 상황\""
+  },
+  {
+    "name": "VAR02 · 적용해도 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "VAR02 · 적용 후 초안 재생성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 적용 후 포커스 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 되돌리기 버튼 노출",
+    "pass": true,
+    "expected": "“카페에 앉기” 상황 적용 되돌리기",
+    "actual": "\"“카페에 앉기” 상황 적용 되돌리기\""
+  },
+  {
+    "name": "VAR02 · 되돌리기 사용 가능",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "VAR02 · 되돌리기 줄은 하나",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "VAR02 · 패널 상태 문구",
+    "pass": true,
+    "expected": "“카페에 앉기” 상황을 적용했습니다. 다른 후보와 비교하거나 바로 되돌릴 수 있습니다.",
+    "actual": "\"“카페에 앉기” 상황을 적용했습니다. 다른 후보와 비교하거나 바로 되돌릴 수 있습니다.\""
+  },
+  {
+    "name": "VAR02 적용",
+    "pass": null,
+    "detail": "{\"chips\":[\"인물\",\"흰 셔츠\",\"앉기\",\"카페\"],\"applied\":[\"카페에 앉기\"],\"appliedText\":\"· 지금 선택에 반영됨\",\"applyButtons\":1,\"headline\":\"상황 후보 3개 · 표시 불가 1\",\"undo\":\"“카페에 앉기” 상황 적용 되돌리기\",\"undoDisabled\":false,\"cardUndoLines\":0,\"status\":\"“카페에 앉기” 상황을 적용했습니다. 다른 후보와 비교하거나 바로 되돌릴 수 있습니다.\",\"notice\":\"“카페에 앉기” 상황을 적용했습니다. 다른 후보와 비교하거나 바로 되돌릴 수 있습니다. | “카페에 앉기” 상황을 선택에 반영했습니다. 사전에 없는 표현 “우산을 접으며”은(는) 반영되지 않았습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"freeText\":\"같은 인물과 의상으로 다른 상황\",\"finalPrompt\":\"\",\"draft\":\"a person, white shirt, sitting, in a cafe\"}"
+  },
+  {
+    "name": "VAR02 · 되돌리면 선택 복원",
+    "pass": true,
+    "expected": "인물,흰 셔츠,서 있기,거리",
+    "actual": "\"인물,흰 셔츠,서 있기,거리\""
+  },
+  {
+    "name": "VAR02 · 되돌린 뒤 버튼 사라짐",
+    "pass": true,
+    "expected": "null",
+    "actual": "null"
+  },
+  {
+    "name": "VAR02 · 되돌린 뒤 적용 표시 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "VAR02 · 되돌린 뒤 표시 불가 복귀",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 되돌리기 안내 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 되돌려도 원문 불변",
+    "pass": true,
+    "expected": "같은 인물과 의상으로 다른 상황",
+    "actual": "\"같은 인물과 의상으로 다른 상황\""
+  },
+  {
+    "name": "VAR02 · 되돌려도 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "VAR02 되돌리기",
+    "pass": null,
+    "detail": "{\"chips\":[\"인물\",\"흰 셔츠\",\"서 있기\",\"거리\"],\"undo\":null,\"applied\":0,\"headline\":\"상황 후보 3개 · 표시 불가 1\",\"notice\":\"상황 후보 3개를 받았습니다. 아직 선택에 반영하지 않았습니다. | “카페에 앉기” 상황 적용을 되돌렸습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"freeText\":\"같은 인물과 의상으로 다른 상황\",\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "VAR02 · 편집 후 후보 폐기",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "VAR02 · 편집 후 되돌리기 차단",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 편집 후 차단 사유",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 편집 후 선택 유지",
+    "pass": true,
+    "expected": "인물,흰 셔츠,걷기,공원",
+    "actual": "\"인물,흰 셔츠,걷기,공원\""
+  },
+  {
+    "name": "VAR02 되돌리기 차단",
+    "pass": null,
+    "detail": "{\"cards\":0,\"undo\":\"상황 되돌리기 사용 불가\",\"disabled\":true,\"hint\":\"상황을 적용한 뒤 선택이나 원문이 바뀌어 되돌릴 수 없습니다. 필요한 항목만 직접 해제하세요. 지금 선택은 덮어쓰지 않습니다.\",\"chips\":[\"인물\",\"흰 셔츠\",\"걷기\",\"공원\"]}"
   }
 ]

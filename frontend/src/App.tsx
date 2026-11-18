@@ -15,6 +15,7 @@ import PromptBuilder from "./components/PromptBuilder";
 import { initialBuilderState, appliedForFamily, restoreComposition } from "./prompt/builderState";
 import { changeSceneFamily } from "./prompt/scene";
 import { DICTIONARY, DICTIONARY_VERSION } from "./prompt/dictionary";
+import { readProposalCapability, UNSUPPORTED, type ProposalCapability } from "./prompt/proposalCapability";
 import { characterCount, validateSubmission } from "./prompt/validation";
 import { queueCounts, queueExpanded, queueSummary } from "./lib/queue";
 
@@ -46,6 +47,12 @@ function App() {
   const [builder, setBuilder] = useState(initialBuilderState);
   const [compositionSupported, setCompositionSupported] = useState(false);
   const [maxBodyBytes, setMaxBodyBytes] = useState<number | null>(null);
+  /**
+   * LLM-I04: default is "absent", so the AI action stays hidden until the server
+   * proves it can serve a proposal. A failed capabilities call is not an error to
+   * report: the rule-based suggestions keep working.
+   */
+  const [proposalCapability, setProposalCapability] = useState<ProposalCapability>(UNSUPPORTED);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [studio, setStudio] = useState<"art" | "pixel">("art");
@@ -159,9 +166,12 @@ function App() {
     const controller = new AbortController();
     api.capabilities(controller.signal).then((data) => {
       setCompositionSupported(Boolean(data.prompt_composition?.schema_versions?.includes(1)));
+      setProposalCapability(readProposalCapability(data.prompt_proposals, DICTIONARY_VERSION));
       const limit = data.request_limits?.max_body_bytes;
       setMaxBodyBytes(typeof limit === "number" && Number.isSafeInteger(limit) && limit > 0 ? limit : null);
-    }).catch(() => { setCompositionSupported(false); setMaxBodyBytes(null); });
+    }).catch(() => {
+      setCompositionSupported(false); setMaxBodyBytes(null); setProposalCapability(UNSUPPORTED);
+    });
     return () => controller.abort();
   }, [api]);
 
@@ -317,7 +327,11 @@ function App() {
             <option value="">모델 선택</option>{models.map((model) => <option key={model.model_id} value={model.model_id} disabled={!model.execution_enabled}>{model.display_name}{model.execution_enabled ? "" : " · 사용 불가"}</option>)}
           </select></label>
           {!compositionSupported && <p className="prompt-notice" data-tone="caution">서버가 구성 이력 저장을 지원하지 않거나 확인할 수 없습니다. 최종 프롬프트만 저장됩니다.</p>}
-          <PromptBuilder compositionSupported={compositionSupported} family={activeModel?.family ?? ""} value={settings.prompt} onChange={(prompt) => { setPromptDirty(true); setSettings((old) => ({ ...old, prompt })); }} state={builder} setState={setBuilder} />
+          <PromptBuilder compositionSupported={compositionSupported} family={activeModel?.family ?? ""} value={settings.prompt}
+            onChange={(prompt) => { setPromptDirty(true); setSettings((old) => ({ ...old, prompt })); }}
+            state={builder} setState={setBuilder}
+            proposalCapability={proposalCapability}
+            sendProposal={proposalCapability.supported ? (body, signal) => api.proposals(body, signal) : undefined} />
           <label>최종 프롬프트<textarea aria-invalid={showPromptIssues && promptIssues.length > 0} aria-describedby="prompt-errors" value={settings.prompt} onChange={(event) => { setPromptDirty(true); setSettings({ ...settings, prompt: event.target.value }); }} onBlur={() => setPromptBlurred(true)} placeholder="장면, 피사체, 조명, 스타일을 설명하세요." rows={5} /></label>
           <div id="prompt-errors" role="status"><p className="prompt-hint">{characterCount(settings.prompt)}/8000자</p>{promptHint && <p className="prompt-hint">{promptHint}</p>}{showPromptIssues && promptIssues.map((issue, index) => <p className="prompt-error" key={index}>{issue.message}</p>)}</div>
           <label className={negativeEnabled ? "" : "disabled"}>Negative prompt<textarea aria-invalid={negativeIssues.length > 0} aria-describedby="negative-errors" disabled={!negativeEnabled} value={settings.negativePrompt} onChange={(event) => setSettings({ ...settings, negativePrompt: event.target.value })} placeholder={negativeEnabled ? "제외할 요소를 입력하세요." : "이 모델의 현재 CFG에서는 negative prompt를 사용할 수 없습니다."} rows={2} /></label>

@@ -1,0 +1,40 @@
+EVAL-UX01 · scripts/eval-ux01/scenes.mjs (project-authored, 12 scenes)
+사전 1.2.0 · 100개 · 계열 sd15 (100/100 매핑) · compiler 1.3.0 · LLM 호출 0회
+
+id                          기대 적중 누락 오탐 미분류  클릭(보정)
+daily-rain-store              2    2    0    0      0    4(0)
+product-bottle                2    1    1    0      0    6(1)
+  누락: 단색 배경
+landscape-lake-dusk           2    0    2    1      0    8(2)
+  누락: 산, 골든 아워
+  오탐(원치 않은 추가): 인물
+multi-person-street           4    3    1    0      0    8(1)
+  누락: 미소
+negation-empty-beach          1    1    0    1      0    3(0)
+  오탐(원치 않은 추가): 인물
+partial-lighting-only         3    2    1    0      0    7(1)
+  누락: 창문 빛
+portrait-front-closeup        5    5    0    0      1    7(0)
+  미분류: subject.person
+alley-neon-coat               4    3    1    0      0    8(1)
+  누락: 서 있기
+cat-window-cozy               4    2    2    0      0   10(2)
+  누락: 앉기, 포근한 분위기
+group-hiking                  2    1    1    1      0    6(1)
+  누락: 산
+  오탐(원치 않은 추가): 인물
+beach-sunset-couple           3    3    0    0      1    5(0)
+  미분류: subject.person
+studio-bw-portrait            6    6    0    0      0    8(0)
+
+합계 · 기대 38 · 적중 29 (recall 76.3%) · 누락 9 · 원치 않은 추가 3 · 미분류 2
+규칙 경로 precision 91.2% (제안 34개 기준)
+결정 가능한 제안만 계산한 precision 90.6% (사람이 판정해야 할 미분류 2개 제외)
+사전 밖 표현 23개 · 원문은 그대로 보존되고 초안에는 들어가지 않는다
+규칙 경로 클릭 합계 80 (장면당 6.7) · 그중 수동 보정 27회(누락 9개 ×3) · 규칙 제안만 쓸 때 53회
+원치 않은 제안 3개는 클릭을 쓰지 않지만, 알아채고 넘겨야 하는 항목이다
+초안은 자동 미리보기(UX03)라 클릭 0 · 초안 승인(적용) 1회는 위 클릭에 포함되지 않았다
+상황 후보 경로 클릭 합계 36 · 되돌리기까지 확인 12/12 · 차단된 후보 12건
+부분 변경(partial-lighting-only) · 대상 lighting · 고정 인물,흰 셔츠 · 추가 어두운 조명 · 차단 1 (카페:out_of_scope)
+
+미측정: 입력→초안 승인 소요 시간 · 실제 LLM 응답의 정확도·지연 · 사용자 주관 평가 · 실제 생성 이미지 품질

@@ -1,0 +1,507 @@
+{
+  "dictionary_version": "1.2.0",
+  "source": "frontend/src/prompt/dictionary.ts",
+  "active_entries": 100,
+  "entries": [
+    {
+      "id": "subject.person",
+      "category": "subject",
+      "active": true
+    },
+    {
+      "id": "subject.portrait",
+      "category": "subject",
+      "active": true
+    },
+    {
+      "id": "action.standing",
+      "category": "action",
+      "active": true
+    },
+    {
+      "id": "action.walking",
+      "category": "action",
+      "active": true
+    },
+    {
+      "id": "location.street",
+      "category": "location",
+      "active": true
+    },
+    {
+      "id": "location.room",
+      "category": "location",
+      "active": true
+    },
+    {
+      "id": "composition.full_body",
+      "category": "composition",
+      "active": true
+    },
+    {
+      "id": "composition.close_up",
+      "category": "composition",
+      "active": true
+    },
+    {
+      "id": "lighting.soft",
+      "category": "lighting",
+      "active": true
+    },
+    {
+      "id": "lighting.neon",
+      "category": "lighting",
+      "active": true
+    },
+    {
+      "id": "style.photographic",
+      "category": "style",
+      "active": true
+    },
+    {
+      "id": "style.illustration",
+      "category": "style",
+      "active": true
+    },
+    {
+      "id": "subject.two_people",
+      "category": "subject",
+      "active": true
+    },
+    {
+      "id": "subject.group",
+      "category": "subject",
+      "active": true
+    },
+    {
+      "id": "subject.cat",
+      "category": "subject",
+      "active": true
+    },
+    {
+      "id": "subject.dog",
+      "category": "subject",
+      "active": true
+    },
+    {
+      "id": "subject.tree",
+      "category": "subject",
+      "active": true
+    },
+    {
+      "id": "subject.building",
+      "category": "subject",
+      "active": true
+    },
+    {
+      "id": "appearance.short_hair",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "appearance.long_hair",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "appearance.curly_hair",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "appearance.straight_hair",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "appearance.black_hair",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "appearance.brown_hair",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "appearance.blonde_hair",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "appearance.red_hair",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "appearance.glasses",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "appearance.freckles",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "appearance.beard",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "appearance.ponytail",
+      "category": "appearance",
+      "active": true
+    },
+    {
+      "id": "clothing.white_shirt",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "clothing.black_shirt",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "clothing.t_shirt",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "clothing.sweater",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "clothing.jacket",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "clothing.coat",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "clothing.dress",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "clothing.jeans",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "clothing.trousers",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "clothing.skirt",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "clothing.hat",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "clothing.scarf",
+      "category": "clothing",
+      "active": true
+    },
+    {
+      "id": "expression.smile",
+      "category": "expression",
+      "active": true
+    },
+    {
+      "id": "expression.serious",
+      "category": "expression",
+      "active": true
+    },
+    {
+      "id": "expression.laughing",
+      "category": "expression",
+      "active": true
+    },
+    {
+      "id": "expression.surprised",
+      "category": "expression",
+      "active": true
+    },
+    {
+      "id": "expression.sad",
+      "category": "expression",
+      "active": true
+    },
+    {
+      "id": "expression.neutral",
+      "category": "expression",
+      "active": true
+    },
+    {
+      "id": "expression.eyes_closed",
+      "category": "expression",
+      "active": true
+    },
+    {
+      "id": "expression.looking_at_viewer",
+      "category": "expression",
+      "active": true
+    },
+    {
+      "id": "pose.sitting",
+      "category": "pose",
+      "active": true
+    },
+    {
+      "id": "pose.lying",
+      "category": "pose",
+      "active": true
+    },
+    {
+      "id": "pose.running",
+      "category": "pose",
+      "active": true
+    },
+    {
+      "id": "pose.kneeling",
+      "category": "pose",
+      "active": true
+    },
+    {
+      "id": "pose.arms_crossed",
+      "category": "pose",
+      "active": true
+    },
+    {
+      "id": "pose.hands_in_pockets",
+      "category": "pose",
+      "active": true
+    },
+    {
+      "id": "pose.waving",
+      "category": "pose",
+      "active": true
+    },
+    {
+      "id": "pose.looking_back",
+      "category": "pose",
+      "active": true
+    },
+    {
+      "id": "setting.park",
+      "category": "setting",
+      "active": true
+    },
+    {
+      "id": "setting.forest",
+      "category": "setting",
+      "active": true
+    },
+    {
+      "id": "setting.beach",
+      "category": "setting",
+      "active": true
+    },
+    {
+      "id": "setting.mountain",
+      "category": "setting",
+      "active": true
+    },
+    {
+      "id": "setting.cafe",
+      "category": "setting",
+      "active": true
+    },
+    {
+      "id": "setting.library",
+      "category": "setting",
+      "active": true
+    },
+    {
+      "id": "setting.garden",
+      "category": "setting",
+      "active": true
+    },
+    {
+      "id": "setting.rooftop",
+      "category": "setting",
+      "active": true
+    },
+    {
+      "id": "setting.train_station",
+      "category": "setting",
+      "active": true
+    },
+    {
+      "id": "setting.plain_background",
+      "category": "setting",
+      "active": true
+    },
+    {
+      "id": "camera.medium_shot",
+      "category": "camera",
+      "active": true
+    },
+    {
+      "id": "camera.wide_shot",
+      "category": "camera",
+      "active": true
+    },
+    {
+      "id": "camera.profile",
+      "category": "camera",
+      "active": true
+    },
+    {
+      "id": "camera.front_view",
+      "category": "camera",
+      "active": true
+    },
+    {
+      "id": "camera.back_view",
+      "category": "camera",
+      "active": true
+    },
+    {
+      "id": "camera.high_angle",
+      "category": "camera",
+      "active": true
+    },
+    {
+      "id": "camera.low_angle",
+      "category": "camera",
+      "active": true
+    },
+    {
+      "id": "camera.eye_level",
+      "category": "camera",
+      "active": true
+    },
+    {
+      "id": "lighting.sunlight",
+      "category": "lighting",
+      "active": true
+    },
+    {
+      "id": "lighting.window_light",
+      "category": "lighting",
+      "active": true
+    },
+    {
+      "id": "lighting.backlight",
+      "category": "lighting",
+      "active": true
+    },
+    {
+      "id": "lighting.rim_light",
+      "category": "lighting",
+      "active": true
+    },
+    {
+      "id": "lighting.golden_hour",
+      "category": "lighting",
+      "active": true
+    },
+    {
+      "id": "lighting.overcast",
+      "category": "lighting",
+      "active": true
+    },
+    {
+      "id": "lighting.candlelight",
+      "category": "lighting",
+      "active": true
+    },
+    {
+      "id": "lighting.low_key",
+      "category": "lighting",
+      "active": true
+    },
+    {
+      "id": "style.watercolor",
+      "category": "style",
+      "active": true
+    },
+    {
+      "id": "style.oil_painting",
+      "category": "style",
+      "active": true
+    },
+    {
+      "id": "style.pencil_sketch",
+      "category": "style",
+      "active": true
+    },
+    {
+      "id": "style.ink_drawing",
+      "category": "style",
+      "active": true
+    },
+    {
+      "id": "style.pixel_art",
+      "category": "style",
+      "active": true
+    },
+    {
+      "id": "style.comic",
+      "category": "style",
+      "active": true
+    },
+    {
+      "id": "style.3d_render",
+      "category": "style",
+      "active": true
+    },
+    {
+      "id": "style.black_and_white",
+      "category": "style",
+      "active": true
+    },
+    {
+      "id": "mood.calm",
+      "category": "mood",
+      "active": true
+    },
+    {
+      "id": "mood.tense",
+      "category": "mood",
+      "active": true
+    },
+    {
+      "id": "mood.cheerful",
+      "category": "mood",
+      "active": true
+    },
+    {
+      "id": "mood.melancholic",
+      "category": "mood",
+      "active": true
+    },
+    {
+      "id": "mood.mysterious",
+      "category": "mood",
+      "active": true
+    },
+    {
+      "id": "mood.cozy",
+      "category": "mood",
+      "active": true
+    },
+    {
+      "id": "mood.dramatic",
+      "category": "mood",
+      "active": true
+    },
+    {
+      "id": "mood.dreamy",
+      "category": "mood",
+      "active": true
+    }
+  ]
+}

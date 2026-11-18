@@ -38,6 +38,12 @@ from app.models.schemas import (
 )
 from app.pixel.service import process_image
 from app.scheduler.runner import TERMINAL
+from app.services.prompt_dictionary import cached
+from app.services.prompt_proposals import MAX_RESPONSE_BYTES as PROPOSAL_MAX_RESPONSE_BYTES
+from app.services.proposal_provider import (
+    PROPOSAL_TIMEOUT_SECONDS,
+    proposals_advertised,
+)
 
 
 def authenticate(request: Request, authorization: Annotated[str | None, Header()] = None):
@@ -171,6 +177,20 @@ async def capabilities(request: Request):
         {"request_limits": {"max_body_bytes": max_body_bytes}}
         if max_body_bytes is not None else {}
     )
+    # C02-4: one added field, omitted entirely when proposals cannot run, so an old
+    # or misconfigured deployment never shows a button that always fails.
+    proposal_dictionary = cached(s, s.settings)
+    prompt_proposals = (
+        {
+            "prompt_proposals": {
+                "schema_versions": [1],
+                "max_response_bytes": PROPOSAL_MAX_RESPONSE_BYTES,
+                "timeout_ms": int(PROPOSAL_TIMEOUT_SECONDS * 1000),
+                "dictionary_version": proposal_dictionary.version,
+            }
+        }
+        if proposals_advertised(s.settings, proposal_dictionary) else {}
+    )
     return {
         "phase": 1,
         "engine": state(request).settings.engine,
@@ -178,6 +198,7 @@ async def capabilities(request: Request):
         "durable_sse": True,
         "prompt_composition": {"schema_versions": [1]},
         **request_limits,
+        **prompt_proposals,
         "pixel_processing": False,
         "phaser_export": False,
         "integrated_chat_proxy": False,

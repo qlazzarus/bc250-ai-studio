@@ -1,0 +1,1077 @@
+{
+  "config": {
+    "evaluatedAt": "2026-11-18",
+    "fixtureSource": "scripts/eval-ux01/scenes.mjs (project-authored, 12 scenes)",
+    "dictionary": {
+      "version": "1.2.0",
+      "entries": 100,
+      "family": "sd15",
+      "coverage": {
+        "mapped": 100,
+        "total": 100,
+        "family": "sd15"
+      }
+    },
+    "compiler": "1.3.0",
+    "llm": {
+      "called": 0,
+      "model": null,
+      "note": "규칙 엔진만 실행했다. 실제 LLM 응답·모델 설정·지연은 측정하지 않았다."
+    },
+    "variantArm": {
+      "scripted": true,
+      "note": "후보 문장은 스크립트이며 모델 품질 평가가 아니다."
+    },
+    "unmeasured": [
+      "입력→초안 승인 소요 시간",
+      "실제 LLM 응답의 정확도·지연",
+      "사용자 주관 평가",
+      "실제 생성 이미지 품질"
+    ],
+    "protocol": {
+      "rule": [
+        "원문 입력 1회",
+        "`원문에서 사전 항목 찾기` 1회",
+        "기대에 맞는 제안마다 `선택에 추가` 1회",
+        "원치 않는 제안마다 칩 `×` 1회",
+        "빠진 항목마다 `세부 조정` 1회 + 분류 1회 + 체크 1회"
+      ],
+      "variant": [
+        "원문 입력 1회",
+        "`장소와 행동만 바꾼 상황 3개` 1회",
+        "쓸 수 있는 후보에 `적용` 1회"
+      ],
+      "draft": "자동 미리보기 · 별도 클릭 없음"
+    }
+  },
+  "pooled": {
+    "scenes": 12,
+    "expected": 38,
+    "hits": 29,
+    "misses": 9,
+    "unwanted": 3,
+    "unclassified": 2,
+    "proposed": 34,
+    "unmatchedKo": 23,
+    "recall": 0.7631578947368421,
+    "precision": 0.9117647058823529,
+    "precisionDecided": 0.90625,
+    "clicksTotal": 80,
+    "clicksPerScene": 6.666666666666667,
+    "manualFixTotal": 27,
+    "manualEditsTotal": 9,
+    "distractors": 3,
+    "ruleClicksOnly": 53,
+    "variantClicksTotal": 36,
+    "variantBlocked": 12,
+    "variantUndoRestores": 12,
+    "partialRefused": 1
+  },
+  "scenes": [
+    {
+      "id": "daily-rain-store",
+      "title": "일상 · 비 오는 밤",
+      "kind": "common",
+      "hits": [
+        "subject.person",
+        "lighting.neon"
+      ],
+      "misses": [],
+      "unwanted": [],
+      "unclassified": [],
+      "expectedCount": 2,
+      "proposedCount": 2,
+      "labels": {
+        "hits": [
+          "인물",
+          "네온 조명"
+        ],
+        "misses": [],
+        "unwanted": []
+      },
+      "hints": [
+        {
+          "id": "lighting.neon",
+          "phrase": "네온 조명",
+          "score": 0.71
+        },
+        {
+          "id": "subject.person",
+          "phrase": "사람",
+          "score": 0.45
+        }
+      ],
+      "unmatchedKo": [
+        {
+          "text": "비 오는 밤",
+          "why": "날씨·시간 항목이 사전에 없음"
+        },
+        {
+          "text": "편의점",
+          "why": "장소 어휘 없음"
+        },
+        {
+          "text": "우산을 접으며",
+          "why": "소품·동작 어휘 없음"
+        },
+        {
+          "text": "친구를 기다리는",
+          "why": "관계·행동 어휘 없음"
+        }
+      ],
+      "unmatchedCount": 4,
+      "draft": "a person, neon lighting",
+      "warnings": [],
+      "finalChips": [
+        "인물",
+        "네온 조명"
+      ],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 2,
+        "distractors": 0,
+        "manualFix": 0,
+        "total": 4,
+        "manualEdits": 0
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    },
+    {
+      "id": "product-bottle",
+      "title": "제품 · 유리병",
+      "kind": "product",
+      "hits": [
+        "lighting.soft"
+      ],
+      "misses": [
+        "setting.plain_background"
+      ],
+      "unwanted": [],
+      "unclassified": [],
+      "expectedCount": 2,
+      "proposedCount": 1,
+      "labels": {
+        "hits": [
+          "부드러운 조명"
+        ],
+        "misses": [
+          "단색 배경"
+        ],
+        "unwanted": []
+      },
+      "hints": [
+        {
+          "id": "lighting.soft",
+          "phrase": "부드러운 조명",
+          "score": 0.83
+        }
+      ],
+      "unmatchedKo": [
+        {
+          "text": "유리병 제품",
+          "why": "제품·재질 어휘 없음"
+        },
+        {
+          "text": "화면 중앙에 놓여",
+          "why": "배치 어휘 없음"
+        },
+        {
+          "text": "글자 없이",
+          "why": "부정 조건을 표현할 필드가 없음"
+        }
+      ],
+      "unmatchedCount": 3,
+      "draft": "soft lighting",
+      "warnings": [],
+      "finalChips": [
+        "부드러운 조명"
+      ],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 1,
+        "distractors": 0,
+        "manualFix": 3,
+        "total": 6,
+        "manualEdits": 1
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    },
+    {
+      "id": "landscape-lake-dusk",
+      "title": "풍경 · 호수와 산",
+      "kind": "landscape",
+      "hits": [],
+      "misses": [
+        "setting.mountain",
+        "lighting.golden_hour"
+      ],
+      "unwanted": [
+        "subject.person"
+      ],
+      "unclassified": [],
+      "expectedCount": 2,
+      "proposedCount": 1,
+      "labels": {
+        "hits": [],
+        "misses": [
+          "산",
+          "골든 아워"
+        ],
+        "unwanted": [
+          "인물"
+        ]
+      },
+      "hints": [
+        {
+          "id": "subject.person",
+          "phrase": "사람",
+          "score": 0.45
+        }
+      ],
+      "unmatchedKo": [
+        {
+          "text": "호수",
+          "why": "수면 어휘 없음"
+        },
+        {
+          "text": "잔잔한 수면",
+          "why": "수면 상태 어휘 없음"
+        }
+      ],
+      "unmatchedCount": 2,
+      "draft": "",
+      "warnings": [],
+      "finalChips": [],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 0,
+        "distractors": 1,
+        "manualFix": 6,
+        "total": 8,
+        "manualEdits": 2
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    },
+    {
+      "id": "multi-person-street",
+      "title": "다인 · 두 사람이 걷는 거리",
+      "kind": "multi_person",
+      "hits": [
+        "subject.two_people",
+        "action.walking",
+        "location.street"
+      ],
+      "misses": [
+        "expression.smile"
+      ],
+      "unwanted": [],
+      "unclassified": [],
+      "expectedCount": 4,
+      "proposedCount": 3,
+      "labels": {
+        "hits": [
+          "두 사람",
+          "걷기",
+          "거리"
+        ],
+        "misses": [
+          "미소"
+        ],
+        "unwanted": []
+      },
+      "hints": [
+        {
+          "id": "location.street",
+          "phrase": "길거리",
+          "score": 0.51
+        },
+        {
+          "id": "subject.two_people",
+          "phrase": "두 명",
+          "score": 0.51
+        },
+        {
+          "id": "action.walking",
+          "phrase": "걷는",
+          "score": 0.45
+        }
+      ],
+      "unmatchedKo": [
+        {
+          "text": "여성",
+          "why": "성별·연령 항목 없음"
+        }
+      ],
+      "unmatchedCount": 1,
+      "draft": "two people, walking, on a street",
+      "warnings": [],
+      "finalChips": [
+        "두 사람",
+        "걷기",
+        "거리"
+      ],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 3,
+        "distractors": 0,
+        "manualFix": 3,
+        "total": 8,
+        "manualEdits": 1
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    },
+    {
+      "id": "negation-empty-beach",
+      "title": "부정 · 텅 빈 해변",
+      "kind": "negation",
+      "hits": [
+        "setting.beach"
+      ],
+      "misses": [],
+      "unwanted": [
+        "subject.person"
+      ],
+      "unclassified": [],
+      "expectedCount": 1,
+      "proposedCount": 2,
+      "labels": {
+        "hits": [
+          "해변"
+        ],
+        "misses": [],
+        "unwanted": [
+          "인물"
+        ]
+      },
+      "hints": [
+        {
+          "id": "setting.beach",
+          "phrase": "해변",
+          "score": 0.53
+        },
+        {
+          "id": "subject.person",
+          "phrase": "사람",
+          "score": 0.45
+        }
+      ],
+      "unmatchedKo": [
+        {
+          "text": "파도",
+          "why": "해양 어휘 없음"
+        },
+        {
+          "text": "텅 빈",
+          "why": "비어 있음 상태 어휘 없음"
+        },
+        {
+          "text": "동물",
+          "why": "동물 상위어 항목 없음"
+        }
+      ],
+      "unmatchedCount": 3,
+      "draft": "on a beach",
+      "warnings": [],
+      "finalChips": [
+        "해변"
+      ],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 1,
+        "distractors": 1,
+        "manualFix": 0,
+        "total": 3,
+        "manualEdits": 0
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    },
+    {
+      "id": "partial-lighting-only",
+      "title": "부분 수정 · 조명만",
+      "kind": "partial",
+      "hits": [
+        "setting.cafe",
+        "lighting.low_key"
+      ],
+      "misses": [
+        "lighting.window_light"
+      ],
+      "unwanted": [],
+      "unclassified": [],
+      "expectedCount": 3,
+      "proposedCount": 2,
+      "labels": {
+        "hits": [
+          "카페",
+          "어두운 조명"
+        ],
+        "misses": [
+          "창문 빛"
+        ],
+        "unwanted": []
+      },
+      "hints": [
+        {
+          "id": "lighting.low_key",
+          "phrase": "어두운 조명",
+          "score": 0.77
+        },
+        {
+          "id": "setting.cafe",
+          "phrase": "카페",
+          "score": 0.53
+        }
+      ],
+      "unmatchedKo": [
+        {
+          "text": "같은 옷",
+          "why": "이미 고른 값을 가리키는 지시문"
+        },
+        {
+          "text": "조명만 바꿔",
+          "why": "요청 범위를 말하는 지시문"
+        }
+      ],
+      "unmatchedCount": 2,
+      "draft": "a person, white shirt, in a cafe, low-key lighting",
+      "warnings": [],
+      "finalChips": [
+        "인물",
+        "흰 셔츠",
+        "카페",
+        "어두운 조명"
+      ],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 2,
+        "distractors": 0,
+        "manualFix": 3,
+        "total": 7,
+        "manualEdits": 1
+      },
+      "partial": {
+        "targetGroups": [
+          "lighting"
+        ],
+        "lockedIds": [
+          "subject.person",
+          "clothing.white_shirt"
+        ],
+        "lockedLabels": [
+          "인물",
+          "흰 셔츠"
+        ],
+        "accepted": [
+          "어두운 조명"
+        ],
+        "refused": [
+          "카페:out_of_scope"
+        ],
+        "changes": 1,
+        "kept": 2,
+        "blocked": 1,
+        "noChange": false
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    },
+    {
+      "id": "portrait-front-closeup",
+      "title": "인물 초상 · 정면 클로즈업",
+      "kind": "portrait",
+      "hits": [
+        "subject.portrait",
+        "camera.front_view",
+        "expression.neutral",
+        "appearance.short_hair",
+        "composition.close_up"
+      ],
+      "misses": [],
+      "unwanted": [],
+      "unclassified": [
+        "subject.person"
+      ],
+      "expectedCount": 5,
+      "proposedCount": 6,
+      "labels": {
+        "hits": [
+          "인물 초상",
+          "정면",
+          "무표정",
+          "짧은 머리",
+          "클로즈업"
+        ],
+        "misses": [],
+        "unwanted": []
+      },
+      "hints": [
+        {
+          "id": "appearance.short_hair",
+          "phrase": "짧은 머리",
+          "score": 0.71
+        },
+        {
+          "id": "subject.portrait",
+          "phrase": "인물 초상",
+          "score": 0.71
+        },
+        {
+          "id": "composition.close_up",
+          "phrase": "클로즈업",
+          "score": 0.65
+        },
+        {
+          "id": "expression.neutral",
+          "phrase": "무표정",
+          "score": 0.59
+        },
+        {
+          "id": "camera.front_view",
+          "phrase": "정면",
+          "score": 0.53
+        },
+        {
+          "id": "subject.person",
+          "phrase": "인물",
+          "score": 0.53
+        }
+      ],
+      "unmatchedKo": [],
+      "unmatchedCount": 0,
+      "draft": "a portrait, short hair, neutral expression, front view, close-up",
+      "warnings": [],
+      "finalChips": [
+        "인물 초상",
+        "정면",
+        "무표정",
+        "짧은 머리",
+        "클로즈업"
+      ],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 5,
+        "distractors": 0,
+        "manualFix": 0,
+        "total": 7,
+        "manualEdits": 0
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    },
+    {
+      "id": "alley-neon-coat",
+      "title": "거리 · 네온 골목",
+      "kind": "street",
+      "hits": [
+        "lighting.neon",
+        "clothing.coat",
+        "subject.person"
+      ],
+      "misses": [
+        "action.standing"
+      ],
+      "unwanted": [],
+      "unclassified": [],
+      "expectedCount": 4,
+      "proposedCount": 3,
+      "labels": {
+        "hits": [
+          "네온 조명",
+          "코트",
+          "인물"
+        ],
+        "misses": [
+          "서 있기"
+        ],
+        "unwanted": []
+      },
+      "hints": [
+        {
+          "id": "lighting.neon",
+          "phrase": "네온사인",
+          "score": 0.57
+        },
+        {
+          "id": "clothing.coat",
+          "phrase": "코트",
+          "score": 0.53
+        },
+        {
+          "id": "subject.person",
+          "phrase": "사람",
+          "score": 0.45
+        }
+      ],
+      "unmatchedKo": [
+        {
+          "text": "골목",
+          "why": "골목 어휘 없음"
+        },
+        {
+          "text": "좁은",
+          "why": "공간감 어휘 없음"
+        }
+      ],
+      "unmatchedCount": 2,
+      "draft": "a person, coat, neon lighting",
+      "warnings": [],
+      "finalChips": [
+        "네온 조명",
+        "코트",
+        "인물"
+      ],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 3,
+        "distractors": 0,
+        "manualFix": 3,
+        "total": 8,
+        "manualEdits": 1
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    },
+    {
+      "id": "cat-window-cozy",
+      "title": "고양이 · 창가",
+      "kind": "subject",
+      "hits": [
+        "subject.cat",
+        "lighting.soft"
+      ],
+      "misses": [
+        "pose.sitting",
+        "mood.cozy"
+      ],
+      "unwanted": [],
+      "unclassified": [],
+      "expectedCount": 4,
+      "proposedCount": 2,
+      "labels": {
+        "hits": [
+          "고양이",
+          "부드러운 조명"
+        ],
+        "misses": [
+          "앉기",
+          "포근한 분위기"
+        ],
+        "unwanted": []
+      },
+      "hints": [
+        {
+          "id": "lighting.soft",
+          "phrase": "은은한 빛",
+          "score": 0.63
+        },
+        {
+          "id": "subject.cat",
+          "phrase": "고양이",
+          "score": 0.59
+        }
+      ],
+      "unmatchedKo": [
+        {
+          "text": "담요",
+          "why": "소품 어휘 없음"
+        },
+        {
+          "text": "오후",
+          "why": "시간대 어휘 없음"
+        }
+      ],
+      "unmatchedCount": 2,
+      "draft": "a cat, soft lighting",
+      "warnings": [],
+      "finalChips": [
+        "고양이",
+        "부드러운 조명"
+      ],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 2,
+        "distractors": 0,
+        "manualFix": 6,
+        "total": 10,
+        "manualEdits": 2
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    },
+    {
+      "id": "group-hiking",
+      "title": "다인 · 산에 오르는 사람들",
+      "kind": "multi_person",
+      "hits": [
+        "subject.group"
+      ],
+      "misses": [
+        "setting.mountain"
+      ],
+      "unwanted": [
+        "subject.person"
+      ],
+      "unclassified": [],
+      "expectedCount": 2,
+      "proposedCount": 2,
+      "labels": {
+        "hits": [
+          "사람들"
+        ],
+        "misses": [
+          "산"
+        ],
+        "unwanted": [
+          "인물"
+        ]
+      },
+      "hints": [
+        {
+          "id": "subject.group",
+          "phrase": "사람들",
+          "score": 0.59
+        },
+        {
+          "id": "subject.person",
+          "phrase": "사람",
+          "score": 0.45
+        }
+      ],
+      "unmatchedKo": [
+        {
+          "text": "친구들과 함께",
+          "why": "관계 어휘 없음"
+        },
+        {
+          "text": "오르는",
+          "why": "등산 동작 어휘 없음"
+        },
+        {
+          "text": "맑은 날",
+          "why": "날씨 어휘 없음"
+        }
+      ],
+      "unmatchedCount": 3,
+      "draft": "a group of people",
+      "warnings": [],
+      "finalChips": [
+        "사람들"
+      ],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 1,
+        "distractors": 1,
+        "manualFix": 3,
+        "total": 6,
+        "manualEdits": 1
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    },
+    {
+      "id": "beach-sunset-couple",
+      "title": "해변 · 노을 역광",
+      "kind": "landscape",
+      "hits": [
+        "setting.beach",
+        "subject.two_people",
+        "lighting.backlight"
+      ],
+      "misses": [],
+      "unwanted": [],
+      "unclassified": [
+        "subject.person"
+      ],
+      "expectedCount": 3,
+      "proposedCount": 4,
+      "labels": {
+        "hits": [
+          "해변",
+          "두 사람",
+          "역광"
+        ],
+        "misses": [],
+        "unwanted": []
+      },
+      "hints": [
+        {
+          "id": "subject.two_people",
+          "phrase": "두 사람",
+          "score": 0.65
+        },
+        {
+          "id": "lighting.backlight",
+          "phrase": "역광",
+          "score": 0.53
+        },
+        {
+          "id": "setting.beach",
+          "phrase": "해변",
+          "score": 0.53
+        },
+        {
+          "id": "subject.person",
+          "phrase": "사람",
+          "score": 0.45
+        }
+      ],
+      "unmatchedKo": [
+        {
+          "text": "노을",
+          "why": "일몰 색채 어휘 없음"
+        }
+      ],
+      "unmatchedCount": 1,
+      "draft": "two people, on a beach, backlighting",
+      "warnings": [],
+      "finalChips": [
+        "해변",
+        "두 사람",
+        "역광"
+      ],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 3,
+        "distractors": 0,
+        "manualFix": 0,
+        "total": 5,
+        "manualEdits": 0
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    },
+    {
+      "id": "studio-bw-portrait",
+      "title": "스튜디오 · 흑백 인물",
+      "kind": "style",
+      "hits": [
+        "setting.plain_background",
+        "style.black_and_white",
+        "subject.person",
+        "style.photographic",
+        "camera.low_angle",
+        "expression.smile"
+      ],
+      "misses": [],
+      "unwanted": [],
+      "unclassified": [],
+      "expectedCount": 6,
+      "proposedCount": 6,
+      "labels": {
+        "hits": [
+          "단색 배경",
+          "흑백",
+          "인물",
+          "사진 스타일",
+          "로우 앵글",
+          "미소"
+        ],
+        "misses": [],
+        "unwanted": []
+      },
+      "hints": [
+        {
+          "id": "camera.low_angle",
+          "phrase": "로우 앵글",
+          "score": 0.71
+        },
+        {
+          "id": "setting.plain_background",
+          "phrase": "단색 배경",
+          "score": 0.71
+        },
+        {
+          "id": "expression.smile",
+          "phrase": "미소",
+          "score": 0.53
+        },
+        {
+          "id": "style.black_and_white",
+          "phrase": "흑백",
+          "score": 0.53
+        },
+        {
+          "id": "subject.person",
+          "phrase": "인물",
+          "score": 0.53
+        },
+        {
+          "id": "style.photographic",
+          "phrase": "사진",
+          "score": 0.45
+        }
+      ],
+      "unmatchedKo": [],
+      "unmatchedCount": 0,
+      "draft": "a person, smile, plain background, low angle, black and white, photographic style",
+      "warnings": [],
+      "finalChips": [
+        "단색 배경",
+        "흑백",
+        "인물",
+        "사진 스타일",
+        "로우 앵글",
+        "미소"
+      ],
+      "clicks": {
+        "input": 1,
+        "find": 1,
+        "accept": 6,
+        "distractors": 0,
+        "manualFix": 0,
+        "total": 8,
+        "manualEdits": 0
+      },
+      "variant": {
+        "cards": 3,
+        "blocked": 1,
+        "applicableLabels": [
+          "카페에 앉기",
+          "공원에서 걷기"
+        ],
+        "blockedReasons": [
+          "검은 셔츠로 바꾸기:out_of_scope"
+        ],
+        "undoRestores": true,
+        "clicks": 3
+      }
+    }
+  ]
+}

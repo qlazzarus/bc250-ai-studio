@@ -366,6 +366,12 @@
 .prompt-chip small { color: #b9bdc8; font-weight: 400; overflow-wrap: anywhere; }
 .prompt-proposals { margin: 4px 0 12px; }
 .prompt-proposals > .quiet { padding: 6px 10px; font-size: .78rem; }
+/* LLM-I04: the AI action sits next to the rule-based one; the status line is
+   contract text, so it stays visible instead of folding into a HelpNote. */
+.prompt-proposals__ai { margin-left: 6px; }
+/* VAR02: the situation request is its own action, not a second meaning for the AI one. */
+.prompt-proposals__variants { margin-left: 6px; }
+.prompt-proposals__status { margin: 8px 0 0; }
 .prompt-proposal-list { display: grid; gap: 6px; margin-top: 8px; padding: 10px; border: 1px solid #41444f; border-radius: 8px; }
 .prompt-proposal { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 8px; border: 1px solid #41444f; border-radius: 6px; background: #20222a; font-size: .78rem; }
 .prompt-proposal > div { min-width: 0; overflow-wrap: anywhere; }
@@ -373,6 +379,82 @@
 .prompt-proposal__warn { color: #f4cb84; }
 .prompt-proposal__score { font-variant-numeric: tabular-nums; color: #c6aaff; font-size: .74rem; font-weight: 700; }
 .prompt-proposal > .quiet { padding: 5px 9px; font-size: .74rem; white-space: nowrap; }
+/* LLM-I05: proposal cards. The four kinds are distinguished by a left border rather
+   than colour alone, so a blocked card is still readable without colour vision. */
+.prompt-cards { margin: 10px 0 0; padding: 10px; border: 1px solid #41444f; border-radius: 8px; background: #1b1d24; }
+.prompt-cards__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.prompt-cards__head strong { font-size: .82rem; }
+.prompt-cards__counts { color: #8f95a1; font-size: .72rem; font-variant-numeric: tabular-nums; }
+.prompt-cards__list { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.prompt-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  padding: 8px; border: 1px solid #41444f; border-left: 3px solid #7f8794; border-radius: 6px;
+  background: #20222a; font-size: .78rem; }
+.prompt-card[data-kind="quoted"] { border-left-color: #6ea8fe; }
+.prompt-card[data-kind="inferred"] { border-left-color: #c6aaff; }
+.prompt-card[data-kind="unresolved"] { border-left-color: #f4cb84; }
+.prompt-card[data-kind="ambiguous"] { border-left-color: #e08080; }
+.prompt-card[data-blocked] { opacity: .78; }
+.prompt-card__body { min-width: 0; overflow-wrap: anywhere; }
+.prompt-card__meta { color: #aeb4c1; font-weight: 400; }
+.prompt-card__reason { color: #8f95a1; }
+.prompt-card__score { color: #c6aaff; font-variant-numeric: tabular-nums; }
+.prompt-card__block { color: #f4cb84; }
+.prompt-card > .quiet { padding: 5px 9px; font-size: .74rem; white-space: nowrap; }
+.prompt-cards__excluded { margin: 8px 0 0; font-size: .76rem; }
+.prompt-cards__excluded > summary { cursor: pointer; color: #b9bfcb; }
+.prompt-cards__excluded ul { margin: 6px 0 0; padding-left: 18px; color: #8f95a1; }
+.prompt-cards__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.prompt-cards__actions > .quiet { padding: 6px 10px; font-size: .78rem; }
+/* LLM-I06: partial change. The scope chips read as a filter over the dictionary, the
+   diff as a before/after list, and the undo as one line that outlives the cards. */
+.prompt-scope { margin: 8px 0 0; border: 1px solid #41444f; border-radius: 8px; padding: 8px 10px; }
+.prompt-scope > summary { cursor: pointer; font-size: .78rem; font-weight: 700; color: #cfd4e0; }
+.prompt-scope[open] > summary { margin-bottom: 8px; }
+.prompt-scope__hint { margin-left: 6px; color: #8f95a1; font-size: .72rem; font-weight: 400; }
+.prompt-scope__groups { display: flex; flex-wrap: wrap; gap: 6px; }
+.prompt-scope__groups > .quiet { padding: 5px 9px; font-size: .74rem; }
+.prompt-scope__groups > .quiet[aria-pressed="true"] { color: #17111f; background: #c5a2ff; border-color: #c5a2ff; font-weight: 800; }
+.prompt-scope__count { margin-left: 5px; font-variant-numeric: tabular-nums; font-size: .7rem; opacity: .8; }
+.prompt-scope__actions { margin-top: 8px; }
+.prompt-scope__actions > .quiet { padding: 5px 9px; font-size: .74rem; }
+.prompt-diff { margin: 8px 0 0; padding: 8px; border: 1px dashed #4a4d59; border-radius: 6px; }
+.prompt-diff__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.prompt-diff__head strong { font-size: .78rem; }
+.prompt-diff__counts { color: #8f95a1; font-size: .72rem; font-variant-numeric: tabular-nums; }
+.prompt-diff__rows { display: grid; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; font-size: .76rem; }
+.prompt-diff__rows > li { padding-left: 8px; border-left: 3px solid #7f8794; overflow-wrap: anywhere; }
+.prompt-diff__rows > li[data-diff="kept"] { border-left-color: #6b7280; color: #aeb4c1; }
+.prompt-diff__rows > li[data-diff="change"] { border-left-color: #6ea8fe; }
+.prompt-diff__rows > li[data-diff="blocked"] { border-left-color: #f4cb84; color: #c9bda3; }
+.prompt-undo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 0; }
+.prompt-undo > .quiet { padding: 6px 10px; font-size: .76rem; }
+.prompt-variants { margin: 10px 0 0; padding: 10px; border: 1px solid #41444f; border-radius: 8px; background: #1b1d24; }
+.prompt-variants__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.prompt-variants__head strong { font-size: .82rem; }
+.prompt-variants__scope { color: #8f95a1; font-size: .72rem; }
+.prompt-variants__list { display: grid; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
+/* VAR02: the card and its one apply button share a row, like `.prompt-card`, so the
+   button never wraps under a long Korean sentence on desktop. */
+.prompt-variant { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px;
+  padding: 8px; border: 1px solid #383b45; border-left: 3px solid #7fc4a2; border-radius: 6px; background: #20222a; }
+.prompt-variant[data-blocked] { border-left-color: #f4cb84; opacity: .85; }
+/* The applied candidate is marked by a border and a word, not colour alone. */
+.prompt-variant[data-applied] { border-color: #4a6a8f; border-left-color: #6ea8fe; background: #1e2530; opacity: 1; }
+.prompt-variant__body { min-width: 0; overflow-wrap: anywhere; }
+.prompt-variant__body > strong { font-size: .8rem; }
+.prompt-variant__applied { color: #9fc4f5; font-weight: 600; }
+.prompt-variant__prompt { margin: 4px 0 0; font-size: .78rem; color: #d5d9e2; }
+.prompt-variant__changes { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 6px 0 0; padding: 0; list-style: none; font-size: .73rem; color: #aeb4c1; }
+.prompt-variant__changes > li[data-direction="add"] { color: #8fd0b0; }
+.prompt-variant__changes > li[data-direction="remove"] { color: #d9a6a6; }
+.prompt-variant__unresolved { margin: 6px 0 0; font-size: .73rem; color: #c6aaff; }
+.prompt-variant__warn { margin: 6px 0 0; font-size: .73rem; color: #8f95a1; }
+.prompt-variant__block { margin: 6px 0 0; font-size: .73rem; color: #f4cb84; }
+.prompt-variant > .quiet { padding: 5px 9px; font-size: .74rem; white-space: nowrap; }
+.prompt-variant-undo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 0; }
+.prompt-variant-undo > .quiet { padding: 6px 10px; font-size: .76rem; }
+.prompt-variant-undo > small { color: #8f95a1; }
+.prompt-undo > small { color: #8f95a1; }
 .prompt-warning--action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
 .prompt-warning--action > .quiet { padding: 3px 8px; font-size: .72rem; white-space: nowrap; }
 .prompt-notice--action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
@@ -418,6 +500,20 @@
   .prompt-category-count { font-size: .64rem; }
   .prompt-proposal { grid-template-columns: minmax(0, 1fr) auto; }
   .prompt-proposal > .quiet { grid-column: 1 / -1; text-align: center; }
+  /* LLM-I05: the accept button drops below the text at 460px so neither is clipped. */
+  .prompt-card { grid-template-columns: minmax(0, 1fr); }
+  .prompt-card > .quiet { width: 100%; white-space: normal; }
+  .prompt-cards__actions > .quiet { flex: 1 1 auto; text-align: center; }
+  /* LLM-I06: at 460px the scope chips and the undo wrap instead of shrinking the label. */
+  .prompt-scope__groups > .quiet { flex: 1 1 calc(50% - 6px); text-align: center; }
+  .prompt-undo > .quiet { flex: 1 1 auto; text-align: center; }
+  /* VAR01: at 460px three candidates stack and each sentence wraps instead of clipping. */
+  .prompt-variants { padding: 8px; }
+  .prompt-variant__changes { flex-direction: column; gap: 3px; }
+  /* VAR02: the apply button drops below the sentence, as the card accept button does. */
+  .prompt-variant { grid-template-columns: minmax(0, 1fr); }
+  .prompt-variant > .quiet { width: 100%; white-space: normal; }
+  .prompt-variant-undo > .quiet { flex: 1 1 auto; text-align: center; }
 }
 
 /* UX03: the queue folds so the composer gets the space back. A collapsed queue may

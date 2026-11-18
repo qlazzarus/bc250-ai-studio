@@ -30,7 +30,7 @@ LLM을 넣으면서 지켜야 하는 경계다. 이걸 어기면 지금까지 �
 2. **원문은 불변.** `free_text_ko`는 저장·표시 시 절대 변형하지 않는다. LLM 번역/보강은 별도 필드의 제안으로만 존재한다.
 3. **적용은 명시적.** 사용자가 제안을 확인·승인해야 반영된다. 자동 적용·자동 저장·무단 재결속 없음. A5의 현재 구현은 사용자가 버튼을 눌러야만 제안을 계산하고, 각 항목을 개별적으로 수락해야 선택에 들어간다.
 4. **출력은 구조화 스키마.** 자유 서술을 파싱하지 않는다. JSON Schema + `extra="forbid"` + 개수/길이 상한. 스키마에 없는 `id`는 거부.
-5. **결정론적 validator를 재사용한다.** LLM 제안도 `validateDictionary()`·`compileScene` 경고·32 KiB/8000자/4000자/100개 상한을 통과해야 채택 후보가 된다.
+5. **결정론적 validator를 재사용한다.** LLM 제안도 `validateDictionary()`·`compileScene` 경고·8000자/4000자/100개 상한과 **제안 응답 16 KiB**(LLM-C01 확정, 구성 객체 32 KiB와 별개)를 통과해야 채택 후보가 된다.
 6. **GPU 경합을 기본 전제로 둔다.** 온라인 호출은 gate 경유 + 명시적 트리거 + 짧은 타임아웃. 실패 시 사전/직접 생성이 그대로 동작해야 한다(P8 요구).
 7. **재현성 기록.** LLM 제안을 적용한 구성에는 `compiler_version`이 아니라 `proposal_id`·`proposal_model`·`accepted_at`을 남긴다. 컴파일러 버전을 오염시키지 않는다.
 8. **free text는 신뢰 경계 밖 데이터.** 시스템 프롬프트에 이어붙이지 않고 별도 user 메시지의 데이터로만 취급한다(프롬프트 인젝션 방어).
@@ -189,7 +189,7 @@ POST /api/v1/prompt/proposals/{id}/accept   (수락 → selections 반영은 클
 
 - `id`는 **현재 사전에 존재하는 항목만** 통과. 나머지는 `rejected`에 사유와 함께 남겨 관측 가능하게 한다.
 - `suggestions`는 `max_suggestions` 이하, `reason_ko` 길이 상한, `confidence`는 0~1.
-- 응답 전체가 32 KiB·개수 상한을 넘으면 잘라서 `truncated: true`로 알린다(조용한 절단 금지).
+- 응답 전체가 32 KiB·개수 상한을 넘으면 잘라서 `truncated: true`로 알린다(조용한 절단 금지). **LLM-C01 확정값은 16 KiB**다(아래 확정 안내 참조).
 - 응답은 `extra="forbid"` Pydantic 모델로 검증하고, 스키마 불일치는 422가 아니라 **`status: "unavailable"` 제안**으로 반환해 UI가 조용히 degrade하게 한다.
 - 수락 시 저장되는 것은 LLM 원문이 아니라 **`id` 목록 + `proposal_id`**다. 문구는 항상 사전에서 다시 읽어 compiler가 조립한다.
 
@@ -203,6 +203,17 @@ POST /api/v1/prompt/proposals/{id}/accept   (수락 → selections 반영은 클
 | `translation` | A5의 원문 번역 변형 | 온라인 1회 |
 
 A1–A4·A8은 대화형 API가 아니라 **오프라인 배치 산출물**이다. 파일(JSON/CSV)로 리포트만 남기며 위 엔드포인트를 쓰지 않는다.
+
+> **계약 확정 위치(2026-11-17).** 위 초안은 [실행 태스크의 LLM-C01](PROMPT_COMPOSER_EXECUTION_TASKS.md#llm-c01--제안과-미반영-의미의-계약-결정--완료)에서 확정본으로 대체됐다. 확정된 요청/응답 필드(`basis`, `polarity`, `actor`, `unresolved_spans`, `ambiguities`, `request_id`, `revisions`), 거절·보류 결정표, 상한(**응답 16 KiB**, 제안 8개, `unresolved_spans` 8개·각 200자, `rejected` 12개)은 그 절이 단일 출처이며, 이 절의 "32 KiB" 예시보다 우선한다. `kind`에서 `translation`·`attribute_split`은 v1 미지원(`status: "unsupported_v1"`)으로 거절한다.
+>
+> **운반 경로·인증·저장 경계(LLM-C02).** 같은 문서의 C02 절이 확정본이다. 핵심: ① gate 데이터 경로에는 자체 인증이 없으므로 **Studio가 유일한 인증 경계**다. ② timeout 20초·세션당 1건·전역 2건·자동 재시도 없음·스트리밍 없음. ③ `POST /api/v1/prompt/proposals`를 기존 router 인증으로 추가하고, capability는 `prompt_proposals` 필드 하나만 추가한다(`fake`·gate 미설정 시 생략). ④ v1은 `jobs.spec`을 확장하지 않으므로 제안 이력은 저장되지 않는다. ⑤ 이 절 5절의 GPU 정책표는 C02-3의 상태별 결정표로 대체된다.
+>
+> **수락 UI 확정(LLM-I05).** 응답의 `suggestions`는 카드가 되고, `basis: "inferred"`는 **차단이 아니라 일괄 수락 제외**다 — 개별 수락은 허용된다(위 C01-3/C01-4). 일괄 버튼에는 `basis: "quote"`이면서 막는 사유(중복·사전 밖·비활성·이미 선택·충돌·미변환)가 없는 항목만 들어간다. `unresolved_spans`/`ambiguities`는 표시 전용이며 선택으로 바뀌지 않는다. 수락은 수동 선택과 같은 `selectEntry()` 경로를 쓰고 원문·최종 prompt를 바꾸지 않는다. 이는 4절의 "`id` 목록 + `proposal_id` 저장" 초안보다 우선한다 — v1은 제안 이력을 저장하지 않고 `jobs.spec`도 확장하지 않는다(C02).
+
+> **부분 변경·되돌리기 확정(LLM-I06).** `partial_change`는 새 응답 형식이 아니라 **같은 응답을 범위로 판정**하는 요청이다. `target_groups`는 사용자가 고른 표시 그룹이고, `locked_ids`는 그 그룹 **밖의 현재 선택**을 클라이언트가 계산한 값이다(사용자가 입력하지 않는다). 잠금은 **설정 고정**이며 동일 인물 보장이 아니다 — UI 문구가 그렇게 쓴다(C01-6 #5). 서버는 잠긴 ID를 `locked`, 범위 밖을 `out_of_scope`로 거절하고, 클라이언트도 같은 두 규칙으로 카드를 차단하므로 스텁·구버전 응답이 약속을 우회하지 못한다. 수락 전에 고정/추가/적용 불가 diff를 보여주며, 되돌리기는 **직전 수락이 추가한 ID만** 제거하고 지문이 달라졌으면 비활성한다. 전체 장면 자동 대체·다단계 이력·`jobs.spec` 확장은 여전히 하지 않는다.
+
+> **상황 후보 확정(VAR01).** `situation_variants`는 세 번째 kind이며 새 응답 필드 `variants`를 쓴다. 요청은 `target_groups`를 표시 그룹 `pose`·`setting`으로 제한하고(`action`→`pose`, `location`→`setting` 별칭), 나머지 선택은 `locked_ids`로 고정한다. 후보는 `{variant_id, label_ko, prompt_ko, changed_ids, removed_ids, unresolved_ko, actor}`이고 최대 3개, `label_ko` 40자·`prompt_ko` 200자·ID 목록 20개 상한이다. 후보는 **통째로** 거절한다(`attribution_unsupported_v1`, `no_change`, `duplicate`, `not_in_dictionary`, `inactive_entry`, `locked`, `already_selected`, `not_selected`, `out_of_scope`) — 일부만 적용된 "장소만 바뀐" 반쪽 상황을 만들지 않는다. 다른 kind의 `variants`는 예전처럼 `unexpected_kind`로 거절하고, 두 구 kind의 응답에는 `variants` 키가 아예 없어 기존 바이트가 유지된다. 후보는 사전 제안이 아니라 비교용 한국어 문장이므로 `selection_hint`의 수락·일괄 경로를 타지 않고 저장되지도 않는다. 적용은 VAR02의 카드별 `적용` 버튼 한 번이며, `variantApply.ts`가 차단 사유를 다시 확인한 뒤 `selectEntry`/`removeEntry`로 장면만 바꾸고 적용 전 장면 전체를 기록해 지문 조건부 한 단계 되돌리기를 제공한다. 후보 문장은 원문·최종 prompt·`jobs.spec` 어디에도 저장되지 않는다. 실제 LLM 호출·후보 품질 평가는 아직 하지 않았다.
+
 
 ## 5. GPU 경합과 호출 시점
 

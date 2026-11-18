@@ -1,9 +1,35 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { compileScene, DRAFT_LIMIT } from "../prompt/compiler";
 import { type PromptBuilderState, isDraftStale, withGeneratedDraft, withAppliedDraft, draftComposition } from "../prompt/builderState";
-import { DICTIONARY, DICTIONARY_VERSION, familyCoverage } from "../prompt/dictionary";
+import { DICTIONARY, DICTIONARY_VERSION, familyCoverage, type DictionaryEntry } from "../prompt/dictionary";
 import { changeSceneFamily, removeEntry, selectEntry, type SceneSpecification } from "../prompt/scene";
 import { explainWarning, suggestSelections } from "../prompt/proposals";
+import {
+  type ProposalCapability, UNSUPPORTED, proposalActionLabel, proposalFallbackNotice,
+} from "../prompt/proposalCapability";
+import {
+  ERROR_MESSAGES, IDLE, VARIANT_KIND, cancelProposal, dismissProposal,
+  invalidateProposal, isPending, newRequestId, proposalBody, proposalNotice, reapplyProposal,
+  revisionsFor, runProposal, settleProposal, startProposal, unapplyProposal,
+  VARIANT_GROUPS,
+  type ProposalRevisions, type ProposalState,
+} from "../prompt/llmProposals";
+import {
+  blockReason, cardConfidence, proposalCards, type ProposalCard,
+} from "../prompt/proposalCards";
+import {
+  LOCK_NOTE, describeScope, partialDiff, partialScope, scopeIsActive,
+} from "../prompt/partialChange";
+import {
+  variantBlockReason, variantCards, variantHeadline, type VariantCard,
+} from "../prompt/situationVariants";
+import {
+  applyVariantScene, recordVariantApply, undoVariantScene, variantUndoStatus,
+  type VariantApplyRecord,
+} from "../prompt/variantApply";
+import {
+  recordAcceptance, undoScene, undoStatus, type AcceptRecord,
+} from "../prompt/proposalUndo";
 import {
   DISPLAY_GROUP as displayGroup, activeGroups, filterOptions, nextFocusAfterRemoval,
   selectionCounts, recoveryActions, previewControls, inclusionNotice, appliedStatus,
@@ -24,6 +50,10 @@ type Props = {
   onChange: (value: string) => void;
   state: PromptBuilderState;
   setState: (update: (state: PromptBuilderState) => PromptBuilderState) => void;
+  /** LLM-I04: server capability. Absent/false keeps the rule-based panel only. */
+  proposalCapability?: ProposalCapability;
+  /** Sends one proposal request. `undefined` on an unsupported server. */
+  sendProposal?: (body: unknown, signal: AbortSignal) => Promise<unknown>;
 };
 
 /**
@@ -36,7 +66,9 @@ function HelpNote({ summary, children }: { summary: string; children: ReactNode 
   return <details className="prompt-help"><summary>{summary}</summary><p className="prompt-hint">{children}</p></details>;
 }
 
-export default function PromptBuilder({ family, compositionSupported, value, onChange, state, setState }: Props) {
+export default function PromptBuilder({
+  family, compositionSupported, value, onChange, state, setState, proposalCapability, sendProposal,
+}: Props) {
   const [open, setOpen] = useState(false);
   /** UX02: the dictionary picker is the detail step, so it starts folded. */
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -49,8 +81,127 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
   const [hintsOpen, setHintsOpen] = useState(false);
   /** Set before the render that removes a chip; consumed after that render. */
   const pendingFocusRef = useRef<{ target: string | null } | null>(null);
+  /**
+   * LLM-I05: accepting a card removes the buttons inside it, including the one that
+   * had focus. The tick runs the restore after the commit, like the chip removal.
+   */
+  const [cardFocusTick, setCardFocusTick] = useState(0);
+  const batchRef = useRef<HTMLButtonElement | null>(null);
+  const aiRef = useRef<HTMLButtonElement | null>(null);
   const removeRefs = useRef(new Map<string, HTMLButtonElement>());
   const searchRef = useRef<HTMLInputElement | null>(null);
+  /**
+   * LLM-I04 state. Kept local to the composer: App's builder state, the final prompt
+   * and the accepted draft are untouched by a proposal request, in any outcome.
+   */
+  const [proposal, setProposal] = useState<ProposalState>(IDLE);
+  const proposalAbortRef = useRef<AbortController | null>(null);
+  /**
+   * LLM-I06 partial change: the groups the user wants changed, and the one-step undo
+   * record. Both are local to the composer — no scene or server field is added.
+   */
+  const [targetGroups, setTargetGroups] = useState<string[]>([]);
+  const [acceptRecord, setAcceptRecord] = useState<AcceptRecord | null>(null);
+  /**
+   * VAR02: the scene a chosen situation was applied to, and the fingerprint it
+   * produced. Both live here, next to `acceptRecord`: a candidate is a scene edit, so
+   * it gets the same one-step undo, decided by the fingerprint rather than a timer.
+   */
+  const [variantRecord, setVariantRecord] = useState<VariantApplyRecord | null>(null);
+  const undoRef = useRef<HTMLButtonElement | null>(null);
+  const capability = proposalCapability ?? UNSUPPORTED;
+  const aiEnabled = capability.supported && Boolean(sendProposal);
+  const revisions = useMemo(() => revisionsFor(state.scene), [state.scene]);
+  /** Read inside async settle so the guard sees the state at reply time, not at send. */
+  const revisionsRef = useRef<ProposalRevisions>(revisions);
+  /**
+   * LLM-I04: `settleProposal` runs after an await, so it cannot read the render
+   * closure. The ref is the *current* fingerprint, written by an effect rather than
+   * during render (a ref write in render is a React violation). The effect flushes
+   * on commit, long before a reply can arrive, so a reply always compares against the
+   * fingerprint of the screen the user is looking at.
+   */
+  useEffect(() => { revisionsRef.current = revisions; }, [revisions]);
+  /**
+   * The visible state is derived, never written by an effect: as soon as the text,
+   * the model family or the selection changes, an in-flight request reads as
+   * cancelled ("stale") and its reply is discarded at settle time. That keeps the
+   * screen honest while typing without a setState per keystroke.
+   */
+  const visibleProposal = invalidateProposal(proposal, revisions);
+  const loading = isPending(visibleProposal) ? visibleProposal : null;
+  const pending = loading !== null;
+  /** VAR02: a variant request in flight has its own cancel label in its own button. */
+  const pendingVariant = loading !== null && loading.kind === VARIANT_KIND;
+  const statusNotice = proposalNotice(visibleProposal);
+  /**
+   * LLM-I05 cards. Recomputed from the dictionary and the current selection on every
+   * render, so `already_selected`/`unmapped` follow the screen instead of the reply.
+   * LLM-I06 adds the request scope, so a locked or out-of-scope ID is blocked here as
+   * well as on the server.
+   */
+  const cards = useMemo(
+    () => (visibleProposal.phase === "ready" || visibleProposal.phase === "empty"
+      ? proposalCards({
+        reply: visibleProposal.reply, scene: state.scene, dictionary: DICTIONARY, family,
+        scope: visibleProposal.scope,
+      })
+      : null),
+    [visibleProposal, state.scene, family],
+  );
+  /** The scope a *fresh* request would carry: what the button label and panel show. */
+  const scope = partialScope(state.scene, targetGroups);
+  const scopeActive = scopeIsActive(scope);
+  /** The diff is only meaningful for a reply that arrived for a scope. */
+  const diff = useMemo(() => {
+    if (!cards) return null;
+    const settled = visibleProposal;
+    if (settled.phase !== "ready" && settled.phase !== "empty") return null;
+    if (!settled.scope) return null;
+    return partialDiff({ cards, scene: state.scene, scope: settled.scope });
+  }, [cards, visibleProposal, state.scene]);
+  const undo = undoStatus(acceptRecord, state.scene, revisions);
+  /**
+   * VAR02: the one-step undo of a chosen situation. `variantUndoStatus` compares the
+   * fingerprint of the scene the candidate produced with the current one, so a chip the
+   * user removed after applying refuses the undo instead of overwriting that removal.
+   */
+  const variantUndo = variantUndoStatus(variantRecord, revisions);
+  /** The card that produced the current selection, if the scene still matches it. */
+  const appliedVariantKey = variantRecord !== null && variantUndo.allowed ? variantRecord.key : null;
+  /**
+   * VAR02: the status line above says "아직 선택에 반영하지 않았습니다" until a card is
+   * accepted. Applying a situation is an explicit acceptance, so the same line has to
+   * say so; a candidate is not a suggestion, so `acceptedIds` cannot carry that fact.
+   */
+  const proposalStatus = statusNotice !== null && appliedVariantKey !== null && variantRecord !== null
+    && visibleProposal.phase === "ready" && visibleProposal.kind === VARIANT_KIND
+    ? { tone: statusNotice.tone,
+        text: `“${variantRecord.labelKo}” 상황을 적용했습니다. 다른 후보와 비교하거나 바로 되돌릴 수 있습니다.` }
+    : statusNotice;
+  /**
+   * The scene the candidates are judged against.
+   *
+   * While one candidate is applied and nothing else has moved, that is the scene *before*
+   * the apply: the candidates were written for it, so taking the second one must not be
+   * blocked as "지금 선택에 없는 항목입니다" just because the first was taken. Any other
+   * edit withdraws the reply anyway (`invalidateProposal`), so this is the only case
+   * where the two differ.
+   */
+  const variantBase = appliedVariantKey !== null && variantRecord !== null ? variantRecord.before : state.scene;
+  /**
+   * VAR01: candidates are rendered from the reply and the *current* selection, like the
+   * suggestion cards, so a chip the user removes after the reply changes the diff
+   * instead of leaving a stale one. VAR02 adds the explicit per-card apply.
+   */
+  const variants = useMemo(() => {
+    const settled = visibleProposal;
+    if (settled.phase !== "ready" && settled.phase !== "empty") return null;
+    if (settled.kind !== VARIANT_KIND) return null;
+    return variantCards({
+      reply: settled.reply, scene: variantBase, dictionary: DICTIONARY, family, scope: settled.scope,
+    });
+  }, [visibleProposal, variantBase, family]);
   const selected = new Set(state.scene.selections.map((item) => item.id));
   const categories = activeGroups(DICTIONARY);
   const counts = selectionCounts(state.scene.selections);
@@ -118,12 +269,39 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
     }
   }, [chipOrder.length]);
 
+  /**
+   * Accepting a card unmounts the button that had focus (the item is no longer a
+   * suggestion). Focus moves to the first still-actionable card, then the batch
+   * action, then the AI button: never to a hidden control and never to `document.body`.
+   *
+   * The target is found in the committed DOM, not in a ref map: the accepted card's
+   * ref is detached in the same commit, so a map lookup can miss the survivor.
+   */
+  useEffect(() => {
+    if (!cardFocusTick) return;
+    // VAR02 adds two more places a button can vanish from: the applied card's "적용" and
+    // the situation undo line. Both are in the same panel, so they join the same chain
+    // instead of dropping focus to `document.body`.
+    const next = document.querySelector<HTMLButtonElement>(
+      "#prompt-cards .prompt-card button:not(:disabled), #prompt-variants .prompt-variant button:not(:disabled),"
+      + " .prompt-variant-undo button:not(:disabled), .prompt-undo button:not(:disabled)",
+    );
+    (next ?? batchRef.current ?? aiRef.current)?.focus();
+  }, [cardFocusTick]);
+
   function setScene(update: (scene: SceneSpecification) => SceneSpecification) {
     setState((current) => {
       const scene = current.scene.targetFamily === family ? current.scene : changeSceneFamily(current.scene, family, DICTIONARY, DICTIONARY_VERSION);
       const next = { ...current, scene: update(scene) };
       return family ? withGeneratedDraft(next, compileScene(next.scene)) : next;
     });
+  }
+
+  /** The scene a click is about to edit, rebound to the current family when needed. */
+  function boundScene(scene: SceneSpecification): SceneSpecification {
+    return scene.targetFamily === family
+      ? scene
+      : changeSceneFamily(scene, family, DICTIONARY, DICTIONARY_VERSION);
   }
 
   function setFreeText(freeTextKo: string) {
@@ -190,6 +368,214 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
     if (!entry) return;
     setScene((scene) => selectEntry(scene, entry, DICTIONARY_VERSION));
     setNotice(`"${entry.labelKo}"을(를) 선택에 추가했습니다. 원문은 그대로 유지됩니다.`);
+  }
+
+  /**
+   * LLM-I05: accepting a card uses the same `selectEntry`/`compileScene` path as a
+   * checkbox, so a proposal cannot produce a scene the picker could not. The reply is
+   * re-based on the new fingerprint (`reapplyProposal`) so the remaining cards survive
+   * the click; editing the text still withdraws all of them.
+   */
+  function acceptCards(entries: { id: string; entry: DictionaryEntry; labelKo: string }[]) {
+    if (!entries.length) return;
+    const previousIds = state.scene.selections.map((item) => item.id);
+    const next = entries.reduce(
+      (scene, item) => selectEntry(scene, item.entry, DICTIONARY_VERSION), boundScene(state.scene),
+    );
+    setState((current) => {
+      const updated = { ...current, scene: next };
+      return family ? withGeneratedDraft(updated, compileScene(next)) : updated;
+    });
+    // LLM-I06: what this click added, and the fingerprint it produced. The undo button
+    // reads the current revisions, so a later edit refuses the undo instead of
+    // reverting a scene the record no longer describes.
+    const record = recordAcceptance({
+      ids: entries.map((item) => item.id), labels: entries.map((item) => item.labelKo),
+      previousIds, revisions: revisionsFor(next),
+    });
+    if (record.ids.length > 0) setAcceptRecord(record);
+    // VAR02: one undo slot. An acceptance and a chosen situation are both "the last
+    // scene edit", so taking a card replaces the situation record instead of leaving two
+    // undo lines that each describe a different scene.
+    setVariantRecord(null);
+    // Re-base the reply on the selection the click just produced, so the remaining
+    // cards stay usable. A text edit still invalidates everything (see the module).
+    setProposal((current) => reapplyProposal(
+      current, revisionsFor(next), entries.map((item) => item.id),
+    ));
+    setCardFocusTick((tick) => tick + 1);
+    setNotice(entries.length === 1
+      ? `"${entries[0].labelKo}"을(를) 선택에 추가했습니다. 원문과 최종 프롬프트는 그대로입니다.`
+      : `제안 ${entries.length}개를 선택에 추가했습니다. 원문과 최종 프롬프트는 그대로입니다.`);
+  }
+
+  function acceptCard(card: ProposalCard) {
+    if (!card.entry || card.id === null || card.blocks.length > 0) return;
+    acceptCards([{ id: card.id, entry: card.entry, labelKo: card.labelKo }]);
+  }
+
+  /** Batch acceptance: quoted, unblocked cards only (C01-3). Nothing is guessed. */
+  function acceptBatch() {
+    if (!cards) return;
+    const ids = new Set(cards.batchIds);
+    const entries = cards.cards
+      .filter((card) => card.id !== null && ids.has(card.id) && card.entry !== null)
+      .map((card) => ({ id: card.id as string, entry: card.entry as DictionaryEntry, labelKo: card.labelKo }));
+    acceptCards(entries);
+  }
+
+  /**
+   * LLM-I06 one-step undo. It removes only the IDs the acceptance added, and only while
+   * `undoStatus` says the scene still matches that acceptance: a later hand edit or a
+   * text change refuses it rather than overwriting the user's work.
+   */
+  function undoCards() {
+    if (!acceptRecord || !undo.allowed) return;
+    const next = undoScene(boundScene(state.scene), acceptRecord);
+    setState((current) => {
+      const updated = { ...current, scene: next };
+      return family ? withGeneratedDraft(updated, compileScene(next)) : updated;
+    });
+    setProposal((current) => unapplyProposal(current, revisionsFor(next), undo.ids));
+    setAcceptRecord(null);
+    setNotice(undo.ids.length === 1
+      ? `방금 추가한 "${acceptRecord.labels[acceptRecord.ids.indexOf(undo.ids[0])] ?? undo.ids[0]}"을(를) 되돌렸습니다. 원문과 최종 프롬프트는 그대로입니다.`
+      : `방금 추가한 ${undo.ids.length}개를 되돌렸습니다. 원문과 최종 프롬프트는 그대로입니다.`);
+    // The chip's × button disappears with the chip, so focus goes to the next control
+    // that still exists instead of `document.body`.
+    setCardFocusTick((tick) => tick + 1);
+  }
+
+  /**
+   * VAR02: turning one candidate into a selection.
+   *
+   * The candidate is applied through the same `selectEntry`/`removeEntry` path a chip
+   * uses, then the draft is regenerated like any other selection edit. The final prompt
+   * is not touched: applying it stays the explicit "적용" step, exactly as before.
+   *
+   * The record keeps the *whole* pre-apply scene because a candidate can also remove a
+   * place or action, and re-adding it by id would lose the expression it was selected
+   * with. A blocked card is refused here too, in case a click races a render.
+   *
+   * `variantBase` is the scene the cards were judged against. Applying a second
+   * candidate therefore swaps from the same starting scene the first one used, instead
+   * of stacking two situations, and the undo always lands on that one scene.
+   */
+  function applyVariant(card: VariantCard) {
+    if (card.blocks.length > 0) return;
+    // Recorded exactly as applied, so the undo restores the scene the user was looking
+    // at even after a family rebind, like `undoCards` does.
+    const before = boundScene(variantBase);
+    const applied = applyVariantScene({
+      scene: before, card, dictionary: DICTIONARY, dictionaryVersion: DICTIONARY_VERSION,
+    });
+    if (applied === null) {
+      setNotice("이 상황은 지금 선택에 반영할 수 없습니다. 상황 후보를 다시 요청하세요.");
+      return;
+    }
+    const next = applied.scene;
+    setState((current) => {
+      const updated = { ...current, scene: next };
+      return family ? withGeneratedDraft(updated, compileScene(next)) : updated;
+    });
+    setVariantRecord(recordVariantApply({
+      key: card.key, variantId: card.variantId, labelKo: card.labelKo, before, after: next,
+    }));
+    // The mirror image: a chosen situation is now the last scene edit, so the card
+    // acceptance's undo is replaced rather than shown next to a different one.
+    setAcceptRecord(null);
+    // The cards are rebuilt from the new selection anyway; re-basing keeps the reply
+    // alive for a second look instead of withdrawing it as stale after one click.
+    setProposal((current) => reapplyProposal(current, revisionsFor(next)));
+    setCardFocusTick((tick) => tick + 1);
+    // A candidate may carry Korean the dictionary cannot express. Those words are not
+    // applied, and the sentence says so instead of leaving the user to notice.
+    const missed = card.unresolvedKo.length
+      ? ` 사전에 없는 표현 “${card.unresolvedKo.join("”, “")}”은(는) 반영되지 않았습니다.`
+      : "";
+    setNotice(`“${card.labelKo}” 상황을 선택에 반영했습니다.${missed} 원문과 최종 프롬프트는 그대로입니다.`);
+  }
+
+  /**
+   * VAR02 undo: restores the scene the candidate was applied to, in one step. The
+   * fingerprint gate is `variantUndoStatus`; a chip removed after the apply refuses the
+   * undo instead of re-adding everything the candidate touched.
+   */
+  function undoVariant() {
+    if (!variantRecord || !variantUndo.allowed) return;
+    const next = undoVariantScene(variantRecord);
+    setState((current) => {
+      const updated = { ...current, scene: next };
+      return family ? withGeneratedDraft(updated, compileScene(next)) : updated;
+    });
+    setProposal((current) => unapplyProposal(current, revisionsFor(next)));
+    setVariantRecord(null);
+    setCardFocusTick((tick) => tick + 1);
+    setNotice(`“${variantRecord.labelKo}” 상황 적용을 되돌렸습니다. 원문과 최종 프롬프트는 그대로입니다.`);
+  }
+
+  /** Refusal: closes the cards and leaves the selection exactly as it was. */
+  function dismissCards() {
+    setProposal((current) => dismissProposal(current));
+    setNotice("AI 제안을 닫았습니다. 원문과 선택은 그대로입니다.");
+  }
+
+  /**
+   * LLM-I04: one explicit attempt, never on typing. The request is built from an
+   * immutable snapshot, and the reply is only adopted when both its `request_id` and
+   * its revisions still describe this screen. A cancel or a stale answer leaves the
+   * text, the selections and the final prompt exactly as they were.
+   */
+  async function requestProposal(mode: "scene" | "variant" = "scene") {
+    if (!aiEnabled || !sendProposal) return;
+    if (pending) {
+      cancelProposalRequest();
+      return;
+    }
+    // `random` and the clock are avoided: an id only needs to be unique per screen.
+    const requestId = newRequestId();
+    // LLM-I06: an open partial scope turns the same button into "조명만 변경". The
+    // locked IDs are derived from the scene on screen, so the user never types them.
+    // VAR02: a situation request is always place/action only, so its scope is derived
+    // from `VARIANT_GROUPS` and never from the picker above — the cast stays locked
+    // even when the user happens to have "대상" selected as a partial target.
+    const scope = partialScope(state.scene, mode === "variant" ? [...VARIANT_GROUPS] : targetGroups);
+    const built = proposalBody({
+      scene: state.scene, family, dictionaryVersion: DICTIONARY_VERSION, requestId, scope,
+      variant: mode === "variant",
+    });
+    if ("code" in built) {
+      setProposal({ phase: "error", message: ERROR_MESSAGES[built.code] });
+      return;
+    }
+    // Abort whatever was still open, then register the new controller before any await
+    // so a cancel click during the send always finds something to abort.
+    const controller = new AbortController();
+    proposalAbortRef.current?.abort();
+    proposalAbortRef.current = controller;
+    setProposal((current) => startProposal(current, {
+      requestId, revisions: built.body.revisions,
+      kind: built.body.kind,
+      // VAR01: candidates keep their scope on the state too, so the client can block a
+      // locked or out-of-scope candidate without trusting the reply (VAR02 sends it).
+      scope: built.body.target_groups
+        ? { targetGroups: built.body.target_groups, lockedIds: built.body.locked_ids ?? [] }
+        : null,
+    }));
+    const outcome = await runProposal({
+      body: built.body, send: sendProposal, signal: controller.signal, timeoutMs: capability.timeoutMs,
+    });
+    if (proposalAbortRef.current === controller) proposalAbortRef.current = null;
+    // `revisionsRef`, not `built.body.revisions`: the user may have edited since.
+    setProposal((current) => settleProposal(current, {
+      requestId, outcome, currentRevisions: revisionsRef.current,
+    }));
+  }
+
+  function cancelProposalRequest() {
+    proposalAbortRef.current?.abort();
+    proposalAbortRef.current = null;
+    setProposal((current) => cancelProposal(current));
   }
 
   /**
@@ -262,7 +648,207 @@ export default function PromptBuilder({ family, compositionSupported, value, onC
           onClick={() => setHintsOpen(!hintsOpen)}>
           {hintsOpen ? "제안 닫기" : "원문에서 사전 항목 찾기"}
         </button>
-        <HelpNote summary="제안 동작 안내">입력한 원문에서 사전 항목을 찾아 제안합니다. 원문은 바뀌지 않고, 추가는 직접 눌러야 반영됩니다.</HelpNote>
+        {/*
+          LLM-I04: the AI action exists only when the server advertises the capability.
+          An unsupported server gets one plain sentence instead of a disabled button,
+          and the rule-based list above stays the only proposal path.
+        */}
+        {aiEnabled
+          ? <button type="button" className="quiet prompt-proposals__ai" ref={aiRef}
+              onClick={() => void requestProposal()}
+              // While the situation request is in flight this button would silently
+              // cancel it and send nothing, so it waits for that request to settle.
+              disabled={!family || !state.scene.freeTextKo.trim() || pendingVariant}>
+              {pending && !pendingVariant ? "정리 취소"
+                : scopeActive ? "선택한 그룹만 정리" : proposalActionLabel(capability)}
+            </button>
+          : null}
+        {/*
+          VAR02: an explicit, separate request. Picking a situation is a comparison, so
+          it never reuses the "장면 정리하기" button: the two answers mean different
+          things and would overwrite each other's panel.
+        */}
+        {aiEnabled
+          ? <button type="button" className="quiet prompt-proposals__variants"
+              onClick={() => void requestProposal("variant")}
+              disabled={!family || !state.scene.freeTextKo.trim() || (pending && !pendingVariant)}>
+              {pendingVariant ? "상황 후보 취소" : "장소와 행동만 바꾼 상황 3개"}
+            </button>
+          : (proposalFallbackNotice(capability)
+            ? <p className="prompt-hint">{proposalFallbackNotice(capability)}</p>
+            : null)}
+        {/* LLM-I06: the AI button above is either "전체 장면" or "선택한 그룹만". The
+            scope is built from the selection, so the locked IDs never have to be typed. */}
+        {aiEnabled && <details className="prompt-scope" open={scopeActive || undefined}>
+          <summary>부분 변경 범위 <span className="prompt-scope__hint">{describeScope(scope, (group) => labels[group] ?? group)}</span></summary>
+          <div className="prompt-scope__groups" role="group" aria-label="변경할 그룹">
+            {categories.map((group) => <button type="button" key={group} aria-pressed={targetGroups.includes(group)}
+              className="quiet" onClick={() => setTargetGroups((current) => current.includes(group)
+                ? current.filter((item) => item !== group) : [...current, group])}>
+              {labels[group] ?? group}
+              <span className="prompt-scope__count">{counts[group] ?? 0}</span>
+            </button>)}
+          </div>
+          <p className="prompt-hint">
+            고른 그룹만 바꾸는 제안을 요청합니다. 나머지 선택 {scope.lockedIds.length}개는 잠금으로 보내고,
+            잠긴 값을 바꾸는 제안은 표시하지 않습니다. {LOCK_NOTE}
+          </p>
+          {scopeActive && <div className="prompt-scope__actions">
+            <button type="button" className="quiet" onClick={() => setTargetGroups([])}>범위 지우기</button>
+          </div>}
+        </details>}
+        <HelpNote summary="제안 동작 안내">입력한 원문에서 사전 항목을 찾아 제안합니다. 원문은 바뀌지 않고, 추가는 직접 눌러야 반영됩니다.{aiEnabled ? " AI 정리는 한 번만 요청하며 입력 중에는 자동으로 호출하지 않습니다." : ""}</HelpNote>
+        {proposalStatus && <p className="prompt-notice prompt-proposals__status" data-tone={proposalStatus.tone} role="status">
+          {proposalStatus.text}
+        </p>}
+        {cards && cards.cards.length > 0 && <section className="prompt-cards" id="prompt-cards" aria-label="AI 제안 카드">
+          <div className="prompt-cards__head">
+            <strong>{diff ? "부분 변경 제안" : "장면 정리 제안"} {cards.cards.length}개</strong>
+            <span className="prompt-cards__counts">
+              원문 근거 {cards.counts.quoted} · AI 추가 {cards.counts.inferred}
+              {" · "}미표현 {cards.counts.unresolved} · 모호 {cards.counts.ambiguous}
+            </span>
+          </div>
+          {diff && <section className="prompt-diff" aria-label="수락 전 변경 내용">
+            <div className="prompt-diff__head">
+              <strong>수락하면 이렇게 바뀝니다</strong>
+              <span className="prompt-diff__counts">
+                고정 {diff.kept} · 추가 {diff.changes} · 적용 불가 {diff.blocked}
+              </span>
+            </div>
+            <ul className="prompt-diff__rows">
+              {diff.rows.map((row) => <li key={row.key} data-diff={row.kind}>
+                <strong>{row.labelKo}</strong> <small>· {row.note}</small>
+              </li>)}
+            </ul>
+            {diff.noChange && <p className="prompt-notice" data-tone="caution">
+              지금 수락해도 선택이 바뀌지 않습니다. 다른 그룹을 대상으로 다시 요청하거나 직접 고르세요.
+            </p>}
+            <p className="prompt-hint">{diff.note}</p>
+          </section>}
+          <p className="prompt-hint">수락해도 원문과 최종 프롬프트는 바뀌지 않고 장면 구성만 갱신됩니다. 최종 프롬프트 반영은 초안 적용 단계에서 따로 합니다.</p>
+          <ul className="prompt-cards__list">
+            {cards.cards.map((card) => {
+              const score = cardConfidence(card);
+              const block = card.blocks[0];
+              return <li className="prompt-card" key={card.key} data-kind={card.kind}
+                data-blocked={block !== undefined || undefined}>
+                <div className="prompt-card__body">
+                  <strong>{card.labelKo}</strong>
+                  <small className="prompt-card__meta">
+                    {card.kind === "unresolved" ? " 미표현 구절"
+                      : card.kind === "ambiguous" ? " 모호한 표현"
+                      : ` ${labels[displayGroup[card.category] ?? card.category] ?? card.category}`}
+                    {card.kind === "quoted" || card.kind === "inferred"
+                      ? <> · “{card.text}”</> : null}
+                  </small>
+                  {card.reasonKo && <small className="prompt-card__reason"> · {card.reasonKo}</small>}
+                  {score !== null && card.kind !== "unresolved" && <small className="prompt-card__score"> · 신뢰도 {score}%</small>}
+                  {block !== undefined && <small className="prompt-card__block"> · {blockReason(block)}</small>}
+                </div>
+                {card.entry !== null && card.blocks.length === 0
+                  ? <button type="button" className="quiet"
+                      onClick={() => acceptCard(card)}>선택에 추가</button>
+                  : null}
+              </li>;
+            })}
+          </ul>
+          {cards.excluded.length > 0 && <details className="prompt-cards__excluded">
+            <summary>일괄 수락에서 빠진 항목 {cards.excluded.length}개</summary>
+            <ul>{cards.excluded.map((item) => <li key={item.key}>“{item.labelKo}” · {item.why}</li>)}</ul>
+          </details>}
+          {cards.truncated && <p className="prompt-notice" data-tone="caution">제안 일부를 표시하지 못했습니다. 남은 카드만 수락할 수 있습니다.</p>}
+          <div className="prompt-cards__actions">
+            <button type="button" className="quiet" disabled={cards.batchIds.length === 0} ref={batchRef}
+              onClick={acceptBatch}>원문 근거 {cards.batchIds.length}개 선택에 추가</button>
+            <button type="button" className="quiet" onClick={dismissCards}>제안 닫기</button>
+          </div>
+          <p className="prompt-hint">일괄 추가는 원문에 근거 문구가 있는 항목만 포함합니다. AI가 덧붙인 항목과 함께 쓸 수 없는 항목은 개별로 확인하세요.</p>
+        </section>}
+        {/*
+          VAR01/VAR02: situation candidates, and the one explicit button that turns one
+          into a selection. Each card states the place/action it would swap; "적용" is
+          per card, never automatic, and the final prompt is still only changed by the
+          "적용" step in the result panel. A blocked card keeps its reason and has no
+          button. Nothing here is stored with the job.
+        */}
+        {variants && variants.cards.length > 0 && <section className="prompt-variants" id="prompt-variants" aria-label="상황 후보">
+          <div className="prompt-variants__head">
+            <strong>{variantHeadline(variants)}</strong>
+            <span className="prompt-variants__scope">장소·행동만 바뀐 후보 · 인물과 의상은 그대로</span>
+          </div>
+          <p className="prompt-hint">하나를 골라 “적용”을 누르면 선택만 바뀝니다. 원문과 최종 프롬프트는 그대로이고, 마음에 들지 않으면 바로 되돌릴 수 있습니다.</p>
+          <ul className="prompt-variants__list">
+            {variants.cards.map((card) => {
+              // The card that produced the current selection is stated as such: its own
+              // blocks ("이미 선택했습니다", "지금 선택에 없는 항목입니다") describe this
+              // very scene and would read like two contradicting sentences.
+              const applied = appliedVariantKey === card.key;
+              return <li className="prompt-variant" key={card.key}
+                data-blocked={card.blocks.length > 0 || undefined}
+                data-applied={applied || undefined}>
+                <div className="prompt-variant__body">
+                  <strong>{card.labelKo}</strong>
+                  {applied && <small className="prompt-variant__applied"> · 지금 선택에 반영됨</small>}
+                  <p className="prompt-variant__prompt">{card.promptKo}</p>
+                  <ul className="prompt-variant__changes">
+                    {card.changes.map((change) => <li key={`${card.key}:${change.direction}:${change.id}`}
+                      data-direction={change.direction}>
+                      {labels[change.group] ?? change.group} · {change.labelKo}
+                      {change.direction === "add" ? " 추가" : " 제거"}
+                    </li>)}
+                  </ul>
+                  {card.unresolvedKo.length > 0 && <p className="prompt-variant__unresolved">
+                    사전 밖 표현: {card.unresolvedKo.join(", ")}
+                  </p>}
+                  {card.unmappedFamily && <p className="prompt-variant__warn">이 모델 계열은 일부 항목을 변환하지 못합니다.</p>}
+                  {!applied && card.blocks.map((block) => <p className="prompt-variant__block" key={block}>
+                    사용할 수 없음 · {variantBlockReason(block)}
+                  </p>)}
+                </div>
+                {!applied && card.blocks.length === 0
+                  ? <button type="button" className="quiet"
+                      aria-label={`“${card.labelKo}” 상황을 선택에 적용`}
+                      onClick={() => applyVariant(card)}>적용</button>
+                  : null}
+              </li>;
+            })}
+          </ul>
+          {variants.truncated && <p className="prompt-notice" data-tone="caution">
+            후보 일부를 표시하지 못했습니다. 표시된 후보만 비교할 수 있습니다.
+          </p>}
+          <p className="prompt-hint">후보는 저장되지 않습니다. 새 이미지를 만드는 요청도 나가지 않으므로, 마음에 드는 상황을 고른 뒤 초안을 적용하세요.</p>
+        </section>}
+
+        {/*
+          LLM-I06: the undo sits outside the card panel on purpose. Accepting every card
+          empties the panel, and a control that disappears with what it undoes is not an
+          undo. It stays a single step: taking another card records that click instead.
+        */}
+        {acceptRecord !== null && <div className="prompt-undo" role="group" aria-label="제안 수락 되돌리기">
+          <button type="button" className="quiet" ref={undoRef} disabled={!undo.allowed} onClick={undoCards}
+            title={undo.allowed ? undefined : undo.text}>
+            {undo.allowed ? undo.label : "되돌리기 사용 불가"}
+          </button>
+          <small>{undo.allowed
+            ? "방금 수락한 항목만 해제합니다. 원문과 최종 프롬프트는 그대로입니다."
+            : `${undo.text}. 직접 바꾼 선택은 덮어쓰지 않습니다.`}</small>
+        </div>}
+        {/*
+          VAR02 undo. Outside the variant panel for the same reason: the panel vanishes
+          when the reply is withdrawn, and a control that disappears with what it undoes
+          is not an undo. Its own class keeps it apart from the card acceptance's undo,
+          and it stays one step: applying another candidate replaces the record.
+        */}
+        {variantRecord !== null && <div className="prompt-variant-undo" role="group" aria-label="상황 적용 되돌리기">
+          <button type="button" className="quiet" disabled={!variantUndo.allowed} onClick={undoVariant}
+            title={variantUndo.allowed ? undefined : variantUndo.text}>
+            {variantUndo.allowed ? variantUndo.label : "상황 되돌리기 사용 불가"}
+          </button>
+          <small>{variantUndo.allowed
+            ? "적용 전 선택으로 한 번에 돌립니다. 원문과 최종 프롬프트는 그대로입니다."
+            : `${variantUndo.text}. 지금 선택은 덮어쓰지 않습니다.`}</small>
+        </div>}
         {hintsOpen && <div id="prompt-proposals" className="prompt-proposal-list" role="group" aria-label="사전 항목 제안">
           {hints.length === 0
             ? <p className="prompt-hint">원문에서 사전 항목을 찾지 못했습니다. 직접 선택하거나 원문을 그대로 사용하세요.</p>

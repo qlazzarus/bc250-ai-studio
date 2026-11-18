@@ -5,6 +5,22 @@ export async function adjustOpen(page) {
   return page.evaluate(`!!document.querySelector('.prompt-adjust')?.open`);
 }
 
+/**
+ * Opens the composer's outer disclosure. A reload starts it closed, and everything
+ * inside — the description field, the proposal cards — is inside a `hidden` div then:
+ * a value injected there still lands, but `focus()` is a no-op, so a focus assertion
+ * would fail for the wrong reason.
+ */
+export async function openBuilder(page) {
+  if (await page.evaluate(`(() => {
+    const panel = document.querySelector('#prompt-builder-panel');
+    return !!panel && !panel.hidden;
+  })()`)) return true;
+  await page.click(".prompt-builder > .quiet");
+  await page.waitFor(`!document.querySelector('#prompt-builder-panel').hidden`, { label: "builder open" });
+  return true;
+}
+
 /** Opens 세부 조정 only when closed; a native summary click keeps the real path. */
 export async function openAdjust(page) {
   if (await adjustOpen(page)) return;
