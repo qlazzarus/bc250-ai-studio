@@ -29,6 +29,7 @@ from app.services.prompt_proposals import (
     VARIANT_KIND,
     ProposalRequest,
     ValidatedProposal,
+    groups_in_use,
 )
 from app.services.proposal_provider import (
     MAX_REQUEST_BYTES,
@@ -134,6 +135,12 @@ def unavailable(failure: Failure, detail: str | None = None, *, latency_ms: int 
         body["ambiguities"] = [dict(item) for item in proposal.ambiguities]
         body["rejected"] = [dict(item) for item in proposal.rejected]
         body["truncated"] = proposal.truncated
+        if proposal.provider is not None:
+            # LLM-R05: keep the provider facts even on a failure. This is exactly the
+            # case where the evidence matters — a rejected reply must still say which
+            # model ran and whether it was cut off, instead of losing the only account
+            # of what happened.
+            body["provider"] = proposal.provider.model_dump(mode="json")
     return JSONResponse(body)
 
 
@@ -225,6 +232,17 @@ async def create_proposal(
         # The schema is the client's contract; a malformed request is a 422 even
         # though provider failures are 200.
         raise HTTPException(422, f"Invalid proposal request: {error}") from None
+
+    # LLM-R06: `target_groups` names display groups (`pose`, `setting`), while the
+    # dictionary stores categories (`action`, `location`). A group the live dictionary
+    # does not have can only ever produce an empty reply, which reads like "the model
+    # found nothing". This is a client contract error, so it is a 422 — not a 200
+    # failure the browser would show as a model problem.
+    unknown_groups = sorted(set(proposal_request.target_groups)
+                            - groups_in_use(dictionary.entries))
+    if unknown_groups:
+        raise HTTPException(
+            422, f"Unknown target_groups: {','.join(unknown_groups)}")
 
     outcome = await proposal_client(request).propose(
         proposal_request,

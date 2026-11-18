@@ -3,505 +3,105 @@
   "source": "frontend/src/prompt/dictionary.ts",
   "active_entries": 100,
   "entries": [
-    {
-      "id": "subject.person",
-      "category": "subject",
-      "active": true
-    },
-    {
-      "id": "subject.portrait",
-      "category": "subject",
-      "active": true
-    },
-    {
-      "id": "action.standing",
-      "category": "action",
-      "active": true
-    },
-    {
-      "id": "action.walking",
-      "category": "action",
-      "active": true
-    },
-    {
-      "id": "location.street",
-      "category": "location",
-      "active": true
-    },
-    {
-      "id": "location.room",
-      "category": "location",
-      "active": true
-    },
-    {
-      "id": "composition.full_body",
-      "category": "composition",
-      "active": true
-    },
-    {
-      "id": "composition.close_up",
-      "category": "composition",
-      "active": true
-    },
-    {
-      "id": "lighting.soft",
-      "category": "lighting",
-      "active": true
-    },
-    {
-      "id": "lighting.neon",
-      "category": "lighting",
-      "active": true
-    },
-    {
-      "id": "style.photographic",
-      "category": "style",
-      "active": true
-    },
-    {
-      "id": "style.illustration",
-      "category": "style",
-      "active": true
-    },
-    {
-      "id": "subject.two_people",
-      "category": "subject",
-      "active": true
-    },
-    {
-      "id": "subject.group",
-      "category": "subject",
-      "active": true
-    },
-    {
-      "id": "subject.cat",
-      "category": "subject",
-      "active": true
-    },
-    {
-      "id": "subject.dog",
-      "category": "subject",
-      "active": true
-    },
-    {
-      "id": "subject.tree",
-      "category": "subject",
-      "active": true
-    },
-    {
-      "id": "subject.building",
-      "category": "subject",
-      "active": true
-    },
-    {
-      "id": "appearance.short_hair",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "appearance.long_hair",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "appearance.curly_hair",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "appearance.straight_hair",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "appearance.black_hair",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "appearance.brown_hair",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "appearance.blonde_hair",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "appearance.red_hair",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "appearance.glasses",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "appearance.freckles",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "appearance.beard",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "appearance.ponytail",
-      "category": "appearance",
-      "active": true
-    },
-    {
-      "id": "clothing.white_shirt",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "clothing.black_shirt",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "clothing.t_shirt",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "clothing.sweater",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "clothing.jacket",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "clothing.coat",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "clothing.dress",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "clothing.jeans",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "clothing.trousers",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "clothing.skirt",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "clothing.hat",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "clothing.scarf",
-      "category": "clothing",
-      "active": true
-    },
-    {
-      "id": "expression.smile",
-      "category": "expression",
-      "active": true
-    },
-    {
-      "id": "expression.serious",
-      "category": "expression",
-      "active": true
-    },
-    {
-      "id": "expression.laughing",
-      "category": "expression",
-      "active": true
-    },
-    {
-      "id": "expression.surprised",
-      "category": "expression",
-      "active": true
-    },
-    {
-      "id": "expression.sad",
-      "category": "expression",
-      "active": true
-    },
-    {
-      "id": "expression.neutral",
-      "category": "expression",
-      "active": true
-    },
-    {
-      "id": "expression.eyes_closed",
-      "category": "expression",
-      "active": true
-    },
-    {
-      "id": "expression.looking_at_viewer",
-      "category": "expression",
-      "active": true
-    },
-    {
-      "id": "pose.sitting",
-      "category": "pose",
-      "active": true
-    },
-    {
-      "id": "pose.lying",
-      "category": "pose",
-      "active": true
-    },
-    {
-      "id": "pose.running",
-      "category": "pose",
-      "active": true
-    },
-    {
-      "id": "pose.kneeling",
-      "category": "pose",
-      "active": true
-    },
-    {
-      "id": "pose.arms_crossed",
-      "category": "pose",
-      "active": true
-    },
-    {
-      "id": "pose.hands_in_pockets",
-      "category": "pose",
-      "active": true
-    },
-    {
-      "id": "pose.waving",
-      "category": "pose",
-      "active": true
-    },
-    {
-      "id": "pose.looking_back",
-      "category": "pose",
-      "active": true
-    },
-    {
-      "id": "setting.park",
-      "category": "setting",
-      "active": true
-    },
-    {
-      "id": "setting.forest",
-      "category": "setting",
-      "active": true
-    },
-    {
-      "id": "setting.beach",
-      "category": "setting",
-      "active": true
-    },
-    {
-      "id": "setting.mountain",
-      "category": "setting",
-      "active": true
-    },
-    {
-      "id": "setting.cafe",
-      "category": "setting",
-      "active": true
-    },
-    {
-      "id": "setting.library",
-      "category": "setting",
-      "active": true
-    },
-    {
-      "id": "setting.garden",
-      "category": "setting",
-      "active": true
-    },
-    {
-      "id": "setting.rooftop",
-      "category": "setting",
-      "active": true
-    },
-    {
-      "id": "setting.train_station",
-      "category": "setting",
-      "active": true
-    },
-    {
-      "id": "setting.plain_background",
-      "category": "setting",
-      "active": true
-    },
-    {
-      "id": "camera.medium_shot",
-      "category": "camera",
-      "active": true
-    },
-    {
-      "id": "camera.wide_shot",
-      "category": "camera",
-      "active": true
-    },
-    {
-      "id": "camera.profile",
-      "category": "camera",
-      "active": true
-    },
-    {
-      "id": "camera.front_view",
-      "category": "camera",
-      "active": true
-    },
-    {
-      "id": "camera.back_view",
-      "category": "camera",
-      "active": true
-    },
-    {
-      "id": "camera.high_angle",
-      "category": "camera",
-      "active": true
-    },
-    {
-      "id": "camera.low_angle",
-      "category": "camera",
-      "active": true
-    },
-    {
-      "id": "camera.eye_level",
-      "category": "camera",
-      "active": true
-    },
-    {
-      "id": "lighting.sunlight",
-      "category": "lighting",
-      "active": true
-    },
-    {
-      "id": "lighting.window_light",
-      "category": "lighting",
-      "active": true
-    },
-    {
-      "id": "lighting.backlight",
-      "category": "lighting",
-      "active": true
-    },
-    {
-      "id": "lighting.rim_light",
-      "category": "lighting",
-      "active": true
-    },
-    {
-      "id": "lighting.golden_hour",
-      "category": "lighting",
-      "active": true
-    },
-    {
-      "id": "lighting.overcast",
-      "category": "lighting",
-      "active": true
-    },
-    {
-      "id": "lighting.candlelight",
-      "category": "lighting",
-      "active": true
-    },
-    {
-      "id": "lighting.low_key",
-      "category": "lighting",
-      "active": true
-    },
-    {
-      "id": "style.watercolor",
-      "category": "style",
-      "active": true
-    },
-    {
-      "id": "style.oil_painting",
-      "category": "style",
-      "active": true
-    },
-    {
-      "id": "style.pencil_sketch",
-      "category": "style",
-      "active": true
-    },
-    {
-      "id": "style.ink_drawing",
-      "category": "style",
-      "active": true
-    },
-    {
-      "id": "style.pixel_art",
-      "category": "style",
-      "active": true
-    },
-    {
-      "id": "style.comic",
-      "category": "style",
-      "active": true
-    },
-    {
-      "id": "style.3d_render",
-      "category": "style",
-      "active": true
-    },
-    {
-      "id": "style.black_and_white",
-      "category": "style",
-      "active": true
-    },
-    {
-      "id": "mood.calm",
-      "category": "mood",
-      "active": true
-    },
-    {
-      "id": "mood.tense",
-      "category": "mood",
-      "active": true
-    },
-    {
-      "id": "mood.cheerful",
-      "category": "mood",
-      "active": true
-    },
-    {
-      "id": "mood.melancholic",
-      "category": "mood",
-      "active": true
-    },
-    {
-      "id": "mood.mysterious",
-      "category": "mood",
-      "active": true
-    },
-    {
-      "id": "mood.cozy",
-      "category": "mood",
-      "active": true
-    },
-    {
-      "id": "mood.dramatic",
-      "category": "mood",
-      "active": true
-    },
-    {
-      "id": "mood.dreamy",
-      "category": "mood",
-      "active": true
-    }
+    {"id":"subject.person","category":"subject","active":true,"label_ko":"인물","aliases":["사람"]},
+    {"id":"subject.portrait","category":"subject","active":true,"label_ko":"인물 초상","aliases":["초상화","포트레이트"]},
+    {"id":"action.standing","category":"action","active":true,"label_ko":"서 있기","aliases":["서있는","서다"]},
+    {"id":"action.walking","category":"action","active":true,"label_ko":"걷기","aliases":["걷는","걸어가는"]},
+    {"id":"location.street","category":"location","active":true,"label_ko":"거리","aliases":["길거리","도로"]},
+    {"id":"location.room","category":"location","active":true,"label_ko":"실내","aliases":["방","실내 공간"]},
+    {"id":"composition.full_body","category":"composition","active":true,"label_ko":"전신","aliases":["전신샷"]},
+    {"id":"composition.close_up","category":"composition","active":true,"label_ko":"클로즈업","aliases":["근접","가까이"]},
+    {"id":"lighting.soft","category":"lighting","active":true,"label_ko":"부드러운 조명","aliases":["은은한 빛"]},
+    {"id":"lighting.neon","category":"lighting","active":true,"label_ko":"네온 조명","aliases":["네온","네온사인"]},
+    {"id":"style.photographic","category":"style","active":true,"label_ko":"사진 스타일","aliases":["사진","포토리얼"]},
+    {"id":"style.illustration","category":"style","active":true,"label_ko":"일러스트","aliases":["그림","삽화"]},
+    {"id":"subject.two_people","category":"subject","active":true,"label_ko":"두 사람","aliases":["두 명","2인"]},
+    {"id":"subject.group","category":"subject","active":true,"label_ko":"사람들","aliases":["여러 사람","단체"]},
+    {"id":"subject.cat","category":"subject","active":true,"label_ko":"고양이","aliases":["야옹이"]},
+    {"id":"subject.dog","category":"subject","active":true,"label_ko":"개","aliases":["강아지"]},
+    {"id":"subject.tree","category":"subject","active":true,"label_ko":"나무","aliases":["수목"]},
+    {"id":"subject.building","category":"subject","active":true,"label_ko":"건물","aliases":["건축물"]},
+    {"id":"appearance.short_hair","category":"appearance","active":true,"label_ko":"짧은 머리","aliases":["단발","짧은 헤어"]},
+    {"id":"appearance.long_hair","category":"appearance","active":true,"label_ko":"긴 머리","aliases":["긴 헤어"]},
+    {"id":"appearance.curly_hair","category":"appearance","active":true,"label_ko":"곱슬머리","aliases":["컬","곱슬"]},
+    {"id":"appearance.straight_hair","category":"appearance","active":true,"label_ko":"생머리","aliases":["직모"]},
+    {"id":"appearance.black_hair","category":"appearance","active":true,"label_ko":"검은 머리","aliases":["흑발"]},
+    {"id":"appearance.brown_hair","category":"appearance","active":true,"label_ko":"갈색 머리","aliases":["갈발"]},
+    {"id":"appearance.blonde_hair","category":"appearance","active":true,"label_ko":"금발","aliases":["금색 머리"]},
+    {"id":"appearance.red_hair","category":"appearance","active":true,"label_ko":"붉은 머리","aliases":["적발"]},
+    {"id":"appearance.glasses","category":"appearance","active":true,"label_ko":"안경","aliases":["안경 착용"]},
+    {"id":"appearance.freckles","category":"appearance","active":true,"label_ko":"주근깨","aliases":["얼굴 주근깨"]},
+    {"id":"appearance.beard","category":"appearance","active":true,"label_ko":"수염","aliases":["턱수염"]},
+    {"id":"appearance.ponytail","category":"appearance","active":true,"label_ko":"포니테일","aliases":["묶은 머리","말총머리"]},
+    {"id":"clothing.white_shirt","category":"clothing","active":true,"label_ko":"흰 셔츠","aliases":["흰색 셔츠"]},
+    {"id":"clothing.black_shirt","category":"clothing","active":true,"label_ko":"검은 셔츠","aliases":["검정 셔츠"]},
+    {"id":"clothing.t_shirt","category":"clothing","active":true,"label_ko":"티셔츠","aliases":["티","반팔 티"]},
+    {"id":"clothing.sweater","category":"clothing","active":true,"label_ko":"스웨터","aliases":["니트","풀오버"]},
+    {"id":"clothing.jacket","category":"clothing","active":true,"label_ko":"재킷","aliases":["자켓"]},
+    {"id":"clothing.coat","category":"clothing","active":true,"label_ko":"코트","aliases":["외투"]},
+    {"id":"clothing.dress","category":"clothing","active":true,"label_ko":"원피스","aliases":["드레스"]},
+    {"id":"clothing.jeans","category":"clothing","active":true,"label_ko":"청바지","aliases":["데님 바지"]},
+    {"id":"clothing.trousers","category":"clothing","active":true,"label_ko":"바지","aliases":["긴 바지"]},
+    {"id":"clothing.skirt","category":"clothing","active":true,"label_ko":"치마","aliases":["스커트"]},
+    {"id":"clothing.hat","category":"clothing","active":true,"label_ko":"모자","aliases":["머리 모자"]},
+    {"id":"clothing.scarf","category":"clothing","active":true,"label_ko":"목도리","aliases":["스카프"]},
+    {"id":"expression.smile","category":"expression","active":true,"label_ko":"미소","aliases":["웃는 얼굴"]},
+    {"id":"expression.serious","category":"expression","active":true,"label_ko":"진지한 표정","aliases":["엄숙한 얼굴"]},
+    {"id":"expression.laughing","category":"expression","active":true,"label_ko":"웃음","aliases":["소리 내어 웃기"]},
+    {"id":"expression.surprised","category":"expression","active":true,"label_ko":"놀란 표정","aliases":["놀람"]},
+    {"id":"expression.sad","category":"expression","active":true,"label_ko":"슬픈 표정","aliases":["슬픔"]},
+    {"id":"expression.neutral","category":"expression","active":true,"label_ko":"무표정","aliases":["표정 없음"]},
+    {"id":"expression.eyes_closed","category":"expression","active":true,"label_ko":"감은 눈","aliases":["눈 감기"]},
+    {"id":"expression.looking_at_viewer","category":"expression","active":true,"label_ko":"정면 응시","aliases":["카메라 보기"]},
+    {"id":"pose.sitting","category":"pose","active":true,"label_ko":"앉기","aliases":["앉은 자세"]},
+    {"id":"pose.lying","category":"pose","active":true,"label_ko":"누워 있기","aliases":["누운 자세"]},
+    {"id":"pose.running","category":"pose","active":true,"label_ko":"달리기","aliases":["달리는 자세"]},
+    {"id":"pose.kneeling","category":"pose","active":true,"label_ko":"무릎 꿇기","aliases":["무릎 꿇은 자세"]},
+    {"id":"pose.arms_crossed","category":"pose","active":true,"label_ko":"팔짱","aliases":["팔짱 낀 자세"]},
+    {"id":"pose.hands_in_pockets","category":"pose","active":true,"label_ko":"주머니에 손","aliases":["손을 주머니에"]},
+    {"id":"pose.waving","category":"pose","active":true,"label_ko":"손 흔들기","aliases":["인사"]},
+    {"id":"pose.looking_back","category":"pose","active":true,"label_ko":"뒤돌아보기","aliases":["고개 돌리기"]},
+    {"id":"setting.park","category":"setting","active":true,"label_ko":"공원","aliases":["도시 공원"]},
+    {"id":"setting.forest","category":"setting","active":true,"label_ko":"숲","aliases":["산림"]},
+    {"id":"setting.beach","category":"setting","active":true,"label_ko":"해변","aliases":["바닷가","모래사장"]},
+    {"id":"setting.mountain","category":"setting","active":true,"label_ko":"산","aliases":["산지"]},
+    {"id":"setting.cafe","category":"setting","active":true,"label_ko":"카페","aliases":["커피숍"]},
+    {"id":"setting.library","category":"setting","active":true,"label_ko":"도서관","aliases":["서가"]},
+    {"id":"setting.garden","category":"setting","active":true,"label_ko":"정원","aliases":["뜰"]},
+    {"id":"setting.rooftop","category":"setting","active":true,"label_ko":"옥상","aliases":["건물 옥상"]},
+    {"id":"setting.train_station","category":"setting","active":true,"label_ko":"기차역","aliases":["철도역","역"]},
+    {"id":"setting.plain_background","category":"setting","active":true,"label_ko":"단색 배경","aliases":["무지 배경"]},
+    {"id":"camera.medium_shot","category":"camera","active":true,"label_ko":"미디엄 샷","aliases":["중간 거리 구도"]},
+    {"id":"camera.wide_shot","category":"camera","active":true,"label_ko":"와이드 샷","aliases":["넓은 구도"]},
+    {"id":"camera.profile","category":"camera","active":true,"label_ko":"측면","aliases":["옆모습","측면 구도"]},
+    {"id":"camera.front_view","category":"camera","active":true,"label_ko":"정면","aliases":["정면 구도"]},
+    {"id":"camera.back_view","category":"camera","active":true,"label_ko":"후면","aliases":["뒷모습","뒤에서"]},
+    {"id":"camera.high_angle","category":"camera","active":true,"label_ko":"하이 앵글","aliases":["위에서 내려다보기"]},
+    {"id":"camera.low_angle","category":"camera","active":true,"label_ko":"로우 앵글","aliases":["아래에서 올려다보기"]},
+    {"id":"camera.eye_level","category":"camera","active":true,"label_ko":"눈높이 구도","aliases":["아이레벨"]},
+    {"id":"lighting.sunlight","category":"lighting","active":true,"label_ko":"햇빛","aliases":["태양광","자연광"]},
+    {"id":"lighting.window_light","category":"lighting","active":true,"label_ko":"창문 빛","aliases":["창가 빛"]},
+    {"id":"lighting.backlight","category":"lighting","active":true,"label_ko":"역광","aliases":["뒤에서 비추는 빛"]},
+    {"id":"lighting.rim_light","category":"lighting","active":true,"label_ko":"림 라이트","aliases":["테두리 조명"]},
+    {"id":"lighting.golden_hour","category":"lighting","active":true,"label_ko":"골든 아워","aliases":["해 질 녘 빛"]},
+    {"id":"lighting.overcast","category":"lighting","active":true,"label_ko":"흐린 날 빛","aliases":["구름 낀 조명"]},
+    {"id":"lighting.candlelight","category":"lighting","active":true,"label_ko":"촛불","aliases":["촛불 조명"]},
+    {"id":"lighting.low_key","category":"lighting","active":true,"label_ko":"어두운 조명","aliases":["로우키 조명"]},
+    {"id":"style.watercolor","category":"style","active":true,"label_ko":"수채화","aliases":["수채화풍"]},
+    {"id":"style.oil_painting","category":"style","active":true,"label_ko":"유화","aliases":["유화풍"]},
+    {"id":"style.pencil_sketch","category":"style","active":true,"label_ko":"연필 스케치","aliases":["연필화"]},
+    {"id":"style.ink_drawing","category":"style","active":true,"label_ko":"잉크 드로잉","aliases":["펜화"]},
+    {"id":"style.pixel_art","category":"style","active":true,"label_ko":"픽셀 아트","aliases":["도트 그림"]},
+    {"id":"style.comic","category":"style","active":true,"label_ko":"만화","aliases":["코믹 스타일"]},
+    {"id":"style.3d_render","category":"style","active":true,"label_ko":"3D 렌더","aliases":["3D 렌더링"]},
+    {"id":"style.black_and_white","category":"style","active":true,"label_ko":"흑백","aliases":["모노크롬","흑백 사진"]},
+    {"id":"mood.calm","category":"mood","active":true,"label_ko":"차분한 분위기","aliases":["고요한"]},
+    {"id":"mood.tense","category":"mood","active":true,"label_ko":"긴장된 분위기","aliases":["긴장감"]},
+    {"id":"mood.cheerful","category":"mood","active":true,"label_ko":"밝은 분위기","aliases":["명랑한"]},
+    {"id":"mood.melancholic","category":"mood","active":true,"label_ko":"우울한 분위기","aliases":["쓸쓸한"]},
+    {"id":"mood.mysterious","category":"mood","active":true,"label_ko":"신비로운 분위기","aliases":["미스터리"]},
+    {"id":"mood.cozy","category":"mood","active":true,"label_ko":"포근한 분위기","aliases":["아늑한"]},
+    {"id":"mood.dramatic","category":"mood","active":true,"label_ko":"극적인 분위기","aliases":["드라마틱"]},
+    {"id":"mood.dreamy","category":"mood","active":true,"label_ko":"몽환적인 분위기","aliases":["꿈같은"]}
   ]
 }

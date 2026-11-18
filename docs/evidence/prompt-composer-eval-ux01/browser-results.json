@@ -2,62 +2,62 @@
   {
     "name": "EVAL-UX01 daily-rain-store",
     "pass": null,
-    "detail": "{\"id\":\"daily-rain-store\",\"findClick\":true,\"seeded\":[],\"offered\":2,\"accepted\":[\"인물\",\"네온 조명\"],\"chips\":[\"인물\",\"네온 조명\"],\"draft\":\"a person, neon lighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":4,\"elapsedMs\":680,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"daily-rain-store\",\"findClick\":true,\"seeded\":[],\"offered\":2,\"accepted\":[\"인물\",\"네온 조명\"],\"chips\":[\"인물\",\"네온 조명\"],\"draft\":\"a person, neon lighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":4,\"elapsedMs\":657,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 product-bottle",
     "pass": null,
-    "detail": "{\"id\":\"product-bottle\",\"findClick\":false,\"seeded\":[],\"offered\":1,\"accepted\":[\"부드러운 조명\"],\"chips\":[\"부드러운 조명\"],\"draft\":\"soft lighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":2,\"elapsedMs\":590,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"product-bottle\",\"findClick\":false,\"seeded\":[],\"offered\":1,\"accepted\":[\"부드러운 조명\"],\"chips\":[\"부드러운 조명\"],\"draft\":\"soft lighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":2,\"elapsedMs\":566,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 landscape-lake-dusk",
     "pass": null,
-    "detail": "{\"id\":\"landscape-lake-dusk\",\"findClick\":false,\"seeded\":[],\"offered\":1,\"accepted\":[],\"chips\":[],\"draft\":\"\",\"applyPresent\":true,\"approved\":false,\"clicks\":0,\"elapsedMs\":482,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"landscape-lake-dusk\",\"findClick\":false,\"seeded\":[],\"offered\":0,\"accepted\":[],\"chips\":[],\"draft\":\"\",\"applyPresent\":true,\"approved\":false,\"clicks\":0,\"elapsedMs\":480,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 multi-person-street",
     "pass": null,
-    "detail": "{\"id\":\"multi-person-street\",\"findClick\":false,\"seeded\":[],\"offered\":3,\"accepted\":[\"두 사람\",\"걷기\",\"거리\"],\"chips\":[\"두 사람\",\"걷기\",\"거리\"],\"draft\":\"two people, walking, on a street\",\"applyPresent\":true,\"approved\":true,\"clicks\":4,\"elapsedMs\":673,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"multi-person-street\",\"findClick\":false,\"seeded\":[],\"offered\":3,\"accepted\":[\"두 사람\",\"걷기\",\"거리\"],\"chips\":[\"두 사람\",\"걷기\",\"거리\"],\"draft\":\"two people, walking, on a street\",\"applyPresent\":true,\"approved\":true,\"clicks\":4,\"elapsedMs\":642,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 negation-empty-beach",
     "pass": null,
-    "detail": "{\"id\":\"negation-empty-beach\",\"findClick\":false,\"seeded\":[],\"offered\":2,\"accepted\":[\"해변\"],\"chips\":[\"해변\"],\"draft\":\"on a beach\",\"applyPresent\":true,\"approved\":true,\"clicks\":2,\"elapsedMs\":585,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"negation-empty-beach\",\"findClick\":false,\"seeded\":[],\"offered\":1,\"accepted\":[\"해변\"],\"chips\":[\"해변\"],\"draft\":\"on a beach\",\"applyPresent\":true,\"approved\":true,\"clicks\":2,\"elapsedMs\":577,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 partial-lighting-only",
     "pass": null,
-    "detail": "{\"id\":\"partial-lighting-only\",\"findClick\":false,\"seeded\":[\"인물\",\"흰 셔츠\"],\"offered\":2,\"accepted\":[\"카페\",\"어두운 조명\"],\"chips\":[\"인물\",\"흰 셔츠\",\"카페\",\"어두운 조명\"],\"draft\":\"a person, white shirt, in a cafe, low-key lighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":5,\"elapsedMs\":623,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"partial-lighting-only\",\"findClick\":false,\"seeded\":[\"인물\",\"흰 셔츠\"],\"offered\":2,\"accepted\":[\"카페\",\"어두운 조명\"],\"chips\":[\"인물\",\"흰 셔츠\",\"카페\",\"어두운 조명\"],\"draft\":\"a person, white shirt, in a cafe, low-key lighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":5,\"elapsedMs\":610,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 portrait-front-closeup",
     "pass": null,
-    "detail": "{\"id\":\"portrait-front-closeup\",\"findClick\":false,\"seeded\":[],\"offered\":6,\"accepted\":[\"인물 초상\",\"정면\",\"무표정\",\"짧은 머리\",\"클로즈업\"],\"chips\":[\"인물 초상\",\"짧은 머리\",\"무표정\",\"정면\",\"클로즈업\"],\"draft\":\"a portrait, short hair, neutral expression, front view, close-up\",\"applyPresent\":true,\"approved\":true,\"clicks\":6,\"elapsedMs\":771,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"portrait-front-closeup\",\"findClick\":false,\"seeded\":[],\"offered\":6,\"accepted\":[\"인물 초상\",\"정면\",\"무표정\",\"짧은 머리\",\"클로즈업\"],\"chips\":[\"인물 초상\",\"짧은 머리\",\"무표정\",\"정면\",\"클로즈업\"],\"draft\":\"a portrait, short hair, neutral expression, front view, close-up\",\"applyPresent\":true,\"approved\":true,\"clicks\":6,\"elapsedMs\":731,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 alley-neon-coat",
     "pass": null,
-    "detail": "{\"id\":\"alley-neon-coat\",\"findClick\":false,\"seeded\":[],\"offered\":3,\"accepted\":[\"네온 조명\",\"코트\",\"인물\"],\"chips\":[\"인물\",\"코트\",\"네온 조명\"],\"draft\":\"a person, coat, neon lighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":4,\"elapsedMs\":648,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"alley-neon-coat\",\"findClick\":false,\"seeded\":[],\"offered\":3,\"accepted\":[\"네온 조명\",\"코트\",\"인물\"],\"chips\":[\"인물\",\"코트\",\"네온 조명\"],\"draft\":\"a person, coat, neon lighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":4,\"elapsedMs\":650,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 cat-window-cozy",
     "pass": null,
-    "detail": "{\"id\":\"cat-window-cozy\",\"findClick\":false,\"seeded\":[],\"offered\":2,\"accepted\":[\"고양이\",\"부드러운 조명\"],\"chips\":[\"고양이\",\"부드러운 조명\"],\"draft\":\"a cat, soft lighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":3,\"elapsedMs\":643,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"cat-window-cozy\",\"findClick\":false,\"seeded\":[],\"offered\":2,\"accepted\":[\"고양이\",\"부드러운 조명\"],\"chips\":[\"고양이\",\"부드러운 조명\"],\"draft\":\"a cat, soft lighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":3,\"elapsedMs\":605,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 group-hiking",
     "pass": null,
-    "detail": "{\"id\":\"group-hiking\",\"findClick\":false,\"seeded\":[],\"offered\":2,\"accepted\":[\"사람들\"],\"chips\":[\"사람들\"],\"draft\":\"a group of people\",\"applyPresent\":true,\"approved\":true,\"clicks\":2,\"elapsedMs\":596,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"group-hiking\",\"findClick\":false,\"seeded\":[],\"offered\":1,\"accepted\":[\"사람들\"],\"chips\":[\"사람들\"],\"draft\":\"a group of people\",\"applyPresent\":true,\"approved\":true,\"clicks\":2,\"elapsedMs\":569,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 beach-sunset-couple",
     "pass": null,
-    "detail": "{\"id\":\"beach-sunset-couple\",\"findClick\":false,\"seeded\":[],\"offered\":4,\"accepted\":[\"해변\",\"두 사람\",\"역광\"],\"chips\":[\"두 사람\",\"해변\",\"역광\"],\"draft\":\"two people, on a beach, backlighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":4,\"elapsedMs\":670,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"beach-sunset-couple\",\"findClick\":false,\"seeded\":[],\"offered\":3,\"accepted\":[\"해변\",\"두 사람\",\"역광\"],\"chips\":[\"두 사람\",\"해변\",\"역광\"],\"draft\":\"two people, on a beach, backlighting\",\"applyPresent\":true,\"approved\":true,\"clicks\":4,\"elapsedMs\":654,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 studio-bw-portrait",
     "pass": null,
-    "detail": "{\"id\":\"studio-bw-portrait\",\"findClick\":false,\"seeded\":[],\"offered\":6,\"accepted\":[\"단색 배경\",\"흑백\",\"인물\",\"사진 스타일\",\"로우 앵글\",\"미소\"],\"chips\":[\"인물\",\"미소\",\"단색 배경\",\"로우 앵글\",\"흑백\",\"사진 스타일\"],\"draft\":\"a person, smile, plain background, low angle, black and white, photographic style\",\"applyPresent\":true,\"approved\":true,\"clicks\":7,\"elapsedMs\":797,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
+    "detail": "{\"id\":\"studio-bw-portrait\",\"findClick\":false,\"seeded\":[],\"offered\":6,\"accepted\":[\"단색 배경\",\"흑백\",\"인물\",\"사진 스타일\",\"로우 앵글\",\"미소\"],\"chips\":[\"인물\",\"미소\",\"단색 배경\",\"로우 앵글\",\"흑백\",\"사진 스타일\"],\"draft\":\"a person, smile, plain background, low angle, black and white, photographic style\",\"applyPresent\":true,\"approved\":true,\"clicks\":7,\"elapsedMs\":762,\"matchesNodeArmDraft\":true,\"matchesNodeArmChips\":true,\"finalPromptEqualsDraft\":true}"
   },
   {
     "name": "EVAL-UX01 브라우저 · 클릭 = 모델(수락+찾기) + 시작 선택 + 적용",
@@ -115,6 +115,6 @@
   {
     "name": "EVAL-UX01 자동화 소요 시간",
     "pass": null,
-    "detail": "7758ms (사람의 시간이 아님 · UI 반응만 측정)"
+    "detail": "7503ms (사람의 시간이 아님 · UI 반응만 측정)"
   }
 ]

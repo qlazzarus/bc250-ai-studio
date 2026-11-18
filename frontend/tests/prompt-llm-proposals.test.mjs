@@ -5,9 +5,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { sha256Hex } from '../src/prompt/digest.ts';
 import {
-  CANCELLED_MESSAGES, ERROR_MESSAGES, IDLE, cancelProposal, invalidateProposal, isPending,
-  newRequestId, parseReply, proposalBody, proposalNotice, revisionsFor, runProposal,
-  sameRevisions, settleProposal, startProposal,
+  CANCELLED_MESSAGES, ERROR_MESSAGES, IDLE, MAX_REQUEST_BYTES, cancelProposal,
+  invalidateProposal, isPending, newRequestId, parseReply, proposalBody, proposalNotice,
+  revisionsFor, runProposal, sameRevisions, settleProposal, startProposal, utf8Bytes,
 } from '../src/prompt/llmProposals.ts';
 import {
   DEFAULT_TIMEOUT_MS, TIMEOUT_SLACK_MS, UNSUPPORTED, proposalActionLabel,
@@ -92,6 +92,47 @@ test('the request body follows the C01-2 shape and is refused locally when inval
   const long = proposalBody({ scene: scene({ freeTextKo: 'a'.repeat(4001) }), family: 'sd15',
     dictionaryVersion: '1.2.0', requestId: 'req-abc' });
   assert.deepEqual(long, { code: 'too_large' });
+});
+
+test('the request body is refused by its real UTF-8 byte size, not its character count', () => {
+  // LLM-R04: Korean is 3 bytes per character, so a 2,600-character description is over
+  // 7.8 KB before any selection is added. The old check counted characters only.
+  const korean = (count) => '가'.repeat(count);
+  const body = (text) => proposalBody({
+    scene: scene({ freeTextKo: text }), family: 'sd15',
+    dictionaryVersion: '1.2.0', requestId: 'req-abc',
+  });
+
+  // A long Korean text is far past 8 KiB while still under the 4,000-character cap.
+  assert.deepEqual(body(korean(4000)), { code: 'too_large' });
+  assert.equal(utf8Bytes(korean(4000)), 12000);
+
+  // ASCII is one byte per character, so it is refused only near the cap.
+  assert.ok('body' in body('a'.repeat(4000)));
+  assert.deepEqual(body('a'.repeat(9000)), { code: 'too_large' });
+});
+
+test('a legal but crowded body is refused locally instead of coming back as a 413', () => {
+  // LLM-R04: 60 selections plus 60 locked IDs consume most of the 8 KiB budget, so the
+  // body can exceed the cap before the description is long. This is the case that used
+  // to pass every local check and get a 413 from the server.
+  const crowd = (lockCount, textLength) => ({
+    scene: scene({
+      freeTextKo: '가'.repeat(textLength),
+      selections: Array.from({ length: lockCount }, (_, index) => selection(`subject.entry${index}`)),
+    }),
+    family: 'sd15', dictionaryVersion: '1.2.0', requestId: 'req-abc',
+    scope: { targetGroups: ['subject'], lockedIds: Array.from({ length: lockCount }, (_, index) => `subject.entry${index}`) },
+  });
+
+  // Comfortably inside: forwarded, and its bytes are known to be under the cap.
+  const small = proposalBody(crowd(5, 100));
+  assert.ok('body' in small);
+  assert.ok(utf8Bytes(JSON.stringify(small.body)) <= MAX_REQUEST_BYTES);
+
+  // Too crowded: refused locally with the same `too_large` wording as the other caps.
+  const big = proposalBody(crowd(60, 1500));
+  assert.deepEqual(big, { code: 'too_large' });
 });
 
 test('request IDs satisfy the server grammar and stay unique enough to separate two requests', () => {

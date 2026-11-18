@@ -29,7 +29,7 @@ const root = join(here, "..", "..");
 const src = (name) => join(root, "frontend", "src", "prompt", name);
 
 const { DICTIONARY, DICTIONARY_VERSION, familyCoverage } = await import(src("dictionary.ts"));
-const { suggestSelections } = await import(src("proposals.ts"));
+const { suggestSelections, suggestSelectionsDetailed } = await import(src("proposals.ts"));
 const { compileScene, COMPILER_VERSION } = await import(src("compiler.ts"));
 const { selectEntry, removeEntry } = await import(src("scene.ts"));
 const { partialScope, partialDiff } = await import(src("partialChange.ts"));
@@ -137,7 +137,6 @@ function runScene(fixture) {
   const misses = expected.filter((id) => !proposed.includes(id));
   const unwanted = proposed.filter((id) => forbidden.includes(id));
   const unclassified = proposed.filter((id) => !expected.includes(id) && !forbidden.includes(id));
-
   // The selection the user would end up with after accepting hits and dropping unwanted.
   let finalScene = startScene;
   for (const id of hits) finalScene = selectEntry(finalScene, byId.get(id), DICTIONARY_VERSION);
@@ -162,12 +161,29 @@ function runScene(fixture) {
   // Partial-change arm: the same answer, judged against the scope the button sends.
   if (fixture.request) {
     const scope = partialScope(startScene, fixture.request.targetGroups);
+    /**
+     * RULE02: the rule list is now measured under the *same* scope, because it is the
+     * rule request that used to ignore `조명만` and propose `카페`. `outOfScope` is the
+     * count it withheld, so the two numbers describe one behaviour instead of two.
+     */
+    const scopedHints = suggestSelectionsDetailed({
+      freeTextKo: fixture.textKo, family: FAMILY, dictionary: DICTIONARY,
+      selectedIds: startScene.selections.map((item) => item.id),
+      targetGroups: scope.targetGroups,
+    });
+    /**
+     * The reply carries the in-scope suggestions **and** the ones the rule path now
+     * withholds, because that is the realistic failure: the server — or a model that
+     * ignores `target_groups` — sends `카페` anyway. `proposalCards` must block it, and
+     * that defensive path is what this arm keeps measuring. It is no longer evidence
+     * that the rule path leaks a place into a lighting-only request.
+     */
     const reply = {
       status: "ready", kind: "partial_change", request_id: "req-evalux01",
       revisions: revisionsFor(startScene), provider: null, why: null, message: null, detail: null,
       variants: [], truncated: false,
-      suggestions: hits.map((id) => ({
-        id, matched_phrase: hints.find((hint) => hint.id === id)?.matchedPhrase ?? labelOf(id),
+      suggestions: [...scopedHints.hints, ...scopedHints.outOfScope].map((hint) => ({
+        id: hint.id, matched_phrase: hint.matchedPhrase,
         basis: "quote", polarity: "affirmed", actor: null, confidence: 0.9, reason_ko: "",
       })),
       unresolved_spans: [], ambiguities: [], rejected: [],
@@ -178,6 +194,8 @@ function runScene(fixture) {
       targetGroups: scope.targetGroups,
       lockedIds: scope.lockedIds,
       lockedLabels: scope.lockedIds.map(labelOf),
+      ruleProposed: scopedHints.hints.map((hint) => hint.id),
+      ruleWithheld: scopedHints.outOfScope.map((hint) => hint.id),
       accepted: cards.batchIds.map(labelOf),
       // Cards the scope refuses: a place suggestion in a lighting-only request is
       // exactly the case this exposes.
@@ -238,13 +256,23 @@ export function runEvaluation() {
     unmatchedKo: sum(rows, (row) => row.unmatchedCount),
   };
   pooled.recall = pooled.expected ? pooled.hits / pooled.expected : null;
-  // Precision denominator is what the rules actually proposed, so an unwanted hit lowers it.
-  pooled.precision = pooled.proposed ? (pooled.proposed - pooled.unwanted) / pooled.proposed : null;
-  // An `unclassified` proposal is neither expected nor forbidden: it needs a human
-  // decision, so precision over the *decided* proposals is reported separately instead
-  // of quietly counting those as correct.
-  const decided = pooled.proposed - pooled.unclassified;
-  pooled.precisionDecided = decided ? (decided - pooled.unwanted) / decided : null;
+  /**
+   * METRIC01: three numbers, three names, because only one of them is precision.
+   *
+   * - `precision` counts *decidable* proposals only: an expected ID that was proposed,
+   *   or a forbidden ID that was proposed. An `unclassified` proposal is neither, so it
+   *   is excluded from both numerator and denominator instead of being counted correct.
+   * - `nonForbiddenShare` is the old `(proposed - unwanted) / proposed`. It is an
+   *   **upper bound**: it treats every unclassified proposal as acceptable because
+   *   nobody has judged it yet. It is reported under its own name so it can never be
+   *   quoted as precision.
+   * - `unclassifiedRate` says how much of the answer is still waiting for a human, which
+   *   is the size of the assumption baked into the upper bound.
+   */
+  pooled.decided = pooled.proposed - pooled.unclassified;
+  pooled.precision = pooled.decided ? (pooled.hits) / pooled.decided : null;
+  pooled.nonForbiddenShare = pooled.proposed ? (pooled.proposed - pooled.unwanted) / pooled.proposed : null;
+  pooled.unclassifiedRate = pooled.proposed ? pooled.unclassified / pooled.proposed : null;
   pooled.clicksTotal = sum(rows, (row) => row.clicks.total);
   pooled.clicksPerScene = pooled.clicksTotal / rows.length;
   pooled.manualFixTotal = sum(rows, (row) => row.clicks.manualFix);
@@ -256,6 +284,9 @@ export function runEvaluation() {
   pooled.variantBlocked = sum(rows, (row) => row.variant.blocked);
   pooled.variantUndoRestores = rows.filter((row) => row.variant.undoRestores).length;
   pooled.partialRefused = sum(rows, (row) => (row.partial ? row.partial.refused.length : 0));
+  /** RULE02: what the rule path withheld under the partial scope, and how much it kept. */
+  pooled.partialRuleWithheld = sum(rows, (row) => (row.partial ? row.partial.ruleWithheld.length : 0));
+  pooled.partialRuleProposed = sum(rows, (row) => (row.partial ? row.partial.ruleProposed.length : 0));
 
   const config = {
     evaluatedAt: "2026-11-18",
@@ -314,14 +345,17 @@ function main() {
   console.log("");
   console.log(`합계 · 기대 ${pooled.expected} · 적중 ${pooled.hits} (recall ${pct(pooled.recall)}) · ` +
     `누락 ${pooled.misses} · 원치 않은 추가 ${pooled.unwanted} · 미분류 ${pooled.unclassified}`);
-  console.log(`규칙 경로 precision ${pct(pooled.precision)} (제안 ${pooled.proposed}개 기준)`);
-  console.log(`결정 가능한 제안만 계산한 precision ${pct(pooled.precisionDecided)} ` +
-    `(사람이 판정해야 할 미분류 ${pooled.unclassified}개 제외)`);
+  console.log(`규칙 경로 precision ${pct(pooled.precision)} (판정 가능한 제안 ${pooled.decided}개 기준 · ` +
+    `적중 ${pooled.hits} / 원치 않은 추가 ${pooled.unwanted})`);
+  console.log(`미분류 ${pooled.unclassified}개(${pct(pooled.unclassifiedRate)})를 정답으로 치지 않는다. ` +
+    `이들을 허용으로 가정한 상한은 비금지 제안 비율 ${pct(pooled.nonForbiddenShare)}이며 precision이 아니다`);
   console.log(`사전 밖 표현 ${pooled.unmatchedKo}개 · 원문은 그대로 보존되고 초안에는 들어가지 않는다`);
   console.log(`규칙 경로 클릭 합계 ${pooled.clicksTotal} (장면당 ${pooled.clicksPerScene.toFixed(1)}) · ` +
     `그중 수동 보정 ${pooled.manualFixTotal}회(누락 ${pooled.manualEditsTotal}개 ×3) · ` +
     `규칙 제안만 쓸 때 ${pooled.ruleClicksOnly}회`);
-  console.log(`원치 않은 제안 ${pooled.distractors}개는 클릭을 쓰지 않지만, 알아채고 넘겨야 하는 항목이다`);
+  console.log(pooled.distractors === 0
+    ? "원치 않은 제안 0개 · 알아채고 넘겨야 할 오탐이 이 기준선에는 없다"
+    : `원치 않은 제안 ${pooled.distractors}개는 클릭을 쓰지 않지만, 알아채고 넘겨야 하는 항목이다`);
   console.log("초안은 자동 미리보기(UX03)라 클릭 0 · 초안 승인(적용) 1회는 위 클릭에 포함되지 않았다");
   console.log(`상황 후보 경로 클릭 합계 ${pooled.variantClicksTotal} · 되돌리기까지 확인 ` +
     `${pooled.variantUndoRestores}/${rows.length} · 차단된 후보 ${pooled.variantBlocked}건`);
@@ -330,6 +364,11 @@ function main() {
     console.log(`부분 변경(${partial.id}) · 대상 ${partial.partial.targetGroups.join(",")} · ` +
       `고정 ${partial.partial.lockedLabels.join(",")} · 추가 ${partial.partial.accepted.join(",")} · ` +
       `차단 ${partial.partial.blocked}${partial.partial.refused.length ? ` (${partial.partial.refused.join(", ")})` : ""}`);
+    // RULE02: the rule path now answers within the same scope as the AI path.
+    console.log(`부분 변경 규칙 경로 · 범위 안 제안 ${partial.partial.ruleProposed.length}개` +
+      `${partial.partial.ruleProposed.length ? ` (${partial.partial.ruleProposed.join(", ")})` : ""} · ` +
+      `범위 밖으로 보류 ${partial.partial.ruleWithheld.length}개` +
+      `${partial.partial.ruleWithheld.length ? ` (${partial.partial.ruleWithheld.join(", ")})` : ""}`);
   }
   console.log("");
   console.log(`미측정: ${config.unmeasured.join(" · ")}`);

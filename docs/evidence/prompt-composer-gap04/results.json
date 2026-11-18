@@ -705,7 +705,7 @@
   {
     "name": "재시도 결과",
     "pass": null,
-    "detail": "{\"job_id\":\"59973dd521d2425b8d60522efccc140e\",\"prompt\":\"retry probe\",\"model_id\":\"fake-sd15\",\"status\":\"running\"}"
+    "detail": "{\"job_id\":\"708347db5a7d45dd94920990e9d3a979\",\"prompt\":\"retry probe\",\"model_id\":\"fake-sd15\",\"status\":\"running\"}"
   },
   {
     "name": "capability 실패 · 안내 표시",
@@ -1050,6 +1050,58 @@
     "name": "LLM-I06 범위",
     "pass": null,
     "detail": "{\"label\":\"부분 변경 범위 배경만 변경 · 고정 1개\",\"pressed\":[\"배경\"],\"aiLabel\":\"선택한 그룹만 정리\",\"lockNote\":\"고른 그룹만 바꾸는 제안을 요청합니다. 나머지 선택 1개는 잠금으로 보내고, 잠긴 값을 바꾸는 제안은 표시하지 않습니다. 고정은 선택 값의 유지를 뜻하며 생성 이미지의 동일 인물을 보장하지 않습니다.\"}"
+  },
+  {
+    "name": "RULE02 · 규칙 목록이 변경 범위를 밝힘",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 · 범위 밖 네온은 목록에서 빠짐",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "RULE02 · 보류한 제안의 개수와 이름 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 · 범위 때문에 비었음을 설명",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 규칙 목록 범위",
+    "pass": null,
+    "detail": "{\"notice\":\"“배경만 변경” 범위라 1개 제안(네온 조명)을 목록에서 뺐습니다. 범위를 넓히려면 부분 변경 범위에서 그룹을 해제하세요.\",\"offered\":[],\"empty\":\"이 범위에서 새로 추가할 사전 항목을 찾지 못했습니다. 직접 선택하거나 원문을 그대로 사용하세요.\"}"
+  },
+  {
+    "name": "RULE02 360px · 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 360px · 안내가 화면 안",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 360px · 안내 문장이 목록 폭에서 줄바꿈",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 360px",
+    "pass": null,
+    "detail": "{\"overflow\":true,\"inside\":true,\"wraps\":true,\"height\":36,\"width\":288}"
   },
   {
     "name": "LLM-I06 · 부분 변경 요청 1회",

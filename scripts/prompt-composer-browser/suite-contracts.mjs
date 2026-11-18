@@ -590,6 +590,58 @@ export async function runContracts({ page, check, record, sleep, shots }) {
   record("LLM-I06 범위", JSON.stringify(scope));
   await shot(shots, "25-partial-scope.png");
 
+  // RULE02: the rule list answers inside the same scope and says which items it
+  // withheld. Before this the list offered 네온 (조명) in a 배경-only request, and the
+  // user had to notice and skip it; a shorter list with no explanation is just as bad.
+  // The list keeps its open state across sections, so opening it is conditional.
+  const ruleListOpen = await evaluate(`!!document.querySelector('.prompt-proposal-list')`);
+  if (!ruleListOpen) await clickByText(".prompt-proposals button", "원문에서 사전 항목 찾기");
+  await waitFor(`!!document.querySelector('.prompt-proposal-list')`, { label: "rule list open" });
+  await sleep(200);
+  const scopedRule = await evaluate(`(() => ({
+    notice: document.querySelector('.prompt-proposal-list__scope')?.textContent ?? null,
+    offered: [...document.querySelectorAll('.prompt-proposal strong')].map((node) => node.textContent),
+    empty: document.querySelector('.prompt-proposal-list p.prompt-hint:not(.prompt-proposal-list__scope)')?.textContent ?? null,
+  }))()`);
+  check("RULE02 · 규칙 목록이 변경 범위를 밝힘", true, /배경만 변경/.test(scopedRule.notice ?? ""));
+  check("RULE02 · 범위 밖 네온은 목록에서 빠짐", false, scopedRule.offered.includes("네온 조명"));
+  check("RULE02 · 보류한 제안의 개수와 이름 표시", true,
+    /1개 제안\(네온 조명\)/.test(scopedRule.notice ?? ""));
+  // Empty in this scope, and the empty text says the scope is the reason.
+  check("RULE02 · 범위 때문에 비었음을 설명", true, /이 범위에서/.test(scopedRule.empty ?? ""));
+  record("RULE02 규칙 목록 범위", JSON.stringify(scopedRule));
+  await shot(shots, "25b-rule-scope-notice.png");
+
+  // RULE02 360px: the notice is a full sentence that repeats dictionary labels, so it has
+  // to wrap inside the list rather than widen the panel. Measured on the real element.
+  await page.viewport(360, 740, true);
+  await sleep(350);
+  await evaluate(`document.querySelector('#prompt-proposals')?.scrollIntoView({ block: 'center' })`);
+  await sleep(200);
+  const narrowScope = await evaluate(`(() => {
+    const notice = document.querySelector('.prompt-proposal-list__scope');
+    if (!notice) return null;
+    const box = notice.getBoundingClientRect();
+    return {
+      overflow: document.documentElement.scrollWidth <= innerWidth + 1,
+      inside: box.left >= -1 && box.right <= innerWidth + 1,
+      wraps: notice.scrollWidth <= notice.clientWidth + 1,
+      height: Math.round(box.height),
+      width: Math.round(box.width),
+    };
+  })()`);
+  check("RULE02 360px · 가로 넘침 없음", true, narrowScope?.overflow);
+  check("RULE02 360px · 안내가 화면 안", true, narrowScope?.inside);
+  check("RULE02 360px · 안내 문장이 목록 폭에서 줄바꿈", true, narrowScope?.wraps);
+  record("RULE02 360px", JSON.stringify(narrowScope));
+  await shot(shots, "25c-rule-scope-360.png");
+  await page.viewport(1280, 900);
+  await sleep(300);
+  if (!ruleListOpen) {
+    await clickByText(".prompt-proposals button", "제안 닫기");
+    await sleep(200);
+  }
+
   // The request carries the scope, and the reply's out-of-scope and locked items are
   // blocked before any click can reach the scene.
   await evaluate(`(() => {

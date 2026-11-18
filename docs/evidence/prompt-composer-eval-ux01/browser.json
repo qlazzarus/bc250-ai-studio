@@ -17,7 +17,7 @@
       "applyPresent": true,
       "approved": true,
       "clicks": 4,
-      "elapsedMs": 680,
+      "elapsedMs": 657,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
@@ -37,7 +37,7 @@
       "applyPresent": true,
       "approved": true,
       "clicks": 2,
-      "elapsedMs": 590,
+      "elapsedMs": 566,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
@@ -46,14 +46,14 @@
       "id": "landscape-lake-dusk",
       "findClick": false,
       "seeded": [],
-      "offered": 1,
+      "offered": 0,
       "accepted": [],
       "chips": [],
       "draft": "",
       "applyPresent": true,
       "approved": false,
       "clicks": 0,
-      "elapsedMs": 482,
+      "elapsedMs": 480,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
@@ -77,7 +77,7 @@
       "applyPresent": true,
       "approved": true,
       "clicks": 4,
-      "elapsedMs": 673,
+      "elapsedMs": 642,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
@@ -86,7 +86,7 @@
       "id": "negation-empty-beach",
       "findClick": false,
       "seeded": [],
-      "offered": 2,
+      "offered": 1,
       "accepted": [
         "해변"
       ],
@@ -97,7 +97,7 @@
       "applyPresent": true,
       "approved": true,
       "clicks": 2,
-      "elapsedMs": 585,
+      "elapsedMs": 577,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
@@ -124,7 +124,7 @@
       "applyPresent": true,
       "approved": true,
       "clicks": 5,
-      "elapsedMs": 623,
+      "elapsedMs": 610,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
@@ -152,7 +152,7 @@
       "applyPresent": true,
       "approved": true,
       "clicks": 6,
-      "elapsedMs": 771,
+      "elapsedMs": 731,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
@@ -176,7 +176,7 @@
       "applyPresent": true,
       "approved": true,
       "clicks": 4,
-      "elapsedMs": 648,
+      "elapsedMs": 650,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
@@ -198,7 +198,7 @@
       "applyPresent": true,
       "approved": true,
       "clicks": 3,
-      "elapsedMs": 643,
+      "elapsedMs": 605,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
@@ -207,7 +207,7 @@
       "id": "group-hiking",
       "findClick": false,
       "seeded": [],
-      "offered": 2,
+      "offered": 1,
       "accepted": [
         "사람들"
       ],
@@ -218,7 +218,7 @@
       "applyPresent": true,
       "approved": true,
       "clicks": 2,
-      "elapsedMs": 596,
+      "elapsedMs": 569,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
@@ -227,7 +227,7 @@
       "id": "beach-sunset-couple",
       "findClick": false,
       "seeded": [],
-      "offered": 4,
+      "offered": 3,
       "accepted": [
         "해변",
         "두 사람",
@@ -242,7 +242,7 @@
       "applyPresent": true,
       "approved": true,
       "clicks": 4,
-      "elapsedMs": 670,
+      "elapsedMs": 654,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
@@ -272,12 +272,12 @@
       "applyPresent": true,
       "approved": true,
       "clicks": 7,
-      "elapsedMs": 797,
+      "elapsedMs": 762,
       "matchesNodeArmDraft": true,
       "matchesNodeArmChips": true,
       "finalPromptEqualsDraft": true
     }
   ],
   "totalClicks": 43,
-  "totalElapsedMs": 7758
+  "totalElapsedMs": 7503
 }

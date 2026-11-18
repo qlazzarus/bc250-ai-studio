@@ -49,23 +49,27 @@
     "expected": 38,
     "hits": 29,
     "misses": 9,
-    "unwanted": 3,
-    "unclassified": 2,
-    "proposed": 34,
+    "unwanted": 0,
+    "unclassified": 1,
+    "proposed": 30,
     "unmatchedKo": 23,
     "recall": 0.7631578947368421,
-    "precision": 0.9117647058823529,
-    "precisionDecided": 0.90625,
+    "decided": 29,
+    "precision": 1,
+    "nonForbiddenShare": 1,
+    "unclassifiedRate": 0.03333333333333333,
     "clicksTotal": 80,
     "clicksPerScene": 6.666666666666667,
     "manualFixTotal": 27,
     "manualEditsTotal": 9,
-    "distractors": 3,
+    "distractors": 0,
     "ruleClicksOnly": 53,
     "variantClicksTotal": 36,
     "variantBlocked": 12,
     "variantUndoRestores": 12,
-    "partialRefused": 1
+    "partialRefused": 1,
+    "partialRuleWithheld": 1,
+    "partialRuleProposed": 1
   },
   "scenes": [
     {
@@ -231,29 +235,19 @@
         "setting.mountain",
         "lighting.golden_hour"
       ],
-      "unwanted": [
-        "subject.person"
-      ],
+      "unwanted": [],
       "unclassified": [],
       "expectedCount": 2,
-      "proposedCount": 1,
+      "proposedCount": 0,
       "labels": {
         "hits": [],
         "misses": [
           "산",
           "골든 아워"
         ],
-        "unwanted": [
-          "인물"
-        ]
+        "unwanted": []
       },
-      "hints": [
-        {
-          "id": "subject.person",
-          "phrase": "사람",
-          "score": 0.45
-        }
-      ],
+      "hints": [],
       "unmatchedKo": [
         {
           "text": "호수",
@@ -272,7 +266,7 @@
         "input": 1,
         "find": 1,
         "accept": 0,
-        "distractors": 1,
+        "distractors": 0,
         "manualFix": 6,
         "total": 8,
         "manualEdits": 2
@@ -380,31 +374,22 @@
         "setting.beach"
       ],
       "misses": [],
-      "unwanted": [
-        "subject.person"
-      ],
+      "unwanted": [],
       "unclassified": [],
       "expectedCount": 1,
-      "proposedCount": 2,
+      "proposedCount": 1,
       "labels": {
         "hits": [
           "해변"
         ],
         "misses": [],
-        "unwanted": [
-          "인물"
-        ]
+        "unwanted": []
       },
       "hints": [
         {
           "id": "setting.beach",
           "phrase": "해변",
           "score": 0.53
-        },
-        {
-          "id": "subject.person",
-          "phrase": "사람",
-          "score": 0.45
         }
       ],
       "unmatchedKo": [
@@ -431,7 +416,7 @@
         "input": 1,
         "find": 1,
         "accept": 1,
-        "distractors": 1,
+        "distractors": 0,
         "manualFix": 0,
         "total": 3,
         "manualEdits": 0
@@ -526,6 +511,12 @@
         "lockedLabels": [
           "인물",
           "흰 셔츠"
+        ],
+        "ruleProposed": [
+          "lighting.low_key"
+        ],
+        "ruleWithheld": [
+          "setting.cafe"
         ],
         "accepted": [
           "어두운 조명"
@@ -821,12 +812,10 @@
       "misses": [
         "setting.mountain"
       ],
-      "unwanted": [
-        "subject.person"
-      ],
+      "unwanted": [],
       "unclassified": [],
       "expectedCount": 2,
-      "proposedCount": 2,
+      "proposedCount": 1,
       "labels": {
         "hits": [
           "사람들"
@@ -834,20 +823,13 @@
         "misses": [
           "산"
         ],
-        "unwanted": [
-          "인물"
-        ]
+        "unwanted": []
       },
       "hints": [
         {
           "id": "subject.group",
           "phrase": "사람들",
           "score": 0.59
-        },
-        {
-          "id": "subject.person",
-          "phrase": "사람",
-          "score": 0.45
         }
       ],
       "unmatchedKo": [
@@ -874,7 +856,7 @@
         "input": 1,
         "find": 1,
         "accept": 1,
-        "distractors": 1,
+        "distractors": 0,
         "manualFix": 3,
         "total": 6,
         "manualEdits": 1
@@ -904,11 +886,9 @@
       ],
       "misses": [],
       "unwanted": [],
-      "unclassified": [
-        "subject.person"
-      ],
+      "unclassified": [],
       "expectedCount": 3,
-      "proposedCount": 4,
+      "proposedCount": 3,
       "labels": {
         "hits": [
           "해변",
@@ -933,11 +913,6 @@
           "id": "setting.beach",
           "phrase": "해변",
           "score": 0.53
-        },
-        {
-          "id": "subject.person",
-          "phrase": "사람",
-          "score": 0.45
         }
       ],
       "unmatchedKo": [

@@ -1,14 +1,20 @@
-"""Read-only server view of the operator prompt dictionary (LLM-I03).
+"""Read-only server view of the operator prompt dictionary (LLM-I03, LLM-R02).
 
 The dictionary is authored exactly once, in
 ``frontend/src/prompt/dictionary.ts``. Python must not keep a hand-maintained
-second copy, so ``config/prompt_dictionary.json`` is a generated mirror and
+second copy, so ``config/prompt_dictionary.json`` is a generated mirror —
+``scripts/gen-prompt-dictionary.mjs`` writes it, and
 ``backend/tests/test_proposal_api.py`` fails when the two drift.
 
-Only what the server actually needs is mirrored: ID, category, active flag. Those
-are the validator's whitelist and the model's catalogue; the rendered expression
-stays in the browser and ``compileScene`` assembles the final prompt. Shipping
-expressions to Python would create a second source of truth for it.
+What is mirrored, and why:
+
+* ``id``/``category``/``active`` — the validator's whitelist and the model's catalogue.
+* ``label_ko``/``aliases`` — the Korean search vocabulary the model needs to connect a
+  user's words to an ID (LLM-R02). These are *not* rendered expressions.
+
+What is deliberately **not** mirrored: ``mappings``, the per-family rendered text. The
+final prompt is assembled in the browser by ``compileScene``; shipping expressions to
+Python would create a second source of truth for the rendered output.
 """
 
 import json
@@ -50,13 +56,22 @@ def load_dictionary(path: Path | str) -> ProposalDictionary | None:
             return None
         entry_id, category = item.get("id"), item.get("category")
         active = item.get("active", True)
+        label_ko = item.get("label_ko", "")
+        aliases = item.get("aliases", [])
         if not isinstance(entry_id, str) or not entry_id.strip():
             return None
         if not isinstance(category, str) or not category.strip():
             return None
         if type(active) is not bool or entry_id in entries:
             return None
-        entries[entry_id] = DictionaryEntryRef(category, active)
+        # LLM-R02 fields are optional so an older mirror still loads; when present
+        # they must be the right shape, because they go straight into the prompt.
+        if not isinstance(label_ko, str):
+            return None
+        if not isinstance(aliases, list) or any(
+                not isinstance(alias, str) or not alias.strip() for alias in aliases):
+            return None
+        entries[entry_id] = DictionaryEntryRef(category, active, label_ko, tuple(aliases))
     if not entries:
         return None
     return ProposalDictionary(version=version, entries=entries)

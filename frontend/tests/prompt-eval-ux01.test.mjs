@@ -98,16 +98,42 @@ test("pooled denominators match the per-scene rows", () => {
 
 test("negation scenes keep the person out even though the text contains 사람", () => {
   // Selected by the fixture's own `negated` marker, not by its category label: a
-  // landscape can be a negation case too.
+  // landscape can be a negation case too. RULE01 made this a *pass* condition: the
+  // fixture still forbids 인물, but the rules no longer propose it at all.
   const negated = new Set(SCENES.filter((scene) => scene.negated === true).map((scene) => scene.id));
   const negations = report.scenes.filter((row) => negated.has(row.id));
   assert.equal(negations.length, 2);
   for (const row of negations) {
-    assert.ok(row.unwanted.includes("subject.person"), `${row.id} should flag the substring false positive`);
-    // The prompt the user would end up with must not describe a person.
+    assert.deepEqual(row.unwanted, [], `${row.id} still proposes a forbidden id`);
+    assert.deepEqual(row.unclassified, [], `${row.id} proposes something unjudged`);
     assert.ok(!row.finalChips.includes("인물"), `${row.id} kept 인물`);
     assert.ok(!/a person/.test(row.draft), `${row.id} draft mentions a person: ${row.draft}`);
   }
+});
+
+test("every proposal in the run is either expected or a known, judged case", () => {
+  // Two things at once, both from RULE01:
+  // 1. no forbidden id is proposed anywhere (the three 사례 1–3 false positives are gone),
+  // 2. the only leftovers are the one entry a human still has to judge — `subject.person`
+  //    in the portrait scene, where a person *is* in the picture but the fixture's
+  //    expectation covers `subject.portrait` instead. It is reported, not counted.
+  assert.equal(report.pooled.unwanted, 0);
+  assert.equal(report.pooled.unclassified, 1);
+  const unjudged = report.scenes.flatMap((row) => row.unclassified.map((id) => `${row.id}:${id}`));
+  assert.deepEqual(unjudged, ["portrait-front-closeup:subject.person"]);
+});
+
+test("precision excludes the unjudged proposal instead of counting it as correct", () => {
+  // METRIC01: 29 hits / 29 decidable proposals. The old `(proposed-unwanted)/proposed`
+  // number is reported separately, as an upper bound, never as precision.
+  assert.equal(report.pooled.decided, 29);
+  assert.equal(report.pooled.hits, 29);
+  assert.equal(report.pooled.precision, 1);
+  assert.equal(report.pooled.nonForbiddenShare, 1);
+  assert.ok(Math.abs(report.pooled.unclassifiedRate - 1 / report.pooled.proposed) < 1e-12);
+  // The two are different quantities even when they happen to agree here.
+  assert.ok(report.pooled.precision <= report.pooled.nonForbiddenShare);
+  assert.ok(!("precisionDecided" in report.pooled), "the old ambiguous name must be gone");
 });
 
 test("the partial-change scene locks the cast and refuses a place suggestion", () => {
@@ -123,6 +149,13 @@ test("the partial-change scene locks the cast and refuses a place suggestion", (
   for (const label of partial.partial.accepted) {
     assert.equal(acceptedEntry(label)?.category, "lighting", `${label} is not a lighting item`);
   }
+  // RULE02: the rule path answers within the same scope. `카페` is withheld by the
+  // matcher, and the card layer is measured separately against a reply that sends it.
+  assert.deepEqual(partial.partial.ruleProposed, ["lighting.low_key"]);
+  assert.deepEqual(partial.partial.ruleWithheld, ["setting.cafe"]);
+  for (const id of partial.partial.ruleProposed) assert.equal(byId.get(id).category, "lighting");
+  assert.equal(report.pooled.partialRuleProposed, 1);
+  assert.equal(report.pooled.partialRuleWithheld, 1);
 });
 
 test("the variant arm is scripted, applies nothing automatically and always undoes", () => {
@@ -160,9 +193,10 @@ test("the quoted aggregates still hold", () => {
   assert.equal(report.pooled.expected, 38);
   assert.equal(report.pooled.hits, 29);
   assert.equal(report.pooled.misses, 9);
-  assert.equal(report.pooled.unwanted, 3);
-  assert.equal(report.pooled.unclassified, 2);
-  assert.equal(report.pooled.proposed, 34);
+  // RULE01: 3 → 0. The three false positives of EVAL-UX01 사례 1–3 are gone.
+  assert.equal(report.pooled.unwanted, 0);
+  assert.equal(report.pooled.unclassified, 1);
+  assert.equal(report.pooled.proposed, 30);
   assert.equal(report.pooled.unmatchedKo, 23);
   // 80 = 2 (입력·찾기) × 12 + 29 수락 + 27 수동 보정. An unwanted proposal costs no
   // click, so it is counted in `distractors`, not in the click total.
@@ -170,7 +204,7 @@ test("the quoted aggregates still hold", () => {
   assert.equal(report.pooled.ruleClicksOnly, 53);
   assert.equal(report.pooled.manualFixTotal, 27);
   assert.equal(report.pooled.manualEditsTotal, 9);
-  assert.equal(report.pooled.distractors, 3);
+  assert.equal(report.pooled.distractors, 0);
   assert.equal(report.pooled.variantClicksTotal, 36);
   assert.equal(report.pooled.variantBlocked, 12);
   assert.equal(report.pooled.partialRefused, 1);

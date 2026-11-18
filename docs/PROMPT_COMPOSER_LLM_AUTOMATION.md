@@ -79,7 +79,7 @@ legacy 12개는 4개 family에 **같은 문자열**을 쓰고 있다. 자연어 
 - **결정론:** 후보 id는 반드시 현재 사전에 존재해야 하고, 사용자가 체크해야 `selections`에 들어간다. 원문은 `free_text_ko`에 그대로 남는다. 최종 prompt는 승인 후 compiler가 만든다.
 - **측정:** 제안 수락률, 제안으로 줄어든 평균 선택 시간, 잘못된 매칭(사용자 거부) 비율.
 
-**선행 구현 (2026-11-15, 결정론):** `frontend/src/prompt/proposals.ts`의 `suggestSelections()`. LLM 없이 사전 `labelKo`·`aliases` 부분 문자열 매칭으로 동작한다.
+**선행 구현 (2026-11-15, 결정론 / RULE01·RULE02 반영 2026-11-18):** `frontend/src/prompt/proposals.ts`의 `suggestSelectionsDetailed()`가 `SuggestionReport { hints, outOfScope, scoped }`를 반환하고, `suggestSelections()`는 그 `hints`만 돌려주는 얇은 래퍼다. LLM 없이 사전 `labelKo`·`aliases`를 **발생(occurrence) 단위**로 매칭하며, 부정·복수·명시적 수 판정은 `frontend/src/prompt/matching.ts`의 순수 helper에 있다. `target_groups`가 오면 그룹 밖 후보는 `outOfScope`로 분리한다.
 
 | 구현 사실 | 내용 |
 | --- | --- |
@@ -92,7 +92,7 @@ legacy 12개는 4개 family에 **같은 문자열**을 쓰고 있다. 자연어 
 | 이미 선택된 항목 | 제안에서 제외 |
 | 계열 미매핑 | `available: false`로 표시하고 신뢰도를 낮춘다. 숨기지 않는다 |
 
-**LLM 교체 지점:** `suggestSelections()`가 지금은 순수 함수다. LLM을 붙일 때는 이 함수의 **입출력 타입(`ProposalRequest`/`SelectionHint`)을 그대로 유지**하고 서버 호출 구현만 갈아끼운다. 그러면 UI·테스트·수락 경로를 바꾸지 않아도 된다. LLM 응답은 반드시 사전 id 화이트리스트를 통과해야 하며, 실패 시 결정론 결과로 조용히 폴백한다.
+**LLM 교체 지점:** `suggestSelectionsDetailed()`가 지금은 순수 함수다. LLM을 붙일 때는 이 함수의 **입출력 타입(`ProposalRequest`/`SuggestionReport`)을 그대로 유지**하고 서버 호출 구현만 갈아끼운다. 그러면 UI·테스트·수락 경로를 바꾸지 않아도 된다. `targetGroups`가 주는 범위 계약(RULE02)도 서버 요청의 `target_groups`와 같은 의미로 유지한다. LLM 응답은 반드시 사전 id 화이트리스트를 통과해야 하며, 실패 시 결정론 결과로 조용히 폴백한다.
 
 ### A6. 다인 장면 속성 귀속 제안 (온라인, P7 연결)
 
@@ -301,7 +301,8 @@ cd frontend && npx tsc -b && npm run lint && npm run build
 | --- | --- |
 | `docs/PROMPT_COMPOSER_LLM_AUTOMATION.md` | 신규. 본 제안 설계 + A5/A7 결정론 구현 기록 |
 | `frontend/src/prompt/proposals.ts` | 신규. `suggestSelections()`·`explainWarning()` 순수 함수(LLM 교체 지점) |
-| `frontend/tests/prompt-proposals.test.mjs` | 신규. 9건 — id 화이트리스트·원문 불변·결정론·해소 안전성 |
+| `frontend/src/prompt/matching.ts` | (2026-11-18, RULE01) 신규. 발생 단위 부정·복수·명시적 수·경계 판정 순수 helper |
+| `frontend/tests/prompt-proposals.test.mjs` | 신규. 9건 — id 화이트리스트·원문 불변·결정론·해소 안전성. (RULE01/RULE02에서 부정·다인·범위·선택 후 재열기 14건으로 확장) |
 | `frontend/src/components/PromptBuilder.tsx` | 제안 패널, 경고 해설 행, `acceptHint`/`removeRedundant` |
 | `frontend/src/styles.css` | `.prompt-proposals`, `.prompt-proposal`, `.prompt-warning--action`, 460px 미디어 쿼리 |
 | `docs/PROMPT_COMPOSER_FOLLOWUP.md` | LLM 제안 8항목 추적 행 + A5/A7 상태 반영 |

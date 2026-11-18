@@ -3,7 +3,7 @@ import { compileScene, DRAFT_LIMIT } from "../prompt/compiler";
 import { type PromptBuilderState, isDraftStale, withGeneratedDraft, withAppliedDraft, draftComposition } from "../prompt/builderState";
 import { DICTIONARY, DICTIONARY_VERSION, familyCoverage, type DictionaryEntry } from "../prompt/dictionary";
 import { changeSceneFamily, removeEntry, selectEntry, type SceneSpecification } from "../prompt/scene";
-import { explainWarning, suggestSelections } from "../prompt/proposals";
+import { explainWarning, suggestSelectionsDetailed } from "../prompt/proposals";
 import {
   type ProposalCapability, UNSUPPORTED, proposalActionLabel, proposalFallbackNotice,
 } from "../prompt/proposalCapability";
@@ -152,6 +152,16 @@ export default function PromptBuilder({
   /** The scope a *fresh* request would carry: what the button label and panel show. */
   const scope = partialScope(state.scene, targetGroups);
   const scopeActive = scopeIsActive(scope);
+  /**
+   * RULE02: the hint list below takes the same groups as the AI request, so the
+   * `조명만` promise holds on this path too. A joined string is the dependency because
+   * `partialScope` builds a fresh array every render; `targetGroups` and `state.scene`
+   * are the two things it actually reads.
+   */
+  const scopeKey = useMemo(
+    () => partialScope(state.scene, targetGroups).targetGroups.join(","),
+    [state.scene, targetGroups],
+  );
   /** The diff is only meaningful for a reply that arrived for a scope. */
   const diff = useMemo(() => {
     if (!cards) return null;
@@ -231,9 +241,18 @@ export default function PromptBuilder({
   const unresolved = unresolvedSelections(state.result);
   const advisories = advisoryWarnings(state.result);
   // Recomputed from the immutable free text only when the user opens the panel.
-  const hints = useMemo(() => (hintsOpen && family
-    ? suggestSelections({ freeTextKo: state.scene.freeTextKo, family, dictionary: DICTIONARY, selectedIds: selectedKey.split("\u0000") })
-    : []), [hintsOpen, family, state.scene.freeTextKo, selectedKey]);
+  // RULE02: the rule request now carries the same scope the AI button does, so the
+  // `조명만` promise holds on this path too — `카페` stays out of the list instead of
+  // being proposed and dropped by hand. The dependency is `scopeKey`, not the `scope`
+  // object: that object is rebuilt every render and would defeat the memo.
+  const hintReport = useMemo(() => (hintsOpen && family
+    ? suggestSelectionsDetailed({
+      freeTextKo: state.scene.freeTextKo, family, dictionary: DICTIONARY,
+      selectedIds: selectedKey.split("\u0000"),
+      targetGroups: scopeKey ? scopeKey.split(",") : undefined,
+    })
+    : null), [hintsOpen, family, state.scene.freeTextKo, selectedKey, scopeKey]);
+  const hints = hintReport?.hints ?? [];
 
   /**
    * Focus that must wait for the commit runs here, not in the click handler: the
@@ -850,8 +869,22 @@ export default function PromptBuilder({
             : `${variantUndo.text}. 지금 선택은 덮어쓰지 않습니다.`}</small>
         </div>}
         {hintsOpen && <div id="prompt-proposals" className="prompt-proposal-list" role="group" aria-label="사전 항목 제안">
+          {/*
+            RULE02: a scoped request says which proposals it withheld and why. Without
+            this line the list just looks shorter, and the user cannot tell a
+            deliberate `조명만` filter from a matcher that missed a word.
+          */}
+          {hintReport !== null && hintReport.scoped && <p className="prompt-hint prompt-proposal-list__scope">
+            {`“${scope.targetGroups.map((group) => labels[group] ?? group).join("·")}만 변경” 범위라 `}
+            {hintReport.outOfScope.length
+              ? `${hintReport.outOfScope.length}개 제안(${hintReport.outOfScope.map((hint) => hint.labelKo).join(", ")})을 목록에서 뺐습니다. `
+              : "범위 밖 항목은 없습니다. "}
+            범위를 넓히려면 부분 변경 범위에서 그룹을 해제하세요.
+          </p>}
           {hints.length === 0
-            ? <p className="prompt-hint">원문에서 사전 항목을 찾지 못했습니다. 직접 선택하거나 원문을 그대로 사용하세요.</p>
+            ? <p className="prompt-hint">{hintReport !== null && hintReport.scoped
+              ? "이 범위에서 새로 추가할 사전 항목을 찾지 못했습니다. 직접 선택하거나 원문을 그대로 사용하세요."
+              : "원문에서 사전 항목을 찾지 못했습니다. 직접 선택하거나 원문을 그대로 사용하세요."}</p>
             : hints.map((hint) => <div className="prompt-proposal" key={hint.id}>
               <div>
                 <strong>{hint.labelKo}</strong>

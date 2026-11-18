@@ -16,9 +16,13 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 
 from app.services.prompt_proposals import (
+    DISPLAY_GROUP,
+    FINISH_REASONS,
     MAX_VARIANTS,
     VARIANT_KIND,
     DictionaryEntryRef,
+    FinishReason,
+    ObservedProvider,
     ProposalRequest,
     ValidatedProposal,
     evaluate,
@@ -129,12 +133,30 @@ def _dictionary_listing(dictionary: Mapping[str, DictionaryEntryRef]) -> str:
     Only active entries are listed, so an inactive ID is never offered. The model
     still sees no rendered text; acceptance maps back to an ID and ``compileScene``
     assembles the final prompt.
+
+    LLM-R02: a bare ``id (category)`` list asked the model to guess which Korean words
+    belonged to which ID, while the dictionary already held 100 Korean labels and 122
+    aliases that the rule engine matches on. Each line therefore carries the display
+    group and the Korean vocabulary::
+
+        - setting.cafe (setting) 카페 | 카페 안 | 커피숍
+
+    ``display_group`` is used instead of the stored ``category`` so the catalogue speaks
+    the same vocabulary as ``target_groups`` (``action`` → ``pose``, ``location`` →
+    ``setting``); see ``DISPLAY_GROUP`` in ``prompt_proposals.py``. Adding this text
+    costs ~2.8 KB of system prompt, which is outside the 8 KiB request-body cap.
     """
-    lines = [
-        f"- {entry_id} ({ref.category})"
-        for entry_id, ref in sorted(dictionary.items())
-        if ref.active
-    ]
+    lines = []
+    for entry_id, ref in sorted(dictionary.items()):
+        if not ref.active:
+            continue
+        group = DISPLAY_GROUP.get(ref.category, ref.category)
+        head = f"- {entry_id} ({group})"
+        if ref.label_ko:
+            head += f" {ref.label_ko}"
+        if ref.aliases:
+            head += " | " + " | ".join(ref.aliases)
+        lines.append(head)
     return "\n".join(lines)
 
 
@@ -183,6 +205,8 @@ def _variant_system(schema: dict, catalogue: str) -> str:
         "one flat scene cannot say who owns an attribute. Use only IDs from the "
         "dictionary list, difference each variant from the current selection, "
         "never repeat a variant, never explain."
+        " Never propose an ID that is already in `selections`; `removed_ids` names an "
+        "ID being replaced, so it always appears in `selections` by definition."
         "\nDictionary:\n" + catalogue
     )
 
@@ -195,18 +219,23 @@ def build_payload(
 ) -> dict:
     """The single chat request. ``free_text_ko`` is data, never an instruction."""
     catalogue = _dictionary_listing(dictionary)
+    # LLM-R03: every kind gets the current selection. `partial_change` is a diff request:
+    # without the current values the model could not know which lighting is already
+    # chosen, so it re-proposed the same ID (silently dropped by the validator) or a
+    # conflicting one (blocked by the compiler's conflict pairs). The model was not
+    # wrong — it was never told.
+    selections = [{"id": item.id, "category": item.category}
+                  for item in request.selections]
     if request.kind == VARIANT_KIND:
         schema = _variant_schema(request, model=model)
         system = _variant_system(schema, catalogue)
         # A variant is a diff, so the model needs the selection it must keep and the
-        # values it may replace. For the older kinds the selection is already in the
-        # text and the payload stays as C01 fixed it.
+        # values it may replace.
         user = {
             "kind": request.kind,
             "target_family": request.target_family,
             "free_text_ko": request.free_text_ko,
-            "selections": [{"id": item.id, "category": item.category}
-                           for item in request.selections],
+            "selections": selections,
             "locked_ids": request.locked_ids,
             "target_groups": request.target_groups,
             "max_variants": MAX_VARIANTS,
@@ -235,10 +264,14 @@ def build_payload(
             + json.dumps(schema, ensure_ascii=False)
             + "\nRules: use only IDs from the dictionary list; copy matched_phrase and "
             "span text verbatim from the user text; never invent IDs; never explain."
+            "\nNever propose an ID that is already in `selections`."
+            " Never propose an ID from `locked_ids`: those values may not change."
+            " When `target_groups` is non-empty, only propose IDs whose group is listed."
             "\nDictionary:\n" + catalogue
         )
         user = {"kind": request.kind, "target_family": request.target_family,
                 "free_text_ko": request.free_text_ko,
+                "selections": selections,
                 "locked_ids": request.locked_ids, "target_groups": request.target_groups}
     return {
         "model": model,
@@ -253,20 +286,49 @@ def build_payload(
     }
 
 
-def reply_bytes(body: bytes) -> bytes:
-    """Extract the assistant message content from an OpenAI-shaped chat reply.
+def reply_envelope(body: bytes) -> tuple[bytes, ObservedProvider]:
+    """Extract the assistant content *and* the facts the envelope reports.
+
+    LLM-R05: ``choices[0].finish_reason`` and ``model`` are produced by the server, not
+    the model, so they are the only trustworthy account of whether the reply was cut
+    short. The model also writes its own ``provider`` object inside the JSON content; that
+    claim is never used to decide ``incomplete_reply`` when the envelope disagrees.
 
     A malformed envelope is reported as ``invalid_reply`` by the caller, never as
     a crash: the browser must keep its text and selections untouched.
     """
     try:
         value = json.loads(body)
-        content = value["choices"][0]["message"]["content"]
+        choice = value["choices"][0]
+        content = choice["message"]["content"]
     except (ValueError, KeyError, IndexError, TypeError) as error:
         raise ValueError("provider reply is not an OpenAI chat reply") from error
     if not isinstance(content, str):
         raise ValueError("provider reply content is not a string")
-    return content.encode("utf-8")
+    observed = ObservedProvider(model=_envelope_model(value),
+                                finish_reason=_envelope_finish_reason(choice))
+    return content.encode("utf-8"), observed
+
+
+def _envelope_model(value: dict) -> str | None:
+    """``model`` as the provider named it, or ``None`` when absent/unusable."""
+    model = value.get("model")
+    return model if isinstance(model, str) and model.strip() else None
+
+
+def _envelope_finish_reason(choice: dict) -> FinishReason | None:
+    """Map the provider's stop reason onto the contract's closed set."""
+    reason = choice.get("finish_reason")
+    if reason in FINISH_REASONS:
+        return reason
+    # An unknown reason is still "not a clean stop": keep it observable instead of
+    # letting an unexpected value read as success.
+    return "other" if reason is not None else None
+
+
+def reply_bytes(body: bytes) -> bytes:
+    """The assistant message content alone (kept for callers that need only that)."""
+    return reply_envelope(body)[0]
 
 
 class ProposalProviderClient:
@@ -337,10 +399,13 @@ class ProposalProviderClient:
         if response.status_code != 200:
             return _failure("upstream_status", f"http_{response.status_code}", latency)
         try:
-            content = reply_bytes(response.content)
+            content, observed = reply_envelope(response.content)
         except ValueError as error:
             return _failure("invalid_reply", str(error), latency)
-        result = evaluate(content, request=request, dictionary=dictionary)
+        # LLM-R05: the envelope's stop reason and model name are authoritative; the
+        # model's own `provider` block is only a fallback when the envelope is silent.
+        result = evaluate(content, request=request, dictionary=dictionary,
+                          observed=observed)
         if result.status not in {"ready", "empty"}:
             # C01-3: the browser gets an informative status, not a 5xx.
             return ProposalOutcome(proposal=result, failure="invalid_reply",

@@ -56,15 +56,47 @@ MIN_MATCHED_PHRASE = 2
 MAX_MATCHED_PHRASE = 40
 
 # C01-4 negation markers. Korean attaches the marker *after* the negated noun
-# ("안경 없이", "긴 머리가 아닌", "안경 안 쓴"), so only the characters following
-# each occurrence are inspected. A symmetric window would wrongly hold 짧은 머리
-# in "안경 없이 짧은 머리의 사람", which C01-6 #2 requires to be accepted.
+# ("안경 없이", "긴 머리가 아닌"), so only the characters following each occurrence
+# are inspected, and only up to the end of that clause.
+#
+# The stem list is a *copy* of ``NEGATION_MARKERS`` in
+# ``frontend/src/prompt/matching.ts``, which is the source of truth (RULE01). Keep the
+# two in step: a stem missing here lets the server accept what the rule engine drops.
+# ``안 ``/``못 ``/``아닌`` are server-only extras. ``아닌`` is not covered by the ``아니``
+# stem (``아닌`` is spelled 아 + 닌), and the rule engine's own ``아니`` does not reach
+# it either. Each extra only ever *holds* an entry the text denies, which is the safe
+# direction, so the server is allowed to be stricter than the rule engine — never
+# looser.
 NEGATION_MARKERS = (
-    "없이", "아닌", "아님", "아니", "않", "안 ", "못 ", "말고", "빼고", "제외",
+    "없", "아니", "않", "빼고", "제외", "말고", "금지", "아닌", "안 ", "못 ",
 )
-MATCH_AFTER_WINDOW = 8
+AFFIRMATION_MARKERS = ("있",)
+# A reader ends a statement here; polarity never crosses this boundary. Same character
+# set as ``CLAUSE_BREAK`` in matching.ts.
+CLAUSE_BREAK = frozenset(".!?,、。·\n")
 
 DISPLAY_GROUP = {"action": "pose", "location": "setting", "composition": "camera"}
+
+
+def display_group(category: str) -> str:
+    """The display group for a stored category (``action`` → ``pose``, etc.).
+
+    One function so the catalogue, the scope check and the variant check cannot drift:
+    ``GROUP_ORDER`` in ``frontend/src/prompt/presentation.ts`` owns the vocabulary.
+    """
+    return DISPLAY_GROUP.get(category, category)
+
+
+def groups_in_use(entries: "Mapping[str, DictionaryEntryRef]") -> frozenset[str]:
+    """Every display group the live dictionary actually has (LLM-R06).
+
+    ``target_groups`` used to be accepted as free text: an unknown group simply matched
+    nothing, so a request could ask for ``"pose"`` in a dictionary that had no pose
+    entries and be answered with an empty list that looked like the model's fault. The
+    allowed set is derived from the dictionary rather than hardcoded, so adding a
+    category later does not need a second edit here.
+    """
+    return frozenset(display_group(ref.category) for ref in entries.values() if ref.active)
 
 ProposalKind = Literal["selection_hint", "partial_change", "situation_variants"]
 # VAR01: the third kind. Kept as a name too, because both the validator and the
@@ -76,6 +108,23 @@ SpanWhy = Literal["no_dictionary_entry", "negated", "negation_unsupported",
                   "ambiguous_attribution", "polarity_conflict"]
 AmbiguityWhy = Literal["actor_unknown"]
 FinishReason = Literal["stop", "length", "abort", "content_filter", "other"]
+# LLM-R05: the closed set an envelope's `finish_reason` is mapped onto.
+FINISH_REASONS = frozenset({"stop", "length", "abort", "content_filter", "other"})
+
+
+@dataclass(frozen=True)
+class ObservedProvider:
+    """What the HTTP envelope said, as opposed to what the model claims.
+
+    LLM-R05: ``provider.model`` and ``provider.finish_reason`` used to be written *by the
+    model* inside its JSON reply, so a model that ran out of tokens could still report
+    ``finish_reason: "stop"`` and have its truncated object accepted. The transport knows
+    the real values; when they are available they win. ``None`` means the envelope did not
+    carry the field, and the model's own value is kept as a documented fallback.
+    """
+
+    model: str | None = None
+    finish_reason: FinishReason | None = None
 
 
 class ProposalParseError(ValueError):
@@ -84,10 +133,19 @@ class ProposalParseError(ValueError):
 
 @dataclass(frozen=True)
 class DictionaryEntryRef:
-    """Only the facts the validator needs. Never the rendered expression."""
+    """Only the facts the validator and the model catalogue need.
+
+    ``label_ko``/``aliases`` are *Korean search vocabulary*, not rendered text: they
+    let the model connect user words to an ID (LLM-R02). The final prompt is still
+    assembled from the browser-side ``mappings`` by ``compileScene``, and those are
+    deliberately absent here — mirroring them would create a second source of truth
+    for the rendered expression.
+    """
 
     category: str
     active: bool = True
+    label_ko: str = ""
+    aliases: tuple[str, ...] = ()
 
 
 class ProposalSelection(BaseModel):
@@ -280,22 +338,48 @@ def parse_reply(payload: bytes, *, request: ProposalRequest) -> ProposalResponse
 
 
 def _negated_in_source(phrase: str, source: str) -> bool:
-    """True when a negation marker immediately follows an occurrence of ``phrase``.
+    """True when the first thing that happens after an occurrence negates it.
 
-    This is the deterministic guard the rule engine lacks. Korean negates a noun by
-    attaching a marker after it (``안경 없이``, ``긴 머리가 아닌``), so only the
-    characters right after each occurrence are inspected. Scanning a symmetric
-    window would wrongly hold ``짧은 머리`` in ``안경 없이 짧은 머리의 사람``.
+    This mirrors ``polarityAt`` in ``frontend/src/prompt/matching.ts`` (RULE01), which
+    is the source of truth. Two properties come from that function and both matter:
+
+    * **Clause scope.** The marker search stops at the end of the occurrence's clause.
+      A fixed 8-character window instead let the *next* clause decide
+      (``사람. 안경 없이 걷는다`` held the person), and a bounded window also missed
+      ``사람은 없다`` because the old list only carried ``없이``, not the ``없`` stem.
+    * **First marker wins.** ``사람은 없고 고양이는 있다`` holds the person and affirms the
+      cat, so an affirmation appearing before the negation is not ignored.
+
+    Korean attaches markers after the noun, so only the text *following* each
+    occurrence is read; a negation before the match does not reach it.
     """
     start = 0
     while True:
         index = source.find(phrase, start)
         if index < 0:
             return False
-        after = source[index + len(phrase):index + len(phrase) + MATCH_AFTER_WINDOW]
-        if any(marker in after for marker in NEGATION_MARKERS):
+        if _polarity_after(source, index + len(phrase)) == "negated":
             return True
         start = index + 1
+
+
+def _polarity_after(source: str, from_index: int) -> str:
+    """Polarity of a match that ends at ``from_index``, decided by the rest of its clause."""
+    scope = []
+    for character in source[from_index:]:
+        if character in CLAUSE_BREAK:
+            break
+        scope.append(character)
+    window = "".join(scope)
+    best_index = len(window) + 1
+    negated = False
+    for marker in NEGATION_MARKERS + AFFIRMATION_MARKERS:
+        index = window.find(marker)
+        if index < 0 or index >= best_index:
+            continue
+        best_index = index
+        negated = marker in NEGATION_MARKERS
+    return "negated" if negated else "affirmed"
 
 
 def _variant_rejections(item: RawVariant, *, request: ProposalRequest,
@@ -442,7 +526,7 @@ def validate_reply(
             rejected.append({"raw_id": item.id, "why": "locked"})
             continue
         if scoped:
-            group = DISPLAY_GROUP.get(entry.category, entry.category)
+            group = display_group(entry.category)
             if group not in scoped:
                 rejected.append({"raw_id": item.id, "why": "out_of_scope"})
                 continue
@@ -514,11 +598,16 @@ def evaluate(
     *,
     request: ProposalRequest,
     dictionary: Mapping[str, DictionaryEntryRef],
+    observed: ObservedProvider | None = None,
 ) -> ValidatedProposal:
     """Parse, validate and fit the reply into C01-5 budgets.
 
     Provider defects become ``status: "unavailable"``, never exceptions: the
     caller must keep the existing text and selections untouched.
+
+    ``observed`` carries the facts the HTTP envelope reported (LLM-R05). They override
+    the model's self-reported ``model``/``finish_reason`` before validation, so a
+    truncated reply cannot pass by claiming it stopped cleanly.
     """
     try:
         response = parse_reply(payload, request=request)
@@ -527,8 +616,28 @@ def evaluate(
             status="unavailable", why=str(error), suggestions=(),
             unresolved_spans=(), ambiguities=(), rejected=(), truncated=False,
         )
+    if observed is not None:
+        response = _apply_observed_provider(response, observed)
     result = validate_reply(response, request=request, dictionary=dictionary)
     return fit_budget(result, response, request=request)
+
+
+def _apply_observed_provider(response: ProposalResponse,
+                             observed: ObservedProvider) -> ProposalResponse:
+    """Replace the model's self-report with what the transport actually saw.
+
+    Only fields the envelope carried are replaced; an absent field keeps the reply's
+    value so a provider that omits ``finish_reason`` still behaves as before.
+    """
+    updates = {}
+    if observed.model:
+        updates["model"] = observed.model
+    if observed.finish_reason is not None:
+        updates["finish_reason"] = observed.finish_reason
+    if not updates:
+        return response
+    provider = response.provider.model_copy(update=updates)
+    return response.model_copy(update={"provider": provider})
 
 
 def fit_budget(

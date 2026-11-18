@@ -119,9 +119,30 @@ export const PARTIAL_KIND = "partial_change";
 export const VARIANT_KIND = "situation_variants";
 export type ProposalKind = typeof PROPOSAL_KIND | typeof PARTIAL_KIND | typeof VARIANT_KIND;
 
-/** C01-2 caps. Rejecting locally avoids a 422 that reads like a server fault. */
+/**
+ * C01-2 caps. `MAX_FREE_TEXT` is a *character* cap on the description itself, keeping
+ * the textarea honest; the wire limit is the byte check in `proposalBody` (LLM-R04),
+ * which is what the server actually enforces.
+ */
 export const MAX_FREE_TEXT = 4000;
 export const MAX_SELECTIONS = 100;
+
+/**
+ * LLM-R04: the server rejects a body over 8 KiB, measured in **bytes**, not characters.
+ *
+ * `MAX_FREE_TEXT` is a character cap, and Korean text is three bytes per character in
+ * UTF-8: 4,000 characters is ~12 KB, so a request could pass every local check and still
+ * come back 413. The check below therefore encodes the finished body and compares its
+ * real byte length. The number is duplicated from
+ * `backend/app/services/proposal_provider.py:MAX_REQUEST_BYTES`; the local check is a
+ * courtesy, and the server remains the authority.
+ */
+export const MAX_REQUEST_BYTES = 8 * 1024;
+
+const encoder = new TextEncoder();
+
+/** UTF-8 byte length of a string, so a Korean character counts as 3, not 1. */
+export const utf8Bytes = (value: string): number => encoder.encode(value).length;
 
 /** VAR01 caps. Mirror the server so a long candidate is trimmed, never rendered raw. */
 export const MAX_VARIANTS = 3;
@@ -244,6 +265,10 @@ export function proposalBody(
     body.target_groups = [...target];
     body.locked_ids = [...locked];
   }
+  // LLM-R04: the server counts bytes. `selections` and `locked_ids` are part of the
+  // body too, so the whole thing is measured instead of only the free text: 60 selected
+  // and 60 locked IDs already consume most of the 8 KiB before any Korean is written.
+  if (utf8Bytes(JSON.stringify(body)) > MAX_REQUEST_BYTES) return { code: "too_large" };
   return { body };
 }
 

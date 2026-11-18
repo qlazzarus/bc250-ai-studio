@@ -70,8 +70,15 @@ def reply(**changes):
     return payload
 
 
-def chat_response(content, *, status=200):
-    body = {"choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
+def chat_response(content, *, status=200, finish_reason="stop", model=None):
+    """A provider envelope. LLM-R05: the envelope's stop reason is the authoritative one.
+
+    Tests that want the *model* to claim a stop reason must set it inside `content`;
+    the envelope value here always wins when both are present.
+    """
+    body = {"choices": [{"message": {"content": content}, "finish_reason": finish_reason}]}
+    if model is not None:
+        body["model"] = model
     return httpx.Response(status, json=body)
 
 
@@ -156,6 +163,81 @@ def test_payload_keeps_the_user_text_as_data_and_lists_only_active_ids():
     # No server secret is ever placed in the prompt.
     assert "gate-control-key" not in system["content"]
     assert "llama-key" not in system["content"]
+
+
+def test_catalogue_carries_korean_labels_and_aliases_for_the_model():
+    """LLM-R02: the catalogue must expose the vocabulary the dictionary already has.
+
+    A bare `id (category)` list made the model guess which Korean words belong to
+    which ID while the rule engine matched on 100 labels and 122 aliases. The catalogue
+    is the only place that knowledge can cross the trust boundary.
+    """
+    dictionary = {
+        "setting.cafe": DictionaryEntryRef("location", True, "카페", ("카페 안", "커피숍")),
+        "action.sit": DictionaryEntryRef("action", True, "앉기", ("앉은",)),
+        "subject.person": DictionaryEntryRef("subject", True, "인물", ("사람",)),
+        "appearance.glasses": DictionaryEntryRef("appearance", True, "안경", ()),
+        "style.retired": DictionaryEntryRef("style", False, "은퇴 스타일", ("옛날풍",)),
+    }
+    payload = build_payload(request(), model="qwen-test", dictionary=dictionary)
+    system = payload["messages"][0]["content"]
+
+    assert "- setting.cafe (setting) 카페 | 카페 안 | 커피숍" in system
+    # `action` is stored as a category but presented as the `pose` display group, the
+    # same word `target_groups` uses.
+    assert "- action.sit (pose) 앉기 | 앉은" in system
+    assert "- subject.person (subject) 인물 | 사람" in system
+    # An entry with no aliases still shows its label, without a dangling separator.
+    assert "- appearance.glasses (appearance) 안경" in system
+    assert "안경 |" not in system
+    # An inactive entry is not offered at all (C01: the catalogue is the whitelist).
+    assert "style.retired" not in system
+    assert "옛날풍" not in system
+
+
+def test_catalogue_id_set_is_unchanged_by_the_added_vocabulary():
+    """LLM-R02: richer lines must not add or drop an offerable ID."""
+    ids = [f"subject.entry{index}" for index in range(20)]
+    dictionary = {entry: DictionaryEntryRef("subject", True, f"라벨{entry}", ("별칭",))
+                  for entry in ids}
+    system = build_payload(request(), model="qwen-test", dictionary=dictionary)["messages"][0]["content"]
+    listed = [line for line in system.splitlines() if line.startswith("- ")]
+    assert len(listed) == len(ids)
+    for entry in ids:
+        assert f"- {entry} (subject)" in system
+
+
+def test_catalogue_growth_stays_well_inside_the_system_prompt_budget():
+    """LLM-R02: measure the added text, so a future alias flood is visible.
+
+    The 8 KiB cap applies to the browser→server body, not to the system prompt, so this
+    is not an assertion about the cap. It records that today's catalogue is a few KB,
+    far inside any context a real provider needs, and would catch an accidental dump of
+    every per-family mapping into the prompt.
+    """
+    from pathlib import Path
+
+    from app.services.prompt_dictionary import load_dictionary
+    from app.services.proposal_provider import _dictionary_listing
+
+    root = Path(__file__).resolve().parents[2]
+    loaded = load_dictionary(root / "config/prompt_dictionary.json")
+    assert loaded is not None
+    assert len(loaded.entries) == 100
+
+    listing = _dictionary_listing(loaded.entries)
+    size = len(listing.encode("utf-8"))
+    # id + category alone measured 2,939 B before LLM-R02; labels and aliases push it
+    # into this range. A drop back below 4 KB would mean the vocabulary is gone again.
+    assert 4_000 < size < 9_000, size
+
+    system = build_payload(request(), model="qwen-test",
+                           dictionary=loaded.entries)["messages"][0]["content"]
+    assert listing in system
+    # The rendered expressions stay out of the prompt; only Korean search vocabulary is
+    # allowed to cross the boundary.
+    assert "on a street" not in system
+    assert "with short hair" not in system
 
 
 def test_reply_bytes_rejects_a_non_chat_envelope():
@@ -284,10 +366,14 @@ async def test_broken_json_and_broken_schema_are_invalid_reply(monkeypatch):
 
 
 async def test_unavailable_validator_result_is_not_adopted(monkeypatch):
-    """C01-4: ``finish_reason: length`` discards partial output."""
+    """C01-4: ``finish_reason: length`` discards partial output.
+
+    LLM-R05 moved the authority: the *envelope* says `length`, while the model claims
+    `stop` inside its own JSON. The envelope wins, so the partial object is discarded.
+    """
     client, _ = install(monkeypatch, lambda request: chat_response(json.dumps(
         reply(provider={"model": "qwen-test", "version": "", "latency_ms": 5,
-                        "finish_reason": "length"}))))
+                        "finish_reason": "stop"})), finish_reason="length"))
     outcome = await ok_call(client)
     assert outcome.ok is False
     assert outcome.failure == "invalid_reply"
@@ -514,11 +600,69 @@ def test_variant_payload_asks_for_sentences_and_carries_the_selection():
 
 
 def test_the_older_kinds_keep_the_payload_and_prompt_unchanged():
-    """C01 fixed the hint payload; VAR01 must not add fields to it."""
+    """Hint payload keeps C01's fields, plus the selection LLM-R03 added.
+
+    VAR01 must not leak variant-only fields (`max_variants`) into the hint payload.
+    LLM-R03 does add `selections`, because a `partial_change` diff cannot be answered
+    without the current values; that is a deliberate, tested widening of the C01 shape.
+    """
     payload = build_payload(request(), model="qwen-test", dictionary=VARIANT_DICTIONARY)
     system, user = payload["messages"]
     assert "situation" not in system["content"]
     body = json.loads(user["content"])
-    assert set(body) == {"kind", "target_family", "free_text_ko", "locked_ids",
-                         "target_groups"}
+    assert set(body) == {"kind", "target_family", "free_text_ko", "selections",
+                         "locked_ids", "target_groups"}
+
+
+def test_partial_change_payload_carries_the_current_selection():
+    """LLM-R03: a diff request must state what it is diffing against.
+
+    Without `selections` the model cannot know `lighting.low_key` is already chosen, so
+    it re-proposes it (the validator silently drops it) or proposes a conflicting value
+    (the compiler's conflict pairs block it). Both look like model mistakes.
+    """
+    partial = request(
+        kind="partial_change", free_text_ko="조명만 더 따뜻하게 바꿔줘",
+        selections=[{"id": "lighting.low_key", "category": "lighting"},
+                    {"id": "subject.person", "category": "subject"}],
+        locked_ids=["subject.person"], target_groups=["lighting"],
+    )
+    payload = build_payload(partial, model="qwen-test", dictionary=VARIANT_DICTIONARY)
+    system, user = payload["messages"]
+    body = json.loads(user["content"])
+    assert body["selections"] == [
+        {"id": "lighting.low_key", "category": "lighting"},
+        {"id": "subject.person", "category": "subject"},
+    ]
+    assert body["locked_ids"] == ["subject.person"]
+    assert body["target_groups"] == ["lighting"]
+    # The rules name the three things the model must not do with those fields.
+    assert "already in `selections`" in system["content"]
+    assert "`locked_ids`" in system["content"]
+    assert "`target_groups`" in system["content"]
+
+
+def test_adding_selections_to_the_prompt_does_not_enlarge_the_request_body():
+    """LLM-R03: forwarding `selections` costs the request body exactly nothing.
+
+    The browser already sent `selections` in `proposalBody`; the server simply did not
+    copy them into the model payload. The 8 KiB body cap therefore sees the same fields
+    as before — whether that is enough is LLM-R04's problem, not this change's.
+    """
+    ids = [f"appearance.boundary_entry_{index:03d}" for index in range(60)]
+    partial = request(
+        kind="partial_change", free_text_ko="가" * 500,
+        selections=[{"id": entry, "category": "appearance"} for entry in ids],
+        locked_ids=ids, target_groups=["appearance"],
+    )
+    payload = build_payload(partial, model="qwen-test", dictionary=VARIANT_DICTIONARY)
+    model_body = json.loads(payload["messages"][1]["content"])
+
+    # Same count and order as the request carried; the payload adds no new ID fields.
+    assert len(model_body["selections"]) == 60
+    assert model_body["selections"][0]["id"] == ids[0]
+    assert model_body["locked_ids"] == ids
+    # Nothing beyond the request's own fields is introduced into the user message.
+    request_fields = set(partial.model_dump(mode="json"))
+    assert set(model_body) <= request_fields | {"max_variants"}
 

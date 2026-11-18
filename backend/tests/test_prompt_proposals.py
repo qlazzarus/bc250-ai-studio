@@ -6,7 +6,10 @@ failure instead of a silent UI change.
 """
 
 import json
+import re
+from pathlib import Path
 
+from app.services import prompt_proposals
 from app.services.prompt_proposals import (
     MAX_PROVIDER_REPLY_BYTES,
     MAX_RESPONSE_BYTES,
@@ -17,6 +20,8 @@ from app.services.prompt_proposals import (
     evaluate,
     parse_reply,
 )
+
+ROOT = Path(__file__).resolve().parents[2]
 
 REQUEST_ID = "req-0123456789"
 
@@ -156,6 +161,89 @@ def test_negation_guard_works_for_long_hair_and_glasses_cases():
         assert result.suggestions == (), text
         assert result.unresolved_spans[0]["why"] == "polarity_conflict", text
 
+def test_negation_guard_reads_the_marker_stem_not_one_inflection():
+    """LLM-R01: `없다`/`없는`/`없고` are negations, not just `없이`.
+
+    The old marker list only carried `없이`, so the most ordinary Korean negation —
+    a sentence ending in `없다` — passed the guard as affirmed. The marker is a stem
+    here, the same way `frontend/src/prompt/matching.ts:43` treats it.
+    """
+    for text, phrase in [
+        ("사람은 없다", "사람"),
+        ("사람이 없는 해변", "사람"),
+        ("사람은 없고 고양이는 있다", "사람"),
+    ]:
+        request = make_request(text)
+        result = run(make_reply(suggestions=[hint("subject.person", phrase)]), request)
+        assert result.suggestions == (), text
+        assert result.unresolved_spans[0]["why"] == "polarity_conflict", text
+
+
+def test_negation_guard_stops_at_the_clause_boundary():
+    """LLM-R01: the next clause must not negate the previous one's noun.
+
+    With a fixed 8-character window, `안경 없이` in the second clause reached back to
+    the person in the first, so a valid suggestion was held as `polarity_conflict`.
+    `CLAUSE_BREAK` in matching.ts stops the scan; the server now does the same.
+    """
+    text = "사람. 안경 없이 걷는다"
+    request = make_request(text)
+    result = run(
+        make_reply(suggestions=[hint("subject.person", "사람"),
+                                hint("appearance.glasses", "안경")]),
+        request,
+    )
+    assert [item.id for item in result.suggestions] == ["subject.person"]
+    assert [span["why"] for span in result.unresolved_spans] == ["polarity_conflict"]
+
+
+def test_negation_guard_keeps_a_positive_half_of_a_mixed_clause():
+    """LLM-R01: the first marker wins, matching `polarityAt` in matching.ts."""
+    text = "사람은 없고 고양이는 있다"
+    request = make_request(text)
+    result = run(
+        make_reply(suggestions=[hint("subject.person", "사람"),
+                                hint("setting.plain_background", "고양이")]),
+        request,
+    )
+    # Same clause, two outcomes: `없` reaches the person, `있` reaches the cat. The
+    # entry used for the cat is a fixture chosen only to observe polarity; nothing is
+    # claimed about 고양이 mapping to a plain background.
+    assert [item.id for item in result.suggestions] == ["setting.plain_background"]
+    assert [span["why"] for span in result.unresolved_spans] == ["polarity_conflict"]
+
+
+def test_server_negation_stems_match_the_rule_engine_source():
+    """LLM-R01: the server list is a copy, so drift must fail here.
+
+    ``matching.ts`` owns the polarity vocabulary. If a stem is removed there and left
+    here, the server keeps silently holding entries the rule engine now accepts; if it
+    is added there and missed here, the server accepts what the rule engine drops.
+    """
+    source = (ROOT / "frontend/src/prompt/matching.ts").read_text(encoding="utf-8")
+    rule_stems = re.search(r"const NEGATION_MARKERS = \[(.*?)\] as const;", source, re.S)
+    assert rule_stems is not None
+    for stem in re.findall(r'"([^"]+)"', rule_stems.group(1)):
+        assert stem in prompt_proposals.NEGATION_MARKERS, stem
+
+
+def test_negation_guard_survives_an_affirmation_before_the_negation():
+    """LLM-R01: `있` closer to the noun affirms it even when `없다` follows later.
+
+    This is the `사람은 있지만 안경은 없다` shape: the person's clause-affirmation must
+    not be overridden by a later negation, exactly as `polarityAt` decides it.
+    """
+    request = make_request("사람은 있지만 안경은 없다")
+    result = run(
+        make_reply(suggestions=[hint("subject.person", "사람"),
+                                hint("appearance.glasses", "안경")]),
+        request,
+    )
+    assert [item.id for item in result.suggestions] == ["subject.person"]
+    assert [span["why"] for span in result.unresolved_spans] == ["polarity_conflict"]
+
+
+def test_example_3_two_people_cannot_be_attributed():
     """C01-6 #3: two people's clothing cannot be attributed in Scene v1."""
     text = "빨간 옷을 입은 사람이 파란 옷을 입은 사람에게 책을 건넨다"
     request = make_request(text)

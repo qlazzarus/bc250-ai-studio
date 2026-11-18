@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { explainWarning, suggestSelections } from '../src/prompt/proposals.ts';
+import { explainWarning, suggestSelections, suggestSelectionsDetailed } from '../src/prompt/proposals.ts';
+import { countAround, matchOccurrences, polarityAt } from '../src/prompt/matching.ts';
 import { DICTIONARY, DICTIONARY_VERSION } from '../src/prompt/dictionary.ts';
 import { selectEntry } from '../src/prompt/scene.ts';
 import { compileScene } from '../src/prompt/compiler.ts';
@@ -81,6 +82,140 @@ test('accepting a hint reproduces exactly what manual selection produces', () =>
   assert.equal(hint.id, 'lighting.neon');
   assert.equal(compileScene(accepted).draft, 'neon lighting');
   assert.equal(accepted.freeTextKo, '네온 아래 사람');
+});
+
+test('a negated phrase is not proposed, and a mixed clause keeps its positive half', () => {
+  // RULE01, EVAL-UX01 사례 1–2: "사람은 없다" must not propose 인물.
+  const emptyBeach = suggestSelections({
+    freeTextKo: '텅 빈 해변, 파도만 보인다. 사람이나 동물은 전혀 없다.',
+    family: 'sd15', dictionary: DICTIONARY,
+  });
+  assert.deepEqual(emptyBeach.map((hint) => hint.id), ['setting.beach']);
+
+  const lake = suggestSelections({
+    freeTextKo: '해 질 무렵 넓은 호수와 낮은 산, 잔잔한 수면. 사람은 없다.',
+    family: 'sd15', dictionary: DICTIONARY,
+  });
+  assert.ok(!lake.some((hint) => hint.id === 'subject.person'));
+
+  // The negation belongs to one occurrence, not to the sentence: the cat stays.
+  const mixed = suggestSelections({
+    freeTextKo: '사람은 없고 고양이는 있다', family: 'sd15', dictionary: DICTIONARY,
+  });
+  assert.deepEqual(mixed.map((hint) => hint.id), ['subject.cat']);
+
+  // A negation *before* a later phrase does not reach it either.
+  const catOnly = suggestSelections({
+    freeTextKo: '사람이 없는 해변의 고양이', family: 'sd15', dictionary: DICTIONARY,
+  });
+  assert.deepEqual(catOnly.map((hint) => hint.id).sort(), ['setting.beach', 'subject.cat']);
+
+  // "안경 없이 웃는 사람" negates the glasses only; the person is still affirmed.
+  const glasses = suggestSelections({
+    freeTextKo: '안경 없이 웃는 사람', family: 'sd15', dictionary: DICTIONARY,
+  });
+  assert.ok(!glasses.some((hint) => hint.id === 'appearance.glasses'));
+  assert.ok(glasses.some((hint) => hint.id === 'subject.person'));
+});
+
+test('a plural or counted subject never collapses into the singular person', () => {
+  // 사례 3: "사람들" is the dictionary's own plural entry.
+  const group = suggestSelections({ freeTextKo: '사람들', family: 'sd15', dictionary: DICTIONARY });
+  assert.deepEqual(group.map((hint) => hint.id), ['subject.group']);
+
+  const many = suggestSelections({ freeTextKo: '여러 사람', family: 'sd15', dictionary: DICTIONARY });
+  assert.deepEqual(many.map((hint) => hint.id), ['subject.group']);
+
+  // "사람 둘" / "두 사람" / "사람 2명" are two people, and the reported phrase keeps
+  // the count verbatim so the panel can show what it read.
+  for (const [text, phrase] of [['사람 둘이 걷는다', '사람 둘'], ['두 사람', '두 사람'], ['사람 2명', '사람 2명']]) {
+    const hints = suggestSelections({ freeTextKo: text, family: 'sd15', dictionary: DICTIONARY });
+    const subject = hints.filter((hint) => hint.category === 'subject');
+    assert.deepEqual(subject.map((hint) => hint.id), ['subject.two_people'], text);
+    assert.equal(subject[0].matchedPhrase, phrase);
+    assert.ok(text.includes(subject[0].matchedPhrase));
+  }
+
+  // A numeral that is the tail of another word ("모두") is not a count.
+  const everyOne = suggestSelections({ freeTextKo: '모두 사람', family: 'sd15', dictionary: DICTIONARY });
+  assert.deepEqual(everyOne.map((hint) => hint.id), ['subject.person']);
+});
+
+test('an already selected plural entry keeps the singular silent after reopening', () => {
+  // Selecting 두 사람 must not make the list offer 인물 on the same sentence: the count
+  // is still a count, and the entry that would have carried it is already in.
+  const counted = suggestSelections({
+    freeTextKo: '두 사람이 걷는다', family: 'sd15', dictionary: DICTIONARY,
+    selectedIds: ['subject.two_people'],
+  });
+  assert.ok(!counted.some((hint) => hint.id === 'subject.person'), JSON.stringify(counted));
+
+  const plural = suggestSelections({
+    freeTextKo: '사람들이 걷는다', family: 'sd15', dictionary: DICTIONARY,
+    selectedIds: ['subject.group'],
+  });
+  assert.ok(!plural.some((hint) => hint.id === 'subject.person'), JSON.stringify(plural));
+
+  // The same text without the selection still reaches the plural entry, so the guard is
+  // about the selection and not about the phrase.
+  assert.deepEqual(
+    suggestSelections({ freeTextKo: '두 사람이 걷는다', family: 'sd15', dictionary: DICTIONARY })
+      .filter((hint) => hint.category === 'subject').map((hint) => hint.id),
+    ['subject.two_people'],
+  );
+});
+
+test('matching helpers decide one occurrence at a time and stay boundary-aware', () => {
+  assert.equal(polarityAt('은 없다', 0), 'negated');
+  assert.equal(polarityAt('은 있다', 0), 'affirmed');
+  assert.equal(polarityAt('은 없고 고양이는 있다', 0), 'negated');
+  // A clause break ends the polarity scope.
+  assert.equal(polarityAt('. 사람은 있다', 0), 'affirmed');
+
+  // Word-boundary rule: a Hangul tail is not a match, punctuation and digits are.
+  assert.equal(matchOccurrences('모두 사람', '두 사람', 'label').length, 0);
+  assert.equal(matchOccurrences('두 사람', '두 사람', 'label').length, 1);
+  assert.equal(matchOccurrences('(사람)', '사람', 'alias').length, 1);
+
+  // The width includes the separating space, so the widened span reads "사람 둘".
+  assert.deepEqual(countAround('사람 둘이', 0, 2), { text: '둘', where: 'after', width: 2 });
+  assert.deepEqual(countAround('두 사람', 2, 4), { text: '두', where: 'before', width: 2 });
+  assert.equal(countAround('모두 사람', 2, 4), null);
+  assert.equal(countAround('사람 하나', 0, 2), null);
+});
+
+test('a partial scope withholds out-of-scope proposals instead of dropping them silently', () => {
+  const text = '같은 인물, 같은 옷. 카페 창가, 어두운 조명. 조명만 바꿔 본다.';
+  const selectedIds = ['subject.person', 'clothing.white_shirt'];
+  const open = suggestSelectionsDetailed({ freeTextKo: text, family: 'sd15', dictionary: DICTIONARY, selectedIds });
+  assert.equal(open.scoped, false);
+  assert.deepEqual(open.outOfScope, []);
+  assert.deepEqual(open.hints.map((hint) => hint.id), ['lighting.low_key', 'setting.cafe']);
+
+  // RULE02: 조명만 means the place stays out, and is reported as withheld.
+  const lighting = suggestSelectionsDetailed({
+    freeTextKo: text, family: 'sd15', dictionary: DICTIONARY, selectedIds, targetGroups: ['lighting'],
+  });
+  assert.equal(lighting.scoped, true);
+  assert.deepEqual(lighting.hints.map((hint) => hint.id), ['lighting.low_key']);
+  assert.deepEqual(lighting.outOfScope.map((hint) => hint.id), ['setting.cafe']);
+  // A light-only request can only ever add lighting, which is the promise the button makes.
+  for (const hint of lighting.hints) {
+    assert.equal(DICTIONARY.find((entry) => entry.id === hint.id).category, 'lighting');
+  }
+
+  // Widening the scope brings the place back; nothing was lost by withholding it.
+  const widened = suggestSelectionsDetailed({
+    freeTextKo: text, family: 'sd15', dictionary: DICTIONARY, selectedIds, targetGroups: ['lighting', 'setting'],
+  });
+  assert.deepEqual(widened.hints.map((hint) => hint.id), ['lighting.low_key', 'setting.cafe']);
+  assert.deepEqual(widened.outOfScope, []);
+
+  // The scope is a filter, not a rewrite: the plain callers keep their whole answer.
+  assert.deepEqual(
+    suggestSelections({ freeTextKo: text, family: 'sd15', dictionary: DICTIONARY, selectedIds }),
+    open.hints,
+  );
 });
 
 test('duplicate warnings expose only the redundant tail, conflicts expose nothing', () => {

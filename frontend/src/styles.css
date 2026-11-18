@@ -373,6 +373,9 @@
 .prompt-proposals__variants { margin-left: 6px; }
 .prompt-proposals__status { margin: 8px 0 0; }
 .prompt-proposal-list { display: grid; gap: 6px; margin-top: 8px; padding: 10px; border: 1px solid #41444f; border-radius: 8px; }
+/* RULE02: the withheld-count notice sits inside the list grid, so it must not inherit
+   the flow-level margins of `.prompt-hint`; the text wraps instead of widening the card. */
+.prompt-proposal-list__scope { margin: 0; color: #b9bfcb; font-size: .74rem; overflow-wrap: anywhere; }
 .prompt-proposal { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 8px; border: 1px solid #41444f; border-radius: 6px; background: #20222a; font-size: .78rem; }
 .prompt-proposal > div { min-width: 0; overflow-wrap: anywhere; }
 .prompt-proposal small { color: #aeb4c1; font-weight: 400; }

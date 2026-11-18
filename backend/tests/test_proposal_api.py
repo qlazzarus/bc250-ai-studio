@@ -65,10 +65,14 @@ def reply(**changes):
     return payload
 
 
-def chat(content=None, *, status=200):
-    return httpx.Response(status, json={"choices": [
+def chat(content=None, *, status=200, finish_reason="stop", model=None):
+    """A provider envelope. LLM-R05: the envelope's stop reason/model are authoritative."""
+    body = {"choices": [
         {"message": {"content": json.dumps(content if content is not None else reply())},
-         "finish_reason": "stop"}]})
+         "finish_reason": finish_reason}]}
+    if model is not None:
+        body["model"] = model
+    return httpx.Response(status, json=body)
 
 
 def configured(settings):
@@ -294,12 +298,14 @@ def test_timeout_is_reported_and_nothing_is_adopted(gated):
 
 
 def test_validator_rejection_keeps_the_diagnostic_spans(gated):
-    """A reply the validator refuses must still explain what was not understood."""
-    refused = reply(provider={"model": MODEL, "version": "", "latency_ms": 0,
-                              "finish_reason": "length"},
-                    unresolved_spans=[{"text": "비 오는 밤", "why": "no_dictionary_entry",
+    """A reply the validator refuses must still explain what was not understood.
+
+    LLM-R05: the refusal is driven by the *envelope* stop reason, not by the model's own
+    claim, so the fixture sets `finish_reason` on the transport response.
+    """
+    refused = reply(unresolved_spans=[{"text": "비 오는 밤", "why": "no_dictionary_entry",
                                        "polarity": "affirmed"}])
-    install(gated.app, lambda request: chat(refused))
+    install(gated.app, lambda request: chat(refused, finish_reason="length"))
     value = gated.post("/api/v1/prompt/proposals", json=body()).json()
     assert value["why"] == "invalid_reply"
     assert value["detail"] == "incomplete_reply"
@@ -307,27 +313,84 @@ def test_validator_rejection_keeps_the_diagnostic_spans(gated):
     assert [span["text"] for span in value["unresolved_spans"]] == ["비 오는 밤"]
 
 
+def test_provider_facts_come_from_the_envelope_not_the_model(gated):
+    """LLM-R05: a model cannot launder a truncated reply by writing `stop` itself.
+
+    The envelope reports `length` and the alias the provider actually ran; the model
+    claims a clean `stop` under a different model name. The response must carry the
+    envelope's values, and the partial object must not be adopted.
+    """
+    liar = reply(provider={"model": "qwen-vl-official", "version": "9.9",
+                           "latency_ms": 1, "finish_reason": "stop"},
+                 suggestions=[{"id": "lighting.neon", "matched_phrase": "네온",
+                               "basis": "quote", "polarity": "affirmed", "actor": None,
+                               "confidence": 0.9, "reason_ko": ""}])
+    install(gated.app, lambda request: chat(liar, finish_reason="length",
+                                            model="qwen2.5-vl-7b@alias"))
+    value = gated.post("/api/v1/prompt/proposals", json=body()).json()
+    assert value["status"] == "unavailable"
+    assert value["why"] == "invalid_reply"
+    assert value["detail"] == "incomplete_reply"
+    assert value["provider"]["finish_reason"] == "length"
+    assert value["provider"]["model"] == "qwen2.5-vl-7b@alias"
+    assert value["suggestions"] == []
+
+
 def test_dictionary_mirror_matches_the_frontend_source():
     """The mirror is generated from dictionary.ts; drift must fail loudly.
 
     Python validates proposals against this mirror, while the browser accepts IDs
     from its own copy. If they diverge, the server can offer (or reject) an ID the
-    browser does not have. Rather than keeping two hand-edited lists, this test
-    re-derives the mirror from the TypeScript source and compares.
+    browser does not have. LLM-R07: the comparison runs the real generator with
+    `--stdout` and diffs it against the committed file, so the test cannot
+    re-implement the format and quietly agree with itself.
     """
+    import subprocess
+
+    generated = subprocess.run(
+        ["node", "--experimental-strip-types",
+         str(ROOT / "scripts/gen-prompt-dictionary.mjs"), "--stdout"],
+        capture_output=True, text=True, cwd=ROOT, check=False,
+    )
+    assert generated.returncode == 0, generated.stderr
+    mirror = json.loads((ROOT / "config/prompt_dictionary.json").read_text(encoding="utf-8"))
+    assert json.loads(generated.stdout) == mirror, (
+        "config/prompt_dictionary.json is stale: run "
+        "`node --experimental-strip-types scripts/gen-prompt-dictionary.mjs`")
+
+    # The version still comes from the TypeScript source, not from the mirror itself.
     source = (ROOT / "frontend/src/prompt/dictionary.ts").read_text(encoding="utf-8")
     version = re.search(r'DICTIONARY_VERSION = "([^"]+)"', source).group(1)
-    derived = [
-        {"id": entry_id, "category": category, "active": True}
-        for entry_id, category in re.findall(r'^  \["([^"]+)", "([^"]+)",', source, re.M)
-    ]
-    mirror = json.loads((ROOT / "config/prompt_dictionary.json").read_text(encoding="utf-8"))
     assert mirror["dictionary_version"] == version
-    assert mirror["entries"] == derived
-    # And the loader agrees with the same file the endpoint will read.
+
+    # And the loader agrees with the file the endpoint will read (LLM-R02 fields too).
     loaded = load_dictionary(ROOT / "config/prompt_dictionary.json")
+    assert loaded is not None
     assert loaded.version == version
-    assert set(loaded.entries) == {item["id"] for item in derived}
+    assert set(loaded.entries) == {item["id"] for item in mirror["entries"]}
+    for item in mirror["entries"]:
+        ref = loaded.entries[item["id"]]
+        assert ref.category == item["category"], item["id"]
+        assert ref.label_ko == item["label_ko"], item["id"]
+        assert list(ref.aliases) == item["aliases"], item["id"]
+
+
+def test_every_dictionary_entry_is_active_so_inactive_entry_is_unreachable():
+    """LLM-R07: record the current `active` reality instead of implying a feature.
+
+    `dictionary.ts` hardcodes ``active: true`` for every authored entry, so the
+    ``inactive_entry`` branch in the validator and the ``inactive`` card block cannot be
+    reached today. That is acceptable, but it must be stated rather than look like a
+    working feature. If an entry ever becomes inactive, this test fails and asks for a
+    real inactive-path test instead of letting the contract change silently.
+    """
+    loaded = load_dictionary(ROOT / "config/prompt_dictionary.json")
+    assert loaded is not None
+    assert len(loaded.entries) == 100
+    inactive = [entry_id for entry_id, ref in loaded.entries.items() if not ref.active]
+    assert inactive == [], (
+        "an inactive entry now exists; add an inactive-path test for the validator "
+        "and the card block instead of deleting this assertion")
 
 
 def test_dictionary_loader_refuses_missing_or_malformed_files(tmp_path):
@@ -498,4 +561,53 @@ def test_a_variant_that_breaks_the_lock_is_rejected_by_the_server(gated):
     value = gated.post("/api/v1/prompt/proposals", json=variant_body()).json()
     assert value["variants"] == []
     assert {"raw_id": "v1", "why": "locked", "id": "clothing.white_shirt"} in value["rejected"]
+
+
+def test_groups_in_use_are_derived_from_the_dictionary_not_hardcoded():
+    """LLM-R06: the allowed `target_groups` vocabulary comes from the dictionary.
+
+    The stored categories are `action`/`location`/`composition`, but the browser and
+    `target_groups` speak `pose`/`setting`/`camera`. Deriving the set keeps the two
+    vocabularies from silently diverging when a category is added.
+    """
+    from app.services.prompt_proposals import display_group, groups_in_use
+    from app.services.prompt_proposals import DictionaryEntryRef as Ref
+
+    assert display_group("action") == "pose"
+    assert display_group("location") == "setting"
+    assert display_group("composition") == "camera"
+    # A category with no rename passes through unchanged.
+    assert display_group("lighting") == "lighting"
+
+    entries = {
+        "action.standing": Ref("action"),
+        "location.street": Ref("location"),
+        "lighting.neon": Ref("lighting"),
+        "style.retired": Ref("style", active=False),
+    }
+    assert groups_in_use(entries) == {"pose", "setting", "lighting"}
+
+
+def test_a_target_group_the_dictionary_lacks_is_a_contract_error(gated):
+    """LLM-R06: an unknown group used to be answered as an empty success.
+
+    `{"target_groups": ["props"]}` names no display group the dictionary has, so every
+    entry was rejected as `out_of_scope` and the reply read "the model found no items".
+    It is the request that is wrong, so the answer is a 422 before any model call.
+    """
+    called = install(gated.app, lambda request: chat())
+
+    def chats():
+        return [item for item in called if item.url.path.endswith("/chat/completions")]
+
+    request = body(kind="partial_change", target_groups=["pose"], locked_ids=[])
+    assert gated.post("/api/v1/prompt/proposals", json=request).status_code == 200
+    assert len(chats()) == 1
+
+    unknown = body(kind="partial_change", target_groups=["pose", "props"], locked_ids=[])
+    response = gated.post("/api/v1/prompt/proposals", json=unknown)
+    assert response.status_code == 422
+    assert "props" in response.text
+    # No second model call: the request never reached the provider.
+    assert len(chats()) == 1
 
