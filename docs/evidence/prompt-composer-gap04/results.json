@@ -1,5 +1,10 @@
 [
   {
+    "name": "증거 출처",
+    "pass": null,
+    "detail": "{\"engine\":\"fake\",\"llm\":\"stubbed in page\",\"storage\":\"real sqlite in the disposable STUDIO_DATA_DIR\",\"app\":\"http://localhost:4406/\",\"claim\":\"storage/http/dom only; translation quality is NOT measured here\"}"
+  },
+  {
     "name": "환경",
     "pass": null,
     "detail": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0 · 1280x900"
@@ -705,7 +710,7 @@
   {
     "name": "재시도 결과",
     "pass": null,
-    "detail": "{\"job_id\":\"c5a3c63de83948b6b936d66666bea431\",\"prompt\":\"retry probe\",\"model_id\":\"fake-sd15\",\"status\":\"running\"}"
+    "detail": "{\"job_id\":\"4c957734a27e4800a1757b1599f58d45\",\"prompt\":\"retry probe\",\"model_id\":\"fake-sd15\",\"status\":\"running\"}"
   },
   {
     "name": "capability 실패 · 안내 표시",
@@ -1772,6 +1777,174 @@
   {
     "name": "TRANS06 제출 본문",
     "pass": null,
-    "detail": "{\"schema\":2,\"family\":\"flux2\",\"remainder\":1,\"entry\":{\"source_ko\":\"비치는 골목에 선\",\"suggested_en\":\"a street lit by neon\",\"proposal_id\":\"prop-browser\",\"proposal_model\":\"stub\",\"accepted_at\":\"2026-11-19T11:46:54Z\"}}"
+    "detail": "{\"schema\":2,\"family\":\"flux2\",\"remainder\":1,\"entry\":{\"source_ko\":\"비치는 골목에 선\",\"suggested_en\":\"a street lit by neon\",\"proposal_id\":\"prop-browser\",\"proposal_model\":\"stub\",\"accepted_at\":\"2026-11-20T23:17:20Z\"}}"
+  },
+  {
+    "name": "U12 · 적용된 최종 프롬프트가 번역으로 끝남",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · v2 작업이 자산을 남김",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 제출 작업",
+    "pass": null,
+    "detail": "{\"jobId\":\"2743710ed70544de916e1e8cfdf90a70\",\"assetId\":\"d657b56ba5ef499c8cef44ea84c74392\"}"
+  },
+  {
+    "name": "U12 · 조회된 기록이 v2",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "U12 · 조회된 remainder 항목 1개",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "U12 · 조회된 원문/번역",
+    "pass": true,
+    "expected": "비치는 골목에 선|a street lit by neon",
+    "actual": "\"비치는 골목에 선|a street lit by neon\""
+  },
+  {
+    "name": "U12 · 조회된 출처",
+    "pass": true,
+    "expected": "prop-browser|stub",
+    "actual": "\"prop-browser|stub\""
+  },
+  {
+    "name": "U12 · 조회된 수락 시각",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · draft_prompt에는 번역 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 저장된 기록",
+    "pass": null,
+    "detail": "{\"status\":200,\"schema\":2,\"remainder\":[{\"source_ko\":\"비치는 골목에 선\",\"suggested_en\":\"a street lit by neon\",\"proposal_id\":\"prop-browser\",\"proposal_model\":\"stub\",\"accepted_at\":\"2026-11-20T23:17:20Z\"}],\"draft\":8,\"prompt\":\"a person\\na street lit by neon\"}"
+  },
+  {
+    "name": "U12 · 이력 화면에 포함한 번역",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 이력 화면에 번역 출처",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 이력 화면에 스키마 v2",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 이력 화면이 차이를 번역으로 설명",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 이력 화면이 출처 없음을 주장하지 않음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "U12 이력 화면",
+    "pass": null,
+    "detail": "{\"included\":true,\"phrase\":true,\"provenance\":true,\"proposal\":true,\"schema\":true,\"explanation\":true,\"emptyClaim\":false}"
+  },
+  {
+    "name": "U12 · 복원 시 포함 목록이 기록에서 재구성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 복원해도 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람",
+    "actual": "\"네온이 비치는 골목에 선 사람\""
+  },
+  {
+    "name": "U12 · 복원 상태 문구가 출처를 부정하지 않음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 복원",
+    "pass": null,
+    "detail": "{\"panel\":\"비치는 골목에 선 → a street lit by neon빼기\",\"status\":\"과거 복원 · 적용 문자열 미기록\",\"freeText\":\"네온이 비치는 골목에 선 사람\"}"
+  },
+  {
+    "name": "U12 · 새로고침 후에도 이력 동일",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 새로고침 후 이력",
+    "pass": null,
+    "detail": "{\"included\":true,\"phrase\":true,\"provenance\":true,\"proposal\":true,\"schema\":true,\"explanation\":true,\"emptyClaim\":false}"
+  },
+  {
+    "name": "U12 · 재시도용 v2 작업 접수",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 카드의 재시도 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 재시도가 새 작업을 만듦",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 재시도도 v2",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "U12 · 재시도가 출처까지 보존",
+    "pass": true,
+    "expected": "비치는 골목에 선|a street lit by neon|prop-browser|stub",
+    "actual": "\"비치는 골목에 선|a street lit by neon|prop-browser|stub\""
+  },
+  {
+    "name": "U12 · 재시도 prompt에 번역 1회",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "U12 재시도",
+    "pass": null,
+    "detail": "{\"jobId\":\"38cd9605a03f400abd98ad48b236135f\",\"schema\":2,\"remainder\":1,\"prompt\":\"u12 retry probe\\na street lit by neon\"}"
   }
 ]

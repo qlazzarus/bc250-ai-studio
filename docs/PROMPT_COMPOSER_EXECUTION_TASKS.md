@@ -8,7 +8,7 @@
 
 - **2026-11-18 완료**: LLM-R01–R07(LLM 경로 정합성), RULE01·RULE02(규칙 제안 오탐·범위), METRIC01(지표 분모) 구현·로컬 검증. 상세는 archive.
 - **다음 코드 작업 순서: TRANS01 → TRANS02 → TRANS03 → TRANS04 → TRANS05 → TRANS06 (모두 완료, §1).** 방향 3(사전 밖 잔여 구절의 번역 제안 필드)을 5개 태스크로 분해했고, TRANS01은 계약 결정, TRANS02–05는 순서대로 구현했다. TRANS03(schema v2 변경)은 TRANS01의 승인 뒤에 착수했다. TRANS06은 TRANS05가 남긴 회귀(모델 계열 변경 시 적용 기록 소실)를 U11 브라우저 확인에서 찾아 수정한 후속 태스크다.
-- **2026-11-19 진행**: TRANS02–TRANS06 구현·로컬 검증을 마쳤다(각 태스크의 인계 참조). schema v2는 TRANS01 결정문의 형태 그대로 채택됐다. TRANS06은 실제 브라우저(CDP, Edge)에서 255건/0실패로 확인했고, 계열 변경 회귀는 변이 검증으로 테스트가 실제로 잡는다는 것까지 확인했다. **여전히 미검증: 실제 LLM 응답의 번역 품질·GPU 품질**이며 LIVE02/EVAL-UX02 범위다. U11의 자동화 가능한 부분은 이제 TRANS06 검사로 덮였고, 남은 것은 화면을 사람이 읽고 판단하는 확인이다.
+- **2026-11-20 진행**: U12가 남겨 두었던 "실제 DB·자산 이력에서의 v2 왕복"을 닫았다 — 재시작 경계 백엔드 3건(같은 `data_dir`로 앱 재기동), 실제 브라우저+실제 SQLite 23건(`suite-u12.mjs`: 저장→조회→이력 화면→복원→새로고침→재시도). 그 과정에서 v2 복원 시 "적용 정보 기록 없음"이라고 단정하던 표시 결함을 찾아 문구만 수정했다(§2 U12). 브라우저 검사는 278건/0실패. **여전히 실제 LLM 응답의 번역 품질은 미검증**이며, 이 환경에는 `STUDIO_ADMISSION_URL`·gate·GPU가 없어 LIVE02를 실행할 수 없다. 실행용 하네스(`scripts/live02_proposals.py`)는 준비했고, capability를 광고하지 않는 서버(가짜 엔진 포함)에서는 스스로 거부해 stub 결과가 실연결 증거로 기록되지 않는다.
 - **TRANS01–TRANS05와 무관하게 남은 작업**: RULE03(대기) → VAR03(대기) → U12(대기). 순서는 TRANS 완료 후로 미룰 수 있으나, U12의 선행 조건에 TRANS 태스크가 포함되므로 U12 전에 정리한다.
 - **환경·사용자 대기**: LIVE01(대기) → LIVE02(환경 대기) → EVAL-UX02(대기), U11(사용자 확인 대기). LIVE02는 R01–R05 완료로 선행 조건이 충족됐고 실행 환경만 필요하다. 환경 부재가 다른 태스크를 막지 않는다.
 - Actions DEP와 플랫폼 PLATFORM은 공통 의존 작업으로 후속 표에 유지한다. 사전 프롬프트의 운영 완료로 합산하지 않는다.
@@ -56,7 +56,7 @@ Scene v1/API/저장 데이터/컴파일 출력 의미, 직접 생성, applied �
 
 | 코드 | 실행 | 용도 |
 | --- | --- | --- |
-| F | `node --experimental-strip-types --test frontend/tests/*.test.mjs` | 프론트 **184건**(2026-11-19 TRANS06 반영. TRANS02–05 기준은 177건, 2026-11-18 기준은 133건). 데이터·컴파일러·P5·규칙 제안·매칭 helper·LLM 제안 상태·잔여 구절·번역 포함·메타데이터 표시(SSR 렌더) 회귀. Python/Pydantic 교차 검증 의존성 필요 |
+| F | `node --experimental-strip-types --test frontend/tests/*.test.mjs` | 프론트 **186건**(2026-11-20 U12 반영. TRANS06 기준은 184건, TRANS02–05 기준은 177건). 데이터·컴파일러·P5·규칙 제안·매칭 helper·LLM 제안 상태·잔여 구절·번역 포함·메타데이터 표시(SSR 렌더)·복원 문구 회귀. Python/Pydantic 교차 검증 의존성 필요 |
 | B | `npm --prefix frontend run build` 및 `npm --prefix frontend run lint` | TS·번들·정적 검사 |
 | S | `STUDIO_TEST_PYTHON=.venv/bin/python bash scripts/test-studio.sh` | Studio 131건 기준. 전체 저장소 pytest와 구분 |
 | P | `.venv/bin/python -m pytest backend/tests/test_prompt_composition.py backend/tests/test_coordination_capability.py -q` | 구성 저장과 capability 회귀 |
@@ -384,6 +384,35 @@ TRANS06 / 구현 완료 · 브라우저 검증 완료 / 2026-11-19 / 기준 HEAD
     실패해 성공한 실행이 실패처럼 보였다.
 ```
 
+### U12 보강 — 실제 DB·이력 왕복과 stub/실연결 구분 · 2026-11-20
+
+무엇을 닫았나: TRANS06까지 남아 있던 "v2 왕복은 단위 테스트로만 확인했고 실제 DB·자산 이력 화면에서는 미검증"을 두 층으로 닫았다. **TRANS01–06의 구조는 건드리지 않았다** — 추가한 것은 테스트·하네스·문구뿐이다.
+
+- 백엔드 재시작 경계 3건(`backend/tests/test_prompt_composition.py`, 15 → 19):
+  - `test_a_v2_record_survives_a_server_restart` — 같은 `data_dir`로 앱을 두 번 띄운다. job 행·`GET /assets/{id}/metadata`·sidecar 세 곳에서 `remainder`와 `source_ko`/`suggested_en`/`proposal_id`/`proposal_model`/`accepted_at` 5개 필드가 그대로인지 확인.
+  - `test_a_restored_v2_job_retries_across_a_restart_with_its_translations` — 재시작 뒤 retry가 spec 컬럼의 구성을 deep-copy로 가져오며 재컴파일하지 않고, 최종 prompt에 번역이 정확히 1회 남는지.
+  - `test_a_restarted_server_still_refuses_a_v1_body_with_remainder` — v1+`remainder` 422 가드가 프로세스 상태가 아니라 검증 규칙으로 다시 로드되는지.
+- 브라우저+실제 SQLite 23건(`scripts/prompt-composer-browser/suite-u12.mjs`, §S–V): 번역 stub으로 v2 생성 → 제출 → metadata 조회 → 갤러리 `정보`/`프롬프트 구성 이력` → `이 설정으로 다시 생성` 복원 → **페이지 새로고침 후 이력 재확인** → 취소한 v2 작업 카드의 `재시도`. 이력 화면은 `.asset` 카드 텍스트의 자산 ID 접두사로 **해당 자산을 특정**해 연다 — 첫 카드를 클릭하면 앞 섹션이 남긴 자산을 읽어 거짓 실패가 난다(실제로 처음에 그렇게 실패했고, 그래서 ID로 찾도록 고쳤다).
+- 표시 결함 1건 수정: v2 복원 시 패널 제목이 "과거 복원 · 적용 정보 기록 없음"인데 바로 아래에 포함 번역과 출처가 표시됐다. `presentation.ts`의 `unknownApplicationCopy()`로 v2+번역 있음 / 그 외를 분리했고, v1 문구는 그대로다. 검사 2건 추가 + 브라우저 검사 1건 추가.
+- stub/실연결 구분: `run.mjs`가 `results.json` 첫 항목에 `증거 출처`(engine·llm·storage·claim)를 쓰고, **fake 엔진인데 llm을 stub으로 표시하지 않으면 실행을 거부**한다. `scripts/live02_proposals.py`는 `prompt_proposals`를 광고하지 않는 서버에서 exit 2로 거부하고 파일을 쓰지 않는다.
+
+실행한 명령과 결과:
+  - `.venv/bin/python -m pytest backend/tests -q` → **377 passed, 96 skipped**.
+  - `node --test 'frontend/tests/*.test.mjs'` → **186 pass / 0 fail**(184 → 186).
+  - `CHROME_PATH="…/Microsoft Edge" … sh scripts/prompt-composer-browser/verify.sh` → **278 checks, 0 failed**(255 → 278).
+  - `npx tsc -b`, `npx eslint .` → 통과. `git diff --check` → 통과.
+  - `ruff check backend scripts` → `scripts/inspect-db-service-references.py`(F821)·`scripts/test-verify-candidate-run.py`(I001) 2건. **둘 다 이번에 수정하지 않은 기존 파일**이며 `git status`에 없음을 확인했다.
+
+변이 검증(테스트가 실제로 잡는지):
+  - 시작 시 저장된 v2 행을 조용히 v1로 내리는 mutation → **새 재시작 검사 2건만 실패, 기존 17건은 전부 통과.** 이 경계가 없으면 그 회귀는 잡히지 않는다는 증거다.
+  - retry에서만 `remainder`를 떼는 mutation → retry 검사 2건 실패.
+  - `unknownApplicationCopy`의 v2 분기를 끄는 mutation → frontend 185/1 실패.
+  - enqueue에서 `prompt_composition`을 통째로 버리는 mutation → 10건 실패(광범위하므로 위 두 변이가 더 정밀한 증거다).
+
+미검증으로 남긴 것:
+  - **실제 LLM 번역 품질**: 이 환경에 `STUDIO_ADMISSION_URL`·gate·GPU가 없어 LIVE02를 실행하지 않았다. 위 23건은 페이지 stub 번역문이며 품질 주장이 아니다.
+  - 운영 배포본(REL03)·구 바이너리 호환(REL02).
+
 ## 2. 남은 보완 태스크
 
 아래 태스크는 TRANS01–06과 독립적이거나 후속이다. TRANS가 사전 밖 구절을 다루는 동안 이들은 사전 안쪽 정확도(RULE03)·적용 안내(VAR03)·실연결 검증(LIVE/EVAL)·종료(U12)를 맡는다.
@@ -412,6 +441,8 @@ TRANS06 / 구현 완료 · 브라우저 검증 완료 / 2026-11-19 / 기준 HEAD
 
 ### LIVE02 — 실제 provider 응답의 통합 확인 · 환경 대기
 
+- **하네스 준비 완료(2026-11-20), 실행은 환경 대기**: `scripts/live02_proposals.py`. 12장면 `selection_hint` + 3개 구절 `remainder_translation`을 **각 1회씩, 재시도 없이** 호출하고 지연·provider 봉투·제안/거절 개수·원문 번역을 그대로 기록한다. 사람이 판단해야 하는 항목(의미 보존·자연스러움·누락)은 `human_review: null`로 남겨 스크립트가 품질을 주장하지 못하게 했다.
+- **이 환경에서 실행 불가**: `STUDIO_ADMISSION_URL`·`STUDIO_LLM_MODEL` 미설정, gate 리스너 없음, GPU 없음. 실행하면 서버가 `prompt_proposals`를 광고하지 않으므로 스크립트가 **exit 2로 거부하고 파일을 쓰지 않는다**. 가짜 엔진으로 띄운 실제 서버에 대고 시험해 이 거부가 동작함을 확인했다(§3 검증 기록). 즉 stub 결과가 실연결 증거로 둔갑할 경로가 없다.
 - 선행: LIVE01 **및 LLM-R01·R02·R03·R04·R05**. 운영/GPU 사용은 기존 승인 범위를 확인하고 범위 밖이면 실행하지 않음. fake/stub을 실연결 증거로 대체 금지.
 - 근거: 이 선행 조건은 2026-11-18 리뷰 결과다. 부정 가드가 규칙 경로보다 약하고, 카탈로그에 한국어 어휘가 없고, 부분 변경이 현재 선택을 숨기고, 요청 상한 단위가 어긋나고, `finish_reason`이 모델 자기신고인 상태에서 측정하면 **모델 품질 결함과 하네스 결함을 구분할 수 없다**.
 - 실행: 이미지 생성이 없는 허용된 환경에서 selection_hint, partial_change, situation_variants 각 요청 1개부터 순차 확인. alias·모델 버전·지연·schema 거절·취소·불가 상태 기록. 모델 버전은 **서버가 봉투에서 읽은 값**(LLM-R05)으로 기록하고 모델 자기신고 값은 진단으로만 병기. API 키/원문 사용자 로그는 기록하지 않음.
@@ -419,22 +450,33 @@ TRANS06 / 구현 완료 · 브라우저 검증 완료 / 2026-11-19 / 기준 HEAD
 
 ### EVAL-UX02 — 실제 LLM 평가와 사용자 효율 측정 · 대기
 
+- **평가 항목 준비 완료(2026-11-20), 실행은 LIVE02 대기**: 요청하신 4개 축을 LIVE02 산출물에 그대로 대응시켰다.
+  - **한국어 원문 의미 보존**: `remainder_translation[].human_review.meaning_preserved`(스크립트가 채우지 않고 null로 남긴다 — 스크립트가 의미를 판정할 수 없다).
+  - **번역 누락**: 같은 항목의 `unresolved_spans`·`rejected`와 응답 `translations` 개수를 원문 구절 수와 비교. LIVE02가 이미 원자료를 기록한다.
+  - **이미지 프롬프트 적합성**: `human_review.natural_english` + `human_review.notes`. 이미지 품질 자체는 QUALITY01/02로 분리 유지.
+  - **모델별 결과 차이**: LIVE02를 모델(alias)별로 실행해 `environment.advertised`·`provider`·`ms`와 위 판정을 모델 키로 비교. 모델 버전은 LLM-R05에 따라 **서버가 봉투에서 읽은 값**을 쓰고 모델 자기신고는 진단으로만 병기한다.
 - 선행: LIVE02, METRIC01. EVAL-UX01의 남은 완료 조건을 승계. 규칙 기준선은 archive에 보존.
-- 실행: 같은 12장면으로 실제 모델 응답의 ID 적중·부정·귀속·잠금 준수·원치 않은 추가와 미반영을 비교. 사람이 입력부터 승인까지 수행한 시간·클릭·보정과 의견을 별도 수집. 스텁 후보 품질을 모델 품질로 표시하지 않음.
+- 실행: 같은 12장면으로 실제 모델 응답의 ID 적중·부정·귀속·잠금 준수·원치 않은 추가와 미반영을 비교. 사람이 입력부터 승인까지 수행한 시간·클릭·보정과 의견을 별도 수집. 스텁 후보 품질을 모델 품질로 표시하지 않음. **현재 브라우저 하네스의 번역문은 페이지 stub이므로 EVAL-UX02의 분모가 될 수 없다**(`results.json`의 `증거 출처` 항목이 이를 명시).
 - 완료: 실제 모델/설정/분모/실패 사례/사용자 의견. 사람이 없으면 사람 측정 부분은 대기. 품질 우위·최적성은 비교 없이는 주장하지 않음. 이미지 품질은 QUALITY01/02 별도.
 
 ### U11 — 현재 화면의 사용자 확인 · 사용자 확인 대기
 
 - 실행: 현재 설명 입력→규칙/AI 제안→수락/부분 변경/상황 후보→미리보기→적용 흐름을 텍스트로 설명하고 실제 사용자 의견 기록. 360/390px·데스크톱의 실제 관찰/미검증 구분. RULE/VAR 보완 후 영향 부분은 다시 확인.
 - 완료: 반영/보류 결정과 이유. 기존 화면 계측을 최신 소스의 실측으로 재사용하지 않음. 무응답은 승인 아님. 캡처를 필수로 요구하지 않음.
-- **자동화로 덮인 부분(2026-11-19)**: `scripts/prompt-composer-browser/`가 CDP로 실제 브라우저를 구동해 255건을 검사한다(`verify.sh`, Edge로 실행). TRANS06 흐름(번역 제안→포함→적용→계열 변경→유지→재적용→제출 본문)은 이제 자동 검사가 있고, 변이 검증으로 그 검사가 회귀를 실제로 잡는다는 것까지 확인했다(§1 TRANS06 인계). **남은 것은 화면을 사람이 읽고 판단하는 확인**(문구의 자연스러움, 단계 순서가 사용자에게 납득되는지)이며, 이것은 자동 검사로 대체할 수 없다.
+- **자동화로 덮인 부분(2026-11-19, 2026-11-20 갱신)**: `scripts/prompt-composer-browser/`가 CDP로 실제 브라우저를 구동해 **278건**을 검사한다(`verify.sh`, Edge로 실행). TRANS06 흐름(번역 제안→포함→적용→계열 변경→유지→재적용→제출 본문)과 U12 흐름(제출→저장 조회→이력 화면→복원→새로고침→재시도)은 이제 자동 검사가 있고, 변이 검증으로 그 검사가 회귀를 실제로 잡는다는 것까지 확인했다(§1 TRANS06 인계, §1 U12 보강). **남은 것은 화면을 사람이 읽고 판단하는 확인**(문구의 자연스러움, 단계 순서가 사용자에게 납득되는지)이며, 이것은 자동 검사로 대체할 수 없다. U12가 찾은 문구 결함은 자동 검사가 잡을 수 있는 종류였지만, "자연스러운가"는 여전히 사람 몫이다.
 
 ### U12 — 정합성 회귀와 범위별 종료 · 대기
 
 - 선행: RULE01–03, METRIC01, VAR03, LLM-R01–R07 및 U11. **TRANS01–06을 구현했다면 그 회귀도 포함한다.** 실연결/품질을 포함한 전체 기능 종료는 LIVE02/EVAL-UX02 증거도 필요.
-- **부분 완료(2026-11-19)**: TRANS 계열 회귀는 U12의 두 항목으로 앞당겨 처리했다. (1) MetadataModal 표시는 `frontend/tests/prompt-metadata-modal.test.mjs`가 실제 React SSR로 렌더해 v2 출처·포함 번역·초안/최종 차이 설명을 검사한다(소스 grep이 아니라 렌더 결과를 보므로 죽은 분기의 문구에 속지 않는다). (2) `activeInclusions`·`withReboundFamily`·`appliedStatus`의 v1/v2·epoch 규칙은 단위 테스트와 CDP 브라우저 검사로 덮였다. **남은 U12 범위는 실제 DB·자산 이력에서의 v2 왕복**이며, 이는 아직 미검증이다.
+- **부분 완료(2026-11-19)**: TRANS 계열 회귀는 U12의 두 항목으로 앞당겨 처리했다. (1) MetadataModal 표시는 `frontend/tests/prompt-metadata-modal.test.mjs`가 실제 React SSR로 렌더해 v2 출처·포함 번역·초안/최종 차이 설명을 검사한다(소스 grep이 아니라 렌더 결과를 보므로 죽은 분기의 문구에 속지 않는다). (2) `activeInclusions`·`withReboundFamily`·`appliedStatus`의 v1/v2·epoch 규칙은 단위 테스트와 CDP 브라우저 검사로 덮였다.
+- **DB 왕복 완료(2026-11-20)**: 남아 있던 "실제 DB·자산 이력에서의 v2 왕복"을 두 층으로 닫았다.
+  - **프로세스 재시작 경계(B, `backend/tests/test_prompt_composition.py` 3건 추가, 19 pass)**: 기존 v2 테스트는 모두 **행을 쓴 앱에서 다시 읽었기 때문에** "저장됨"과 "기억됨"을 구분하지 못했다. 그래서 같은 `data_dir`로 앱을 다시 띄워 job 행·asset metadata·sidecar 세 곳에서 `remainder`와 5개 출처 필드가 그대로인지 확인한다(`test_a_v2_record_survives_a_server_restart`). 재시작 뒤 retry가 spec 컬럼의 `remainder`를 그대로 복사하는지(`..._retries_across_a_restart_...`), v1+`remainder` 422 가드가 프로세스 상태가 아니라 검증 규칙으로 다시 로드되는지(`..._still_refuses_a_v1_body_...`)도 포함한다.
+  - **변이 검증**: 시작 시 저장된 v2 행을 v1로 "정리"하는 그럴듯한 mutation을 넣으면 **새 3건 중 2건만 실패하고 기존 17건은 전부 통과**한다. 즉 이 경계는 재시작 없이는 잡히지 않으며, 테스트가 실제로 그 구멍을 메운다는 증거다.
+  - **실제 브라우저+실제 SQLite(S, `suite-u12.mjs` 23건)**: 번역 stub으로 v2를 만들어 제출 → `GET /assets/{id}/metadata` 응답 → 갤러리 `정보` → `프롬프트 구성 이력` 표시 → `이 설정으로 다시 생성` 복원 → **페이지 새로고침 후 이력 재확인** → 취소한 v2 작업의 카드 `재시도`까지 확인한다. 전체 278검사/0실패.
+- **U12가 찾은 표시 결함(수정 완료)**: v2 기록을 복원하면 패널 제목이 "과거 복원 · 적용 정보 기록 없음"인데, 바로 아래에 포함한 번역과 번역 출처(모델명·제안 ID)가 표시됐다. 기록이 실제로 가진 사실을 부정하는 문구였다. `unknownApplicationCopy(schemaVersion, recorded)`로 분리해 **v2+번역 있음**은 "적용 문자열 미기록 + 번역 N건과 출처는 기록됨", v1·번역 없음은 기존 문장을 그대로 유지한다(구조 변경 없음, 문구만). 단위·브라우저 검사와 변이 검증(185/1)으로 고정했다.
 - 실행: F·B·S·P·D 및 제안 provider/API 테스트. 같은 소스에서 이미 통과한 검사는 재사용 범위를 기록. 저장 스냅샷·retry·최종 직접 수정·원문 보존 확인. [LLM 경로 리뷰 보관본](archive/prompt-composer/2026-11-18/LLM_PATH_REVIEW_AND_R01_R07.md)의 정본/사본 표(부정·잠금·그룹·충돌)가 코드 주석과 일치하는지 대조한다.
 - 완료: 로컬 구현/실연결/사용자 검증/운영/GPU 상태를 각각 기록. 미검증을 완료 archive로 숨기지 않음. 완료한 자식 상세만 archive로 옮기고 남은 태스크 유지.
+- **남은 U12 범위**: 위 두 층은 **fake 엔진 + 페이지 stub 번역문**이다. 실제 provider가 쓴 번역문으로 같은 왕복을 확인하는 것은 LIVE02/EVAL-UX02다. 또한 운영 배포본(REL03)·구 바이너리 호환(REL02)은 여전히 미실행이다.
 
 ### 캡처 없는 인계
 

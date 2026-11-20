@@ -164,6 +164,32 @@ export function inclusionNotice(state: PromptBuilderState, result: CompileResult
     : { included: false, unknown: false, text: "별도 보관 · 원문은 미리보기에 포함되지 않고 이력에만 남습니다." };
 }
 
+/**
+ * U12: what an "unknown application" headline may claim, given the record's version.
+ *
+ * `appliedStatus` returns `unknown` whenever a restore cannot know the applied string —
+ * true for both versions. But a v2 record *does* carry recorded facts: the included
+ * translations and their provenance. The old single sentence ("적용 당시 문자열과 반영
+ * 방식은 별도 기록되지 않았습니다") was therefore false on a v2 restore — it contradicted
+ * the inclusion list rendered directly below it, which named the model and proposal IDs.
+ * The wording is split so each version claims only what its record holds; this is copy
+ * only and changes no state.
+ */
+export function unknownApplicationCopy(schemaVersion: 1 | 2 | undefined, recorded: number): {
+  headline: string; reason: string;
+} {
+  if (schemaVersion === 2 && recorded > 0) {
+    return {
+      headline: "과거 복원 · 적용 문자열 미기록",
+      reason: `과거 구성 복원: 적용 당시 문자열은 기록되지 않았습니다. 포함한 번역 ${recorded}건과 그 출처는 기록되어 아래에 표시됩니다.`,
+    };
+  }
+  return {
+    headline: "과거 복원 · 적용 정보 기록 없음",
+    reason: "과거 구성 복원: 적용 당시 문자열과 반영 방식은 별도 기록되지 않았습니다.",
+  };
+}
+
 /** One short label for the applied/edited state; unknown history is not claimed as unedited. */
 export type AppliedStatus = "none" | "applied" | "modified" | "unknown" | "selectionChanged" | "familyChanged";
 

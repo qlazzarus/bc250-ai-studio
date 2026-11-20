@@ -133,13 +133,17 @@ LLM-I04는 이 패널 옆에 `POST /api/v1/prompt/proposals`(LLM-I03)를 호출�
 - **조립은 `applyDraft` 한 곳이다.** `draft` + 수락한 번역문이며 `draft_prompt`·`compiler_version`은 그대로다. sd15 경고는 같은 `estimateTokens`로 **최종 프롬프트**를 다시 재고, 포함 때문에 77을 넘길 때만 버튼 옆에 표시한다(이미 넘은 초안은 초안 자체 경고 소관).
 - **편집하면 사라진 구절의 번역은 빠진다.** 원문에서 `비 오는 밤`을 지우면 그 번역은 렌더에서 제외되지만 기록 목록에서는 지우지 않는다. 구절을 다시 쓰면 되살아난다. 저장된 스냅샷은 `source_ko`를 **텍스트로** 들고 있으므로 나중에 문장이 바뀌어도 당시 사실은 그대로 남는다.
 - **포함이 있을 때만 v2다.** `draftComposition`은 포함이 비면 v1 본문을 그대로 만들고, 하나라도 있으면 `schema_version: 2` + `remainder[]`가 된다. 항목마다 `proposal_id`·`proposal_model`·`accepted_at`을 남기며, `proposal_model`이 없으면 `unknown`이다(빈 문자열은 서버가 거절한다). `accepted_at`은 **초 단위**(`2026-11-19T04:05:06Z`)이고 `toISOString()`의 밀리초는 422다.
-- **복원된 v2는 자기 번역을 시작 목록으로 갖는다.** 포함 목록은 `{owner, items}`로 들고 `activeInclusions(inclusions, applied)`가 파생한다 — 로컬 목록이 그 스냅샷을 가리키면 로컬이 사실이고(pruning이 숨긴 항목이 되살아날 수 있어야 한다), 다른 스냅샷이 오면 그 스냅샷의 기록이 이어받는다. v1 스냅샷은 이어받을 `remainder`가 없고 만들어 내지도 않는다. effect에서 `setState`하지 않기 위한 구조이기도 하다.
+- **복원된 v2는 자기 번역을 시작 목록으로 갖는다.** 포함 목록은 `{owner, epoch, items}`로 들고 `activeInclusions(inclusions, applied, epoch)`가 파생한다 — 로컬 목록이 그 스냅샷을 가리키면 로컬이 사실이고(pruning이 숨긴 항목이 되살아날 수 있어야 한다), 다른 스냅샷이 오면 그 스냅샷의 기록이 이어받는다. v1 스냅샷은 이어받을 `remainder`가 없고 만들어 내지도 않는다. effect에서 `setState`하지 않기 위한 구조이기도 하다. epoch가 함께 필요한 이유는 아래 계열 변경·epoch 항목에 있다.
 - **모델 계열을 바꿔도 포함 목록은 남는다.** 계열 변경은 초안만 버리고 적용 기록은 유지한다(`withReboundFamily`). 포함 목록은 `{owner, epoch, items}`로 들고 `activeInclusions(list, applied, epoch)`가 파생한다: 목록의 `epoch`가 현재 세션과 같고 `owner`가 화면의 구성이면 로컬 목록이 사실이고(pruning이 숨긴 항목이 되살아날 수 있어야 한다), 아니면 그 구성의 `remainder`(v2 한정)를 쓴다. 계열 변경 후 상태는 **"모델 계열 변경 · 기록 유지"**로 표시되고, 패널의 번역과 출처는 그대로 남는다. 같은 계열에서 다시 적용하면 같은 번역이 `remainder`로 다시 기록된다(v2). `appliedForFamily`가 계열을 검사하므로 다른 계열 구성은 제출되지 않는다.
 - **epoch는 "아직 적용 전"과 "처음부터 다시 시작"을 가른다.** 둘 다 `applied === null`이라 `owner`만으로는 구분되지 않는다. 이전에는 그것이 포함 목록을 새 기록에 조용히 물려주는 경로였다. `restartBuilder`와 `restoreComposition`만 epoch를 올리므로, 적용 전 포함은 같은 세션으로 남고 과거 복원은 이전 목록을 이어받지 않는다.
 - **v1 서버로 내려보낼 때는 사본에서 뗀다.** `v1OnlyWhenUnsupported`는 `schema_version`을 1로 바꾸고 `delete`로 `remainder`를 제거한다. 원본은 변형하지 않으므로 화면에 보이는 구성은 그대로다.
 - **카드 문구는 번역의 지위를 밝힌다.** "번역 제안이며 원문과 다를 수 있습니다"가 패널에 상시 있고, 적용 버튼 위에는 "포함한 번역 N개가 줄바꿈으로 붙습니다"가 있다. 번역 품질은 이 경로가 보장하지 않는다.
 
-실제 LLM 응답의 번역 품질은 **미검증**이다(LIVE02·EVAL-UX02). 브라우저에서의 카드 배치·포커스 이동과 계열 변경 후 기록 유지는 `scripts/prompt-composer-browser/`의 CDP 검사로 확인했다(255건/0실패, 신규 TRANS06 30건 포함). 다만 번역 응답은 그 검사에서도 페이지 stub으로 주입하므로, 실제 모델이 만든 문장의 적합성은 여전히 검사 대상이 아니다.
+- **복원 문구는 기록이 실제로 가진 것만 주장한다.** `appliedStatus`가 `unknown`인 것은 두 버전 모두에서 가능하지만, v2 기록에는 포함한 번역과 그 출처가 실제로 남아 있다. 그래서 `unknownApplicationCopy(schemaVersion, recorded)`가 문장을 가른다: v2에 번역이 있으면 "과거 복원 · 적용 문자열 미기록" + "번역 N건과 출처는 기록되어 표시됩니다", 그 외는 기존 "적용 정보 기록 없음"이다. 이전에는 v2 복원에서도 후자를 보여 주어 바로 아래에 표시되는 출처를 부정했다(U12에서 발견).
+
+실제 LLM 응답의 번역 품질은 **미검증**이다(LIVE02·EVAL-UX02). 브라우저에서의 카드 배치·포커스 이동과 계열 변경 후 기록 유지는 `scripts/prompt-composer-browser/`의 CDP 검사로 확인했다(278건/0실패, 신규 TRANS06 30건 + U12 23건 포함). 번역 응답은 그 검사에서도 페이지 stub으로 주입하므로 **실제 모델이 만든 문장의 적합성은 여전히 검사 대상이 아니다** — `results.json` 첫 항목 `증거 출처`가 이 구분을 명시한다.
+
+저장·조회 왕복은 이제 실제 SQLite에서 확인했다. 재시작 경계 3건(같은 `data_dir`로 앱 재기동 후 job 행·asset metadata·sidecar를 다시 읽음)과 브라우저 23건(제출→metadata API→갤러리 `정보`의 구성 이력→복원→새로고침 후 재확인→취소 작업 `재시도`)이 `remainder`와 5개 출처 필드를 확인한다. 다만 이 왕복도 fake 엔진 + stub 번역문이며, **실제 provider가 쓴 번역문으로 같은 왕복을 확인하는 것이 LIVE02**다(`scripts/live02_proposals.py`, 이 환경에는 gate가 없어 미실행).
 
 ## 설명 작업 평가 (EVAL-UX01)
 

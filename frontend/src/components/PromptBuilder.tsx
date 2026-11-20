@@ -40,6 +40,7 @@ import {
   DISPLAY_GROUP as displayGroup, activeGroups, filterOptions, nextFocusAfterRemoval,
   selectionCounts, recoveryActions, previewControls, inclusionNotice, appliedStatus,
   advisoryWarnings, unresolvedSelections, sceneSummary, summaryIsEmpty,
+  unknownApplicationCopy,
 } from "../prompt/presentation";
 import { SCENE_EXAMPLES, applyExample, type SceneExample } from "../prompt/examples";
 import { characterCount, validateComposition, validateText } from "../prompt/validation";
@@ -341,6 +342,8 @@ export default function PromptBuilder({
   const controls = previewControls(state, family, { blocked, separateOnly, prompt: value, dirty });
   const inclusion = inclusionNotice(state, state.result);
   const status = appliedStatus(state, value, family);
+  // U12: the "unknown" headline must not deny the translations it is about to list.
+  const unknownStatus = unknownApplicationCopy(state.applied?.schema_version, recordedRemainder.length);
   /**
    * UX04: the Korean summary and the chips read the same rows, so the flat DOM order
    * of the remove buttons (and therefore focus restoration) cannot drift. Summary rows
@@ -812,14 +815,14 @@ export default function PromptBuilder({
     </button>
     <HelpNote summary="저장 범위 안내">초안을 적용하면 서버 지원 여부에 따라 선택 사항과 초안이 생성 결과에 함께 저장됩니다. 새로고침 전 입력은 저장되지 않습니다.</HelpNote>
     {state.applied && <div role="status" className="prompt-status">
-      <strong>{status === "unknown" ? "과거 복원 · 적용 정보 기록 없음"
+      <strong>{status === "unknown" ? unknownStatus.headline
         : status === "familyChanged" ? "모델 계열 변경 · 기록 유지"
         : status === "modified" ? "적용 후 수정됨"
         : status === "selectionChanged" ? "적용 후 선택 변경됨"
         : "적용됨"}</strong>
       <details className="prompt-status__detail">
         <summary>자세히</summary>
-        <p>{status === "unknown" ? "과거 구성 복원: 적용 당시 문자열과 반영 방식은 별도 기록되지 않았습니다."
+        <p>{status === "unknown" ? unknownStatus.reason
           : status === "familyChanged" ? "모델 계열을 바꿔 이 구성은 지금 계열로 저장되지 않습니다. 포함한 번역과 출처는 패널에 그대로 남고, 지금 계열에서 다시 적용하면 같은 번역으로 새로 기록됩니다."
           : status === "modified" ? "적용 후 최종 프롬프트를 직접 수정했습니다. 구성 이력은 마지막 적용 상태로 저장되며 의미 일치를 보장하지 않습니다."
           : status === "selectionChanged" ? "선택 또는 설명을 편집 중입니다. 다시 적용하기 전에는 마지막 적용 구성이 저장됩니다."

@@ -288,6 +288,106 @@ def test_a_v2_snapshot_over_32_kib_is_refused_even_with_remainder(client):
         'model_id': 'fake', 'prompt': 'x', 'prompt_composition': payload}).status_code == 422
 
 
+def test_a_v2_record_survives_a_server_restart(tmp_path):
+    """U12: a stored record must be readable by a *different* process.
+
+    Every other v2 test reads back through the app that wrote the row, so a bug that
+    kept the snapshot in memory (or in the engine's spec) and only re-emitted it while
+    warm would still pass. Restarting on the same data directory is the only way to
+    distinguish "stored" from "remembered": the second app shares nothing but the
+    sqlite file and the sidecar.
+    """
+    settings = Settings(
+        data_dir=tmp_path / 'data', api_key=CLIENT_KEY, admin_key=ADMIN_KEY,
+        policy='image_priority', poll_interval=0.01, fake_delay=0.01,
+    )
+    payload = v2()
+    final = 'a person\n' + REMAINDER['suggested_en']
+    with TestClient(create_app(settings), headers=HEADERS) as client:
+        response = client.post('/api/v1/jobs', json={
+            'model_id': 'fake', 'prompt': final, 'prompt_composition': payload})
+        assert response.status_code == 202, response.text
+        before = wait_job(client, response.json()['job_id'])
+        assert before['status'] == 'completed'
+        asset_id = before['output_asset_ids'][0]
+        # The file on disk, read before the restart, is what must still be there.
+        sidecar = next((settings.data_dir / 'outputs').rglob('*.json'))
+        assert json.loads(sidecar.read_text())['prompt_composition']['remainder'] == [REMAINDER]
+
+    # Second process, same data directory, no shared memory.
+    with TestClient(create_app(settings), headers=HEADERS) as client:
+        job = client.get(f"/api/v1/jobs/{before['job_id']}").json()
+        assert job['prompt_composition']['schema_version'] == 2
+        assert job['prompt_composition']['remainder'] == [REMAINDER]
+        assert job['prompt'] == final
+
+        metadata = client.get(f"/api/v1/assets/{asset_id}/metadata").json()
+        assert metadata['prompt_composition']['remainder'] == [REMAINDER]
+        # Provenance is per item and is re-read from the row, not from a live dictionary.
+        for field in ('source_ko', 'suggested_en', 'proposal_id', 'proposal_model',
+                      'accepted_at'):
+            assert metadata['prompt_composition']['remainder'][0][field] == REMAINDER[field]
+
+        # The sidecar is a separate copy: corrupting only the DB would still leave this
+        # true, so assert it after the restart rather than trusting the pre-restart read.
+        assert json.loads(sidecar.read_text())['prompt_composition']['remainder'] == [REMAINDER]
+
+
+def test_a_restored_v2_job_retries_across_a_restart_with_its_translations(tmp_path):
+    """U12: retry is the path a user takes after a failure, possibly the next day.
+
+    A retry deep-copies the stored spec, so it also proves the spec column — not just
+    the asset metadata — still carries `remainder` after a restart.
+    """
+    settings = Settings(
+        data_dir=tmp_path / 'data', api_key=CLIENT_KEY, admin_key=ADMIN_KEY,
+        policy='image_priority', poll_interval=0.01, fake_delay=0.01,
+    )
+    with TestClient(create_app(settings, engine=FailOnce()), headers=HEADERS) as client:
+        response = client.post('/api/v1/jobs', json={
+            'model_id': 'fake', 'prompt': 'a person\n' + REMAINDER['suggested_en'],
+            'prompt_composition': v2()})
+        assert response.status_code == 202, response.text
+        failed = wait_job(client, response.json()['job_id'])
+        assert failed['status'] == 'failed'
+
+    with TestClient(create_app(settings), headers=HEADERS) as client:
+        stored = client.get(f"/api/v1/jobs/{failed['job_id']}").json()
+        assert stored['prompt_composition']['remainder'] == [REMAINDER]
+
+        retried = client.post(f"/api/v1/jobs/{failed['job_id']}/retry")
+        assert retried.status_code == 202, retried.text
+        second = wait_job(client, retried.json()['job_id'])
+        assert second['status'] == 'completed'
+        assert second['retry_of'] == failed['job_id']
+        # The copy kept the version and every provenance field, and did not recompile.
+        assert second['prompt_composition'] == stored['prompt_composition']
+        assert second['prompt_composition']['remainder'] == [REMAINDER]
+        assert second['prompt'] == stored['prompt']
+        assert second['prompt'].count(REMAINDER['suggested_en']) == 1
+
+
+def test_a_restarted_server_still_refuses_a_v1_body_with_remainder(tmp_path):
+    """The version guard is validation, not process state: it must reload with the app."""
+    settings = Settings(
+        data_dir=tmp_path / 'data', api_key=CLIENT_KEY, admin_key=ADMIN_KEY,
+        policy='image_priority', poll_interval=0.01, fake_delay=0.01,
+    )
+    with TestClient(create_app(settings), headers=HEADERS) as client:
+        assert client.get('/api/v1/system/capabilities').json()[
+            'prompt_composition']['schema_versions'] == [1, 2]
+
+    assert (settings.data_dir / 'database' / 'studio.sqlite3').is_file()
+    with TestClient(create_app(settings), headers=HEADERS) as client:
+        assert client.get('/api/v1/system/capabilities').json()[
+            'prompt_composition']['schema_versions'] == [1, 2]
+        bad = composition()
+        bad['remainder'] = [REMAINDER]
+        assert client.post('/api/v1/jobs', json={
+            'model_id': 'fake', 'prompt': 'x',
+            'prompt_composition': bad}).status_code == 422
+
+
 def test_remainder_fits_the_measured_budget():
     """TRANS01 §3.1/§7 baseline: v1 + 8 remainder items stays inside 32 KiB.
 

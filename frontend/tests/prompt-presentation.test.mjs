@@ -11,6 +11,7 @@ import {
   previewControls, inclusionNotice, appliedStatus, GROUP_ORDER,
   nextFocusAfterRemoval, unresolvedSelections, advisoryWarnings,
   SUMMARY_ROWS, sceneSummary, summaryIsEmpty,
+  unknownApplicationCopy,
 } from '../src/prompt/presentation.ts';
 import { SCENE_EXAMPLES, applyExample, exampleNeedsConfirm } from '../src/prompt/examples.ts';
 import { queueCounts, queueDefaultExpanded, queueExpanded, queueSummary } from '../src/lib/queue.ts';
@@ -248,6 +249,36 @@ test('applied status distinguishes edited, unchanged, selected and unknown histo
   // TRANS06: a rebind keeps the record, so its status must not keep claiming the record
   // would be stored — `appliedForFamily` refuses to send it for another family.
   assert.equal(appliedStatus(applied, applied.result.draft, 'flux2'), 'familyChanged');
+});
+
+test('an unknown-application headline never denies the translations it lists', () => {
+  // U12 found this in a real browser: a restored v2 record rendered the inclusion list
+  // (model + proposal ID) directly under a headline claiming no application info was
+  // recorded. The v1 wording stays exactly as recorded history justifies.
+  const v1 = unknownApplicationCopy(1, 0);
+  assert.equal(v1.headline, '과거 복원 · 적용 정보 기록 없음');
+  assert.match(v1.reason, /적용 당시 문자열과 반영 방식은 별도 기록되지 않았습니다/);
+
+  const v2 = unknownApplicationCopy(2, 1);
+  assert.equal(v2.headline, '과거 복원 · 적용 문자열 미기록');
+  assert.match(v2.reason, /포함한 번역 1건과 그 출처는 기록되어/);
+  assert.doesNotMatch(v2.headline + v2.reason, /기록되지 않았습니다\.$|적용 정보 기록 없음/);
+  // Only the *application string* is unknown on a v2 record, never the provenance.
+  assert.doesNotMatch(v2.reason, /반영 방식/);
+
+  // A v2 record with an empty remainder has no provenance to defend, so it keeps the
+  // plain sentence rather than promising a list that is not there.
+  assert.equal(unknownApplicationCopy(2, 0).headline, v1.headline);
+  assert.equal(unknownApplicationCopy(undefined, 0).headline, v1.headline);
+});
+
+test('the builder renders the version-aware unknown headline', () => {
+  const source = readFileSync(fileURLToPath(new URL('../src/components/PromptBuilder.tsx', import.meta.url)), 'utf8');
+  assert.ok(source.includes('unknownApplicationCopy(state.applied?.schema_version, recordedRemainder.length)'));
+  // The two literal sentences must not be inlined again: an inlined copy would drift
+  // from the rule that decides whether the claim is true.
+  assert.ok(!source.includes('"과거 복원 · 적용 정보 기록 없음"'));
+  assert.ok(!source.includes('"과거 구성 복원: 적용 당시 문자열과 반영 방식은 별도 기록되지 않았습니다."'));
 });
 
 test('background guidance stays collapsed and state text stays visible', () => {

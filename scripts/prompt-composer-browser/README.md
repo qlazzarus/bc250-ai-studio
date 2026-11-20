@@ -32,6 +32,7 @@ sh scripts/prompt-composer-browser/verify.sh
 | `suite-keyboard.mjs` | 키보드 순회·조작, 터치 크기, 360/390/1280 반응형 |
 | `suite-contracts.mjs` | 적용·덮어쓰기 취소, 생성, 과거 복원, 422/413, 계열 전환, capability 미지원 |
 | `suite-trans06.mjs` | 번역 제안→포함→적용→모델 계열 변경→기록 유지→재적용, 그리고 실제 `POST /jobs` 본문의 v2 `remainder`·출처 검사 |
+| `suite-u12.mjs` | 실제 SQLite 왕복: 제출→metadata 조회→갤러리 `정보`/구성 이력→`이 설정으로 다시 생성`→새로고침 후 재확인→취소 작업 `재시도` |
 | `run.mjs` | Chromium 기동, 스위트 실행, `results.json` 기록 |
 
 ## 주의
@@ -40,3 +41,4 @@ sh scripts/prompt-composer-browser/verify.sh
 - `.focus()` 후 `activeElement`만 비교하면 키보드 도달성을 입증하지 못한다. `tab()`으로 실제 순회한 결과를 기록한다.
 - 결과 판정은 `results.json`의 `pass` 값이다. `pass: null`은 참고 기록이며 실패가 아니다.
 - 이 하네스는 실기기 터치·스크린리더·확대·운영 서버·GPU 품질을 검증하지 않는다(AT01/AT02·P5-L01·P6-Q02 범위).
+- **번역문은 stub이다.** 모든 스위트가 페이지 안에서 제안 응답을 가로채므로 이 결과로 번역 품질을 말할 수 없다. `results.json` 첫 항목 `증거 출처`가 `engine`/`llm`/`claim`을 기록하며, `run.mjs`는 fake 엔진에 stub이 아닌 llm 표기를 주면 실행을 거부한다. 실연결 품질은 `scripts/live02_proposals.py`(LIVE02)다.

@@ -5,6 +5,7 @@ import { runMessages } from "./suite-messages.mjs";
 import { runKeyboard } from "./suite-keyboard.mjs";
 import { runContracts } from "./suite-contracts.mjs";
 import { runTrans06 } from "./suite-trans06.mjs";
+import { runU12 } from "./suite-u12.mjs";
 import { adjustOpen, closeAdjust, openAdjust, pickEntry, stageOrder, waitAdjustOpen, waitSearchFocus } from "./ui.mjs";
 
 export async function runSuite({ page, browser, sessionId, check, record, sleep, shots }) {
@@ -176,4 +177,7 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
   await runContracts({ page, check, record, sleep, shots });
   // TRANS06 runs last: it reloads the page so it owns the builder state it asserts on.
   await runTrans06({ page, check, record, sleep, shots });
+  // U12 needs the v2 capability stub from §N, so it must run after it — and it reloads
+  // too, so nothing above can leak a half-built record into the storage checks.
+  await runU12({ page, check, record, sleep, shots });
 }

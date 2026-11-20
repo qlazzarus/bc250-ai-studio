@@ -32,6 +32,23 @@ const record = (name, detail) => {
 const main = async () => {
   if (!existsSync(CHROME)) throw new Error(`chromium not found at ${CHROME}; set CHROME_PATH`);
   if (!APP) throw new Error("APP_URL is required (e.g. APP_URL=http://localhost:4206/)");
+  // Refuse to label a fake-engine run as a live one. Without this, a suite that stubs the
+  // reply in the page could be re-run with EVIDENCE_LLM set and the artefact would then
+  // claim live-model evidence for stubs — which is the failure mode LIVE02 exists to avoid.
+  const engine = process.env.EVIDENCE_ENGINE || "fake";
+  const llm = process.env.EVIDENCE_LLM || "stubbed in page";
+  if (engine === "fake" && !/^(stub|stubbed|none)/i.test(llm)) {
+    throw new Error(`refusing to record "${llm}" against the fake engine: `
+      + "this harness stubs the proposal reply in the page and never calls a provider. "
+      + "Live-model evidence must come from LIVE02 with a real STUDIO_ADMISSION_URL.");
+  }
+  // Provenance first, so results.json can never be read as a live-model result.
+  record("증거 출처", JSON.stringify({
+    engine, llm,
+    storage: "real sqlite in the disposable STUDIO_DATA_DIR",
+    app: APP,
+    claim: "storage/http/dom only; translation quality is NOT measured here",
+  }));
   const chrome = spawn(CHROME, ["--headless=new", `--remote-debugging-port=${PORT}`,
     `--user-data-dir=${PROFILE}`, "--no-first-run", "--no-default-browser-check", "about:blank"],
   { stdio: "ignore" });
