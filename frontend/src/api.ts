@@ -71,14 +71,33 @@ export type Asset = {
   file_url: string;
 };
 
+export type PromptCompositionRemainder = {
+  source_ko: string;
+  suggested_en: string;
+  proposal_id: string;
+  proposal_model: string;
+  /** ISO-8601 UTC, second precision: `YYYY-MM-DDTHH:MM:SSZ`. */
+  accepted_at: string;
+};
+
 export type PromptComposition = {
-  schema_version: 1;
+  /** 1 for a recorded v1 snapshot, 2 once a translation is included (TRANS01 §2.4). */
+  schema_version: 1 | 2;
   compiler_version: string;
   target_family: string;
   selections: { id: string; category: string; label_ko: string; dictionary_version: string; mapping_status: "mapped" | "unavailable"; rendered: string | null }[];
   free_text_ko: string;
   draft_prompt: string;
   unresolved: { kind: "selection" | "free_text"; id?: string | null; text: string }[];
+  /**
+   * TRANS01: accepted translations of phrases the dictionary cannot express.
+   *
+   * Absent on a v1 snapshot and must stay absent there — the server's `extra="forbid"`
+   * per version rejects the key under `schema_version: 1`, so re-writing an old
+   * snapshot as v2 would change a recorded fact. Only present when `schema_version` is
+   * 2, and never merged into `draft_prompt`.
+   */
+  remainder?: PromptCompositionRemainder[];
 };
 
 export type AssetMetadata = {

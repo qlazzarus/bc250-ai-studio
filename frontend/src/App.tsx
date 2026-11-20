@@ -12,7 +12,7 @@ import editable from "./lib/editable";
 import fixedValue from "./lib/fixedValue";
 import optionStatus from "./lib/optionStatus";
 import PromptBuilder from "./components/PromptBuilder";
-import { initialBuilderState, appliedForFamily, restoreComposition } from "./prompt/builderState";
+import { initialBuilderState, appliedForFamily, restartBuilder, restoreComposition, v1OnlyWhenUnsupported, withReboundFamily } from "./prompt/builderState";
 import { changeSceneFamily } from "./prompt/scene";
 import { DICTIONARY, DICTIONARY_VERSION } from "./prompt/dictionary";
 import { readProposalCapability, UNSUPPORTED, type ProposalCapability } from "./prompt/proposalCapability";
@@ -46,6 +46,13 @@ function App() {
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [builder, setBuilder] = useState(initialBuilderState);
   const [compositionSupported, setCompositionSupported] = useState(false);
+  /**
+   * TRANS01 §2.2: `remainder` may only be sent to a server that advertises v2.
+   * "Supported" (v1) and "v2 aware" are separate facts: an old server accepts a
+   * composition but rejects the new key with `extra_forbidden`, so the write path has
+   * to ask this, not `compositionSupported`.
+   */
+  const [remainderSupported, setRemainderSupported] = useState(false);
   const [maxBodyBytes, setMaxBodyBytes] = useState<number | null>(null);
   /**
    * LLM-I04: default is "absent", so the AI action stays hidden until the server
@@ -166,11 +173,12 @@ function App() {
     const controller = new AbortController();
     api.capabilities(controller.signal).then((data) => {
       setCompositionSupported(Boolean(data.prompt_composition?.schema_versions?.includes(1)));
+      setRemainderSupported(Boolean(data.prompt_composition?.schema_versions?.includes(2)));
       setProposalCapability(readProposalCapability(data.prompt_proposals, DICTIONARY_VERSION));
       const limit = data.request_limits?.max_body_bytes;
       setMaxBodyBytes(typeof limit === "number" && Number.isSafeInteger(limit) && limit > 0 ? limit : null);
     }).catch(() => {
-      setCompositionSupported(false); setMaxBodyBytes(null); setProposalCapability(UNSUPPORTED);
+      setCompositionSupported(false); setRemainderSupported(false); setMaxBodyBytes(null); setProposalCapability(UNSUPPORTED);
     });
     return () => controller.abort();
   }, [api]);
@@ -178,7 +186,11 @@ function App() {
   function changeBuilderFamily(family: string): boolean {
     if (!builder.scene.targetFamily || builder.scene.targetFamily === family) return true;
     if (builder.scene.selections.length && !window.confirm("모델 계열을 변경하면 사전 항목을 새 계열의 표현으로 다시 연결합니다. 기존 최종 프롬프트는 유지됩니다. 계속할까요?")) return false;
-    setBuilder((old) => ({ ...old, scene: changeSceneFamily(old.scene, family, DICTIONARY, DICTIONARY_VERSION), result: null, generatedFrom: null, applied: null, generatedMode: null, appliedScene: null, appliedPrompt: null, provenance: "current" }));
+    // TRANS06: the scene is rebound and the draft dropped, but `applied` is kept. It is
+    // the record of what was accepted — including the translations and their provenance —
+    // and `appliedForFamily` still refuses to submit it for the new family. Dropping it
+    // used to erase the inclusion panel and re-record the next apply without `remainder`.
+    setBuilder((old) => withReboundFamily(old, changeSceneFamily(old.scene, family, DICTIONARY, DICTIONARY_VERSION)));
     return true;
   }
 
@@ -218,7 +230,7 @@ function App() {
       batch_count: settings.batchCount, preset: settings.preset,
     };
     const applied = appliedForFamily(builder, activeModel?.family ?? "", compositionSupported);
-    if (applied && compositionSupported) body.prompt_composition = applied;
+    if (applied && compositionSupported) body.prompt_composition = v1OnlyWhenUnsupported(applied, remainderSupported);
     if (cfgEditable) body.cfg_scale = settings.cfgScale;
     if (negativeEnabled && settings.negativePrompt) body.negative_prompt = settings.negativePrompt;
     if (editable(samplingOption) && settings.samplingMethod) body.sampling_method = settings.samplingMethod;
@@ -226,6 +238,14 @@ function App() {
     return body;
   }
   const submissionIssues = validateSubmission(buildRequest(), activeModel?.family ?? "", maxBodyBytes);
+  /**
+   * TRANS05: the accepted translations go to a v2 server only. When the snapshot on
+   * screen is v2 but the server advertises v1, the body is sent as v1 and the
+   * translations are dropped — say so, because the difference is invisible otherwise
+   * and the record would not match what the user built.
+   */
+  const remainderDowngraded = !remainderSupported
+    && appliedForFamily(builder, activeModel?.family ?? "", compositionSupported)?.schema_version === 2;
   const promptIssues = submissionIssues.filter((issue) => issue.field === "prompt");
   const negativeIssues = submissionIssues.filter((issue) => issue.field === "negative_prompt");
   const otherIssues = submissionIssues.filter((issue) => !["prompt", "negative_prompt"].includes(issue.field));
@@ -270,7 +290,15 @@ function App() {
     if (settings.prompt && settings.prompt !== item.prompt && !window.confirm("현재 최종 프롬프트를 선택한 결과의 프롬프트로 바꿉니다. 계속할까요?")) return;
     const model = models.find((entry) => entry.model_id === item.model_id);
     if (model && !changeBuilderFamily(model.family)) return;
-    setBuilder(item.prompt_composition ? restoreComposition(item.prompt_composition) : initialBuilderState);
+    // TRANS06: both branches start a new composition session (the inclusion list is keyed
+    // by epoch), and both carry the epoch forward so it never repeats. A generation with a
+    // recorded composition restores it — v2 supplies its own translations; v1 supplies
+    // none and is never upgraded here. A generation without one is an explicit restart.
+    // The read is from `builder`, whose epoch is the newest value even though the family
+    // rebind above is still pending in the queue.
+    setBuilder((old) => item.prompt_composition
+      ? restoreComposition(item.prompt_composition, old.compositionEpoch)
+      : restartBuilder(old));
     setSettings({ modelId: item.model_id, prompt: item.prompt, negativePrompt: item.negative_prompt,
       preset: item.preset, resolution: `${item.width}x${item.height}`, steps: item.steps,
       cfgScale: item.cfg_scale, samplingMethod: item.sampling_method ?? null,
@@ -327,7 +355,8 @@ function App() {
             <option value="">모델 선택</option>{models.map((model) => <option key={model.model_id} value={model.model_id} disabled={!model.execution_enabled}>{model.display_name}{model.execution_enabled ? "" : " · 사용 불가"}</option>)}
           </select></label>
           {!compositionSupported && <p className="prompt-notice" data-tone="caution">서버가 구성 이력 저장을 지원하지 않거나 확인할 수 없습니다. 최종 프롬프트만 저장됩니다.</p>}
-          <PromptBuilder compositionSupported={compositionSupported} family={activeModel?.family ?? ""} value={settings.prompt}
+          {remainderDowngraded && <p className="prompt-notice" data-tone="caution">서버가 번역 기록(v2)을 지원하지 않아 이번 저장에는 포함한 번역이 빠집니다. 최종 프롬프트에는 그대로 남습니다.</p>}
+          <PromptBuilder compositionSupported={compositionSupported} remainderSupported={remainderSupported} family={activeModel?.family ?? ""} value={settings.prompt}
             onChange={(prompt) => { setPromptDirty(true); setSettings((old) => ({ ...old, prompt })); }}
             state={builder} setState={setBuilder}
             proposalCapability={proposalCapability}

@@ -61,7 +61,7 @@ function score(phrase: string, isLabel: boolean, available: boolean): number {
 }
 
 /** Every phrase one entry authorises, longest-form attribution kept separate. */
-function phrasesOf(entry: DictionaryEntry): { phrase: string; isLabel: boolean }[] {
+export function phrasesOf(entry: DictionaryEntry): { phrase: string; isLabel: boolean }[] {
   return [
     { phrase: entry.labelKo, isLabel: true },
     ...entry.aliases.map((phrase) => ({ phrase, isLabel: phrase === entry.labelKo })),

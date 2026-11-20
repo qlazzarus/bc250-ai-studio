@@ -60,8 +60,9 @@ Prompt Composer의 [현재 구현](docs/PROMPT_COMPOSER_CURRENT.md), [남은 작
 - [실행·서버 조사·배포·복구](docs/DEPLOYMENT.md)
 - [단계별 구현 범위](docs/ROADMAP.md)
 - [사전 프롬프트 현재 구현과 다음 개선 순서](docs/PROMPT_COMPOSER_CURRENT.md)
-- [Prompt Composer 남은 작업 추적과 활성 항목 코드 대조 보고](docs/PROMPT_COMPOSER_EXECUTION_TASKS.md)
+- [Prompt Composer 앞으로 실행할 태스크와 완료 원장](docs/PROMPT_COMPOSER_EXECUTION_TASKS.md) — 완료된 태스크의 상세 명세는 `docs/archive/prompt-composer/2026-11-18/`에 있다.
 - [Prompt Composer LLM 자동화 제안 설계 (A5/A7 결정론 선행 구현 포함)](docs/PROMPT_COMPOSER_LLM_AUTOMATION.md)
+- [TRANS01 계약 결정: 사전 밖 잔여 구절의 번역 제안 필드·한도·재현성 기록](docs/PROMPT_COMPOSER_TRANS01_CONTRACT.md) — 채택되어 schema v2(TRANS03–05)로 구현됨.
 - [프롬프트 구성·포즈 생성 모드 발전 계획](docs/GENERATION_MODES_DESIGN.md)
 - [프롬프트 구성 작업 계획과 1.2.0 고도화·배포 점검 기록](docs/PROMPT_COMPOSER_EXECUTION_TASKS.md)
 - [테스트 결과와 한계](docs/TESTING.md)

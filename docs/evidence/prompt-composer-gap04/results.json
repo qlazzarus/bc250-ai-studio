@@ -2,7 +2,7 @@
   {
     "name": "환경",
     "pass": null,
-    "detail": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36 · 1280x900"
+    "detail": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0 · 1280x900"
   },
   {
     "name": "UX01 · 설명 → 요약 → 세부 조정 → 초안 순서",
@@ -358,12 +358,12 @@
   {
     "name": "키보드 Tab 순회",
     "pass": null,
-    "detail": "[{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"저장 범위 안내\"},{\"tag\":\"TEXTAREA\",\"id\":\"free-text-ko\",\"className\":null,\"label\":null,\"text\":\"비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"29/4000자\"},{\"tag\":\"BUTTON\",\"id\":null,\"className\":\"quiet\",\"label\":null,\"text\":\"일상\"}]"
+    "detail": "[{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"저장 범위 안내\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"자세히\"},{\"tag\":\"TEXTAREA\",\"id\":\"free-text-ko\",\"className\":null,\"label\":null,\"text\":\"비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"29/4000자\"}]"
   },
   {
     "name": "키보드 Shift+Tab 순회",
     "pass": null,
-    "detail": "[{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"29/4000자\"},{\"tag\":\"TEXTAREA\",\"id\":\"free-text-ko\",\"className\":null,\"label\":null,\"text\":\"비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"저장 범위 안내\"},{\"tag\":\"BUTTON\",\"id\":null,\"className\":\"quiet\",\"label\":null,\"text\":\"프롬프트 구성 닫기\"}]"
+    "detail": "[{\"tag\":\"TEXTAREA\",\"id\":\"free-text-ko\",\"className\":null,\"label\":null,\"text\":\"비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"자세히\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"저장 범위 안내\"},{\"tag\":\"BUTTON\",\"id\":null,\"className\":\"quiet\",\"label\":null,\"text\":\"프롬프트 구성 닫기\"}]"
   },
   {
     "name": "키보드 · 설명 입력이 첫 입력",
@@ -380,8 +380,8 @@
   {
     "name": "키보드 · 역순 정확히 일치",
     "pass": true,
-    "expected": "[\"SUMMARY::29/4000자\",\"TEXTAREA:free-text-ko:비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\",\"SUMMARY::저장 범위 안내\",\"BUTTON::프롬프트 구성 닫기\"]",
-    "actual": "\"[\\\"SUMMARY::29/4000자\\\",\\\"TEXTAREA:free-text-ko:비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\\\",\\\"SUMMARY::저장 범위 안내\\\",\\\"BUTTON::프롬프트 구성 닫기\\\"]\""
+    "expected": "[\"TEXTAREA:free-text-ko:비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\",\"SUMMARY::자세히\",\"SUMMARY::저장 범위 안내\",\"BUTTON::프롬프트 구성 닫기\"]",
+    "actual": "\"[\\\"TEXTAREA:free-text-ko:비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\\\",\\\"SUMMARY::자세히\\\",\\\"SUMMARY::저장 범위 안내\\\",\\\"BUTTON::프롬프트 구성 닫기\\\"]\""
   },
   {
     "name": "키보드 · Enter로 세부 조정 열기",
@@ -665,7 +665,7 @@
   {
     "name": "같은 계열 전환",
     "pass": null,
-    "detail": "{\"before\":null,\"chips\":2,\"maybeCleared\":false}"
+    "detail": "{\"before\":\"과거 복원 · 적용 정보 기록 없음\",\"chips\":2,\"maybeCleared\":false}"
   },
   {
     "name": "재시도 준비",
@@ -705,7 +705,7 @@
   {
     "name": "재시도 결과",
     "pass": null,
-    "detail": "{\"job_id\":\"708347db5a7d45dd94920990e9d3a979\",\"prompt\":\"retry probe\",\"model_id\":\"fake-sd15\",\"status\":\"running\"}"
+    "detail": "{\"job_id\":\"c5a3c63de83948b6b936d66666bea431\",\"prompt\":\"retry probe\",\"model_id\":\"fake-sd15\",\"status\":\"running\"}"
   },
   {
     "name": "capability 실패 · 안내 표시",
@@ -1573,5 +1573,205 @@
     "name": "VAR02 되돌리기 차단",
     "pass": null,
     "detail": "{\"cards\":0,\"undo\":\"상황 되돌리기 사용 불가\",\"disabled\":true,\"hint\":\"상황을 적용한 뒤 선택이나 원문이 바뀌어 되돌릴 수 없습니다. 필요한 항목만 직접 해제하세요. 지금 선택은 덮어쓰지 않습니다.\",\"chips\":[\"인물\",\"흰 셔츠\",\"걷기\",\"공원\"]}"
+  },
+  {
+    "name": "TRANS06 capability",
+    "pass": null,
+    "detail": "{\"server\":{\"composition\":{\"schema_versions\":[1,2]},\"proposals\":null},\"viaFetch\":{\"composition\":{\"schema_versions\":[1,2]},\"proposals\":{\"schema_versions\":[1],\"dictionary_version\":\"1.2.0\",\"timeout_ms\":20000,\"max_response_bytes\":16384}},\"translateButton\":true,\"panel\":true}"
+  },
+  {
+    "name": "TRANS06 · 번역 요청 버튼 이름",
+    "pass": true,
+    "expected": "사전에 없는 구절 번역 제안",
+    "actual": "\"사전에 없는 구절 번역 제안\""
+  },
+  {
+    "name": "TRANS06 · 원문 없으면 비활성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 원문을 쓰면 활성",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "TRANS06 · 카드가 원문과 제안 번역을 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 포함 개수 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 포함 직후 최종 프롬프트 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "TRANS06 · 적용 전 초안 존재",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 적용 후 상태",
+    "pass": true,
+    "expected": "적용됨",
+    "actual": "\"적용됨\""
+  },
+  {
+    "name": "TRANS06 · 최종 프롬프트가 초안 + 번역",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 계열 변경됨",
+    "pass": true,
+    "expected": "fake-flux2",
+    "actual": "\"fake-flux2\""
+  },
+  {
+    "name": "TRANS06 · 상태가 기록 유지를 밝힘",
+    "pass": true,
+    "expected": "모델 계열 변경 · 기록 유지",
+    "actual": "\"모델 계열 변경 · 기록 유지\""
+  },
+  {
+    "name": "TRANS06 · 포함한 번역 패널 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 번역과 원문이 그대로",
+    "pass": true,
+    "expected": "[\"비치는 골목에 선 → a street lit by neon\"]",
+    "actual": "\"[\\\"비치는 골목에 선 → a street lit by neon\\\"]\""
+  },
+  {
+    "name": "TRANS06 · 안내가 다시 적용을 설명",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 다른 계열 초안은 폐기",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "TRANS06 · 최종 프롬프트 불변",
+    "pass": true,
+    "expected": "a person\na street lit by neon",
+    "actual": "\"a person\\na street lit by neon\""
+  },
+  {
+    "name": "TRANS06 계열 변경",
+    "pass": null,
+    "detail": "{\"model\":\"fake-flux2\",\"status\":\"모델 계열 변경 · 기록 유지\",\"detail\":\"자세히모델 계열을 바꿔 이 구성은 지금 계열로 저장되지 않습니다. 포함한 번역과 출처는 패널에 그대로 남고, 지금 계열에서 다시 적용하면 같은 번역으로 새로 기록됩니다.이 기록은 포함한 번역의 출처를 잃지 않기 위해 유지됩니다. 지금 계열로 저장되는 구성은 아래 \\\"적용\\\"으로 다시 기록하는 것입니다.\",\"panel\":\"포함한 번역 1개비치는 골목에 선 → a street lit by neon빼기\",\"panelItems\":[\"비치는 골목에 선 → a street lit by neon\"],\"finalPrompt\":29,\"hasDraft\":false}"
+  },
+  {
+    "name": "TRANS06 · 새 계열에서 초안 만들기 제공",
+    "pass": true,
+    "expected": "초안 만들기",
+    "actual": "\"초안 만들기\""
+  },
+  {
+    "name": "TRANS06 · 새 계열에서 적용 가능",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "TRANS06 · 재적용 후 상태",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 재적용도 번역을 포함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 재적용 후에도 목록 유지",
+    "pass": true,
+    "expected": "[\"비치는 골목에 선 → a street lit by neon\"]",
+    "actual": "\"[\\\"비치는 골목에 선 → a street lit by neon\\\"]\""
+  },
+  {
+    "name": "TRANS06 재적용",
+    "pass": null,
+    "detail": "{\"status\":\"적용됨\",\"draft\":8,\"finalPrompt\":29,\"panelItems\":[\"비치는 골목에 선 → a street lit by neon\"]}"
+  },
+  {
+    "name": "TRANS06 · 요청에 구성 이력 포함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 재적용은 v2로 기록",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "TRANS06 · 구성 계열은 새 계열",
+    "pass": true,
+    "expected": "flux2",
+    "actual": "\"flux2\""
+  },
+  {
+    "name": "TRANS06 · remainder 항목 1개",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "TRANS06 · 원문/번역 보존",
+    "pass": true,
+    "expected": "비치는 골목에 선|a street lit by neon",
+    "actual": "\"비치는 골목에 선|a street lit by neon\""
+  },
+  {
+    "name": "TRANS06 · 출처 보존",
+    "pass": true,
+    "expected": "prop-browser|stub",
+    "actual": "\"prop-browser|stub\""
+  },
+  {
+    "name": "TRANS06 · 수락 시각 기록",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · draft_prompt는 초안 그대로",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 최종 prompt는 번역 포함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 제출 본문",
+    "pass": null,
+    "detail": "{\"schema\":2,\"family\":\"flux2\",\"remainder\":1,\"entry\":{\"source_ko\":\"비치는 골목에 선\",\"suggested_en\":\"a street lit by neon\",\"proposal_id\":\"prop-browser\",\"proposal_model\":\"stub\",\"accepted_at\":\"2026-11-19T11:46:54Z\"}}"
   }
 ]

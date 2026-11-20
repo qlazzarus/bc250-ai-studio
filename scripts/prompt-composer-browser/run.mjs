@@ -75,7 +75,7 @@ const main = async () => {
   }
   await browser.send("Browser.close").catch(() => {});
   chrome.kill();
-  if (!process.env.CHROME_PROFILE) rmSync(PROFILE, { recursive: true, force: true });
+  if (!process.env.CHROME_PROFILE) rmSync(PROFILE, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   const failed = results.filter((item) => item.pass === false).length;
   const resultFile = process.env.RESULT_FILE || join(SHOTS, "results.json");
   mkdirSync(dirname(resultFile), { recursive: true });

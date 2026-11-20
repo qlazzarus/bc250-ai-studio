@@ -4,6 +4,7 @@
 import { runMessages } from "./suite-messages.mjs";
 import { runKeyboard } from "./suite-keyboard.mjs";
 import { runContracts } from "./suite-contracts.mjs";
+import { runTrans06 } from "./suite-trans06.mjs";
 import { adjustOpen, closeAdjust, openAdjust, pickEntry, stageOrder, waitAdjustOpen, waitSearchFocus } from "./ui.mjs";
 
 export async function runSuite({ page, browser, sessionId, check, record, sleep, shots }) {
@@ -173,4 +174,6 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
     pick: (category, index = 0) => pickEntry(page, category, index) });
   await runKeyboard({ page, check, record, sleep, shots });
   await runContracts({ page, check, record, sleep, shots });
+  // TRANS06 runs last: it reloads the page so it owns the builder state it asserts on.
+  await runTrans06({ page, check, record, sleep, shots });
 }

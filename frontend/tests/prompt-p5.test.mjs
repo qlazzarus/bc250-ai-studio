@@ -34,7 +34,7 @@ test('normalized JSON UTF-8 bytes match Python including default IDs and escapes
     const c = snapshot();
     c.free_text_ko = raw;
     c.unresolved = [{ kind: 'free_text', text: raw }];
-    const actual = Number(execFileSync(python, ['-c', 'import json,sys; from app.models.schemas import PromptComposition; c=PromptComposition.model_validate(json.load(sys.stdin)); print(len(json.dumps(c.model_dump(),ensure_ascii=False,separators=(",",":")).encode("utf-8")))'],
+    const actual = Number(execFileSync(python, ['-c', 'import json,sys; from pydantic import TypeAdapter; from app.models.schemas import PromptComposition; c=TypeAdapter(PromptComposition).validate_python(json.load(sys.stdin)); print(len(json.dumps(c.model_dump(),ensure_ascii=False,separators=(",",":")).encode("utf-8")))'],
       { input: JSON.stringify(c), env: { ...process.env, PYTHONPATH: root + 'backend' }, encoding: 'utf8' }));
     assert.equal(compositionBytes(c), actual);
   }

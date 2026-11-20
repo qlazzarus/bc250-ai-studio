@@ -26,6 +26,7 @@ from app.api.routes import authenticate, state
 from app.services.prompt_dictionary import ProposalDictionary, cached
 from app.services.prompt_proposals import (
     MAX_RESPONSE_BYTES,
+    REMAINDER_KIND,
     VARIANT_KIND,
     ProposalRequest,
     ValidatedProposal,
@@ -38,8 +39,10 @@ from app.services.proposal_provider import (
     proposals_advertised,
 )
 
-# C01-2 lists v1 kinds; VAR01 adds the third one. Anything else is unsupported_v1.
-SUPPORTED_KINDS = frozenset({"selection_hint", "partial_change", VARIANT_KIND})
+# C01-2 lists v1 kinds; VAR01 adds the third one and TRANS03 the fourth. Anything
+# else is unsupported_v1.
+SUPPORTED_KINDS = frozenset({"selection_hint", "partial_change", VARIANT_KIND,
+                             REMAINDER_KIND})
 
 router = APIRouter(prefix="/api/v1/prompt", dependencies=[Depends(authenticate)])
 
@@ -128,6 +131,11 @@ def unavailable(failure: Failure, detail: str | None = None, *, latency_ms: int 
         # VAR01 keeps one reply shape per kind: an empty candidate list, never a
         # missing key, so the card area can clear itself without guessing.
         body["variants"] = []
+    if kind == REMAINDER_KIND:
+        # TRANS03 does the same for translations. Unlike `variants`, the key is
+        # always present for this kind: the browser's "번역 제안" area must be able to
+        # distinguish "no translations" from "this kind is unsupported".
+        body["translations"] = []
     if proposal is not None:
         # C01-3 keeps the diagnostic spans the validator did establish, so the user
         # still sees what was not understood, while suggestions stay empty.
@@ -179,6 +187,14 @@ def serialize(proposal: ValidatedProposal, *, request: ProposalRequest) -> dict:
             }
             for item in proposal.variants
         ]} if request.kind == VARIANT_KIND else {}),
+        # TRANS03: same rule for translations.
+        **({"translations": [
+            {
+                "source_ko": item.source_ko, "suggested_en": item.suggested_en,
+                "confidence": item.confidence,
+            }
+            for item in proposal.translations
+        ]} if request.kind == REMAINDER_KIND else {}),
         "unresolved_spans": [dict(span) for span in proposal.unresolved_spans],
         "ambiguities": [dict(item) for item in proposal.ambiguities],
         "rejected": [dict(item) for item in proposal.rejected],

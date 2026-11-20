@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from typing import Literal, Mapping
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 # C01-5 limits. Keep in sync with the documented contract, not with the dictionary.
 # What the UI may receive at most (bytes, items, characters).
@@ -98,10 +98,27 @@ def groups_in_use(entries: "Mapping[str, DictionaryEntryRef]") -> frozenset[str]
     """
     return frozenset(display_group(ref.category) for ref in entries.values() if ref.active)
 
-ProposalKind = Literal["selection_hint", "partial_change", "situation_variants"]
+ProposalKind = Literal["selection_hint", "partial_change", "situation_variants",
+                       "remainder_translation"]
 # VAR01: the third kind. Kept as a name too, because both the validator and the
 # endpoint branch on it and a bare string literal in three places drifts.
 VARIANT_KIND = "situation_variants"
+# TRANS03: translate phrases the dictionary cannot express. It is the only kind that
+# answers with no dictionary ID at all, so ``validate_reply`` routes it separately:
+# every other kind is judged against the dictionary, this one must not be.
+REMAINDER_KIND = "remainder_translation"
+# TRANS03: how many phrases one reply may describe. Same number as ``MAX_UNRESOLVED``
+# because that is how many uncovered phrases ``extractRemainder`` can return, and the
+# composition field uses the same cap. Offsets, not text, cross the wire (§3.2 of the
+# contract): a 200-character Korean phrase is 611.9 B, an offset pair is 27.5 B.
+MAX_REMAINDER_SPANS = 8
+# The slice a span names is bounded by the phrase cap. A span longer than this is not
+# a phrase, so it is a client contract error rather than something to translate.
+MAX_REMAINDER_CHARS = MAX_UNRESOLVED_CHARS
+# A span must be at least this long to be a phrase worth translating. Mirrors
+# `MIN_REMAINDER` in ``frontend/src/prompt/remainder.ts``: a 1-character "phrase" is a
+# particle remnant (`이`, `를`), and translating it would produce noise.
+MIN_REMAINDER_CHARS = 2
 ProposalStatus = Literal["ready", "empty", "unavailable", "unsupported_v1"]
 Polarity = Literal["affirmed", "negated"]
 SpanWhy = Literal["no_dictionary_entry", "negated", "negation_unsupported",
@@ -167,6 +184,26 @@ class ProposalLimits(BaseModel):
     max_unresolved: int = Field(default=MAX_UNRESOLVED, ge=1, le=MAX_UNRESOLVED)
 
 
+class RemainderSpan(BaseModel):
+    """One phrase the browser wants translated, named by **code-point** offsets.
+
+    TRANS01 §3.2: offsets, not text, cross the wire — ``free_text_ko`` is already in
+    the body, so re-sending the phrase would cost 33× more per phrase and the 8 KiB
+    request cap has no room for it.
+
+    ``start`` is inclusive, ``end`` exclusive, in *Python* string indices, which is
+    what ``free_text_ko[start:end]`` uses. The browser's own offsets are UTF-16 code
+    units (``String#indexOf``), so the client converts before sending
+    (``toCodePointSpan`` in ``frontend/src/prompt/remainder.ts``); for a phrase after
+    an emoji those two coordinate systems differ, and a raw UTF-16 offset would slice
+    the wrong text without raising anything.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+
+
 class ProposalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: ProposalKind
@@ -179,6 +216,56 @@ class ProposalRequest(BaseModel):
     target_groups: list[str] = Field(default_factory=list, max_length=10)
     revisions: ProposalRevisions
     limits: ProposalLimits = Field(default_factory=ProposalLimits)
+    # TRANS03: present only for ``remainder_translation``. Omitted for every other
+    # kind so those requests stay byte-identical to the shapes C01/I06/VAR01 fixed.
+    remainder_spans: list[RemainderSpan] = Field(default_factory=list,
+                                                 max_length=MAX_REMAINDER_SPANS)
+
+    @model_validator(mode="after")
+    def validate_remainder_spans(self):
+        kind = self.kind
+        if kind != REMAINDER_KIND:
+            # A span on a dictionary kind would be silently ignored, and "ignored"
+            # reads to the caller as "translated". Refuse instead.
+            if self.remainder_spans:
+                raise ValueError("remainder_spans is only valid for remainder_translation")
+            return self
+        if not self.remainder_spans:
+            # Nothing to translate: an empty request would spend a GPU call to answer
+            # `empty`, so it is a contract error.
+            raise ValueError("remainder_translation requires at least one span")
+        if self.selections:
+            # A translation does not depend on the dictionary, so a selection cannot
+            # influence the answer; sending one only spends the 8 KiB request budget.
+            raise ValueError("remainder_translation does not accept selections")
+        source = self.free_text_ko
+        seen: set[tuple[int, int]] = set()
+        for span in self.remainder_spans:
+            key = (span.start, span.end)
+            if key in seen:
+                # Twice the same phrase is one phrase; a duplicate would produce two
+                # cards the user cannot tell apart.
+                raise ValueError("Duplicate remainder span")
+            seen.add(key)
+            if span.end > len(source):
+                raise ValueError("Remainder span is outside free_text_ko")
+            if span.end - span.start < MIN_REMAINDER_CHARS:
+                raise ValueError("Remainder span is shorter than 2 characters")
+            if span.end - span.start > MAX_REMAINDER_CHARS:
+                raise ValueError("Remainder span exceeds 200 characters")
+            if not source[span.start:span.end].strip():
+                raise ValueError("Remainder span is blank")
+        return self
+
+    def remainder_phrases(self) -> tuple[str, ...]:
+        """The phrases named by ``remainder_spans``, sliced server-side.
+
+        The caller never sends the text, so this is the only place the phrase exists
+        before it reaches the prompt. Order follows ``remainder_spans``, which is the
+        order the browser showed the phrases in.
+        """
+        return tuple(self.free_text_ko[span.start:span.end]
+                     for span in self.remainder_spans)
 
 
 class RawSuggestion(BaseModel):
@@ -226,6 +313,23 @@ class RawVariant(BaseModel):
     actor: str | None = Field(default=None, max_length=100)
 
 
+class RawTranslation(BaseModel):
+    """TRANS03: one English rendering of one phrase the dictionary cannot express.
+
+    The item echoes ``source_ko`` verbatim so the server can prove it sliced the
+    phrase it was asked about, instead of trusting an index into a list the model
+    may have reordered, merged or dropped. ``suggested_en`` is the only new text
+    the model is allowed to produce: it must never invent a dictionary ID here
+    (that is what ``selection_hint`` is for), and it must never rewrite the Korean.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    source_ko: str = Field(min_length=1, max_length=MAX_REMAINDER_CHARS)
+    suggested_en: str = Field(min_length=1, max_length=MAX_REMAINDER_CHARS)
+    # Display-only, like every other proposal confidence: never persisted (TRANS01 §4.3).
+    confidence: float = Field(default=0.0, ge=0, le=1, allow_inf_nan=False)
+
+
 class ProposalProvider(BaseModel):
     model_config = ConfigDict(extra="forbid")
     model: str = Field(min_length=1, max_length=200)
@@ -252,6 +356,9 @@ class ProposalResponse(BaseModel):
     # VAR01: present only for ``kind: "situation_variants"``. Omitted-when-empty keeps
     # the two older kinds byte-identical to the reply C01/I06 already fixed.
     variants: list[RawVariant] = Field(default_factory=list, max_length=HARD_MAX_ITEMS)
+    # TRANS03: present only for ``kind: "remainder_translation"``, same reason.
+    translations: list[RawTranslation] = Field(default_factory=list,
+                                              max_length=HARD_MAX_ITEMS)
     rejected: list[dict] = Field(default_factory=list, max_length=HARD_MAX_ITEMS)
     truncated: bool = False
 
@@ -281,6 +388,20 @@ class AcceptedVariant:
 
 
 @dataclass(frozen=True)
+class AcceptedTranslation:
+    """TRANS03: one phrase/translation pair the UI may offer for explicit inclusion.
+
+    It is not a suggestion and not a selection: nothing here becomes a dictionary ID,
+    and ``free_text_ko`` is never rewritten (TRANS04 forbids both). The browser turns
+    an accepted item into a ``CompositionRemainder`` at ``applyDraft`` time.
+    """
+
+    source_ko: str
+    suggested_en: str
+    confidence: float
+
+
+@dataclass(frozen=True)
 class ValidatedProposal:
     status: ProposalStatus
     why: str | None
@@ -293,6 +414,9 @@ class ValidatedProposal:
     # are *never* suggestions: a variant is a Korean sentence for the user to read,
     # not a dictionary ID to accept (C01-6 #1).
     variants: tuple[AcceptedVariant, ...] = ()
+    # TRANS03: same rule for translations — Korean phrase in, English phrase out,
+    # no dictionary ID anywhere.
+    translations: tuple[AcceptedTranslation, ...] = ()
     # C01-3 response metadata, copied from the accepted reply so the endpoint can
     # echo it without re-parsing. ``None`` when the reply was never accepted.
     proposal_id: str | None = None
@@ -474,6 +598,49 @@ def validate_variants(
     return kept, rejected, ambiguities, len(accepted) > len(kept)
 
 
+def validate_translations(
+    response: ProposalResponse,
+    *,
+    request: ProposalRequest,
+) -> tuple[tuple[AcceptedTranslation, ...], list[dict], bool]:
+    """TRANS03 decision table for ``remainder_translation``.
+
+    Two things are checked here that the schema cannot check:
+
+    * **The phrase must be one the caller asked about.** ``source_ko`` is matched
+      against the server's own slice of ``free_text_ko``, so a model that paraphrases
+      the Korean, merges two phrases into one, or answers about a different span is
+      rejected instead of silently producing a card that no longer corresponds to the
+      text the user pointed at. This is the same discipline as ``matched_phrase in
+      request.free_text_ko`` for suggestions (C01-4 ``quote``).
+    * **The translation must not be the Korean phrase again.** A model that echoes its
+      input would otherwise create a card whose "translation" is the original, which
+      would look like a successful translation and change nothing.
+
+    Returns the accepted pairs, the ``rejected`` rows and whether anything was cut.
+    """
+    expected = request.remainder_phrases()
+    remaining = list(expected)
+    rejected: list[dict] = []
+    accepted: list[AcceptedTranslation] = []
+    for item in response.translations:
+        if item.source_ko not in remaining:
+            # Covers three cases at once: a phrase that was never sent, a phrase
+            # already answered (duplicate), and a paraphrase of a sent phrase.
+            rejected.append({"raw_id": item.source_ko, "why": "unrequested_phrase"})
+            continue
+        remaining.remove(item.source_ko)
+        if item.suggested_en.strip() == item.source_ko.strip():
+            rejected.append({"raw_id": item.source_ko, "why": "untranslated"})
+            continue
+        accepted.append(AcceptedTranslation(
+            source_ko=item.source_ko, suggested_en=item.suggested_en,
+            confidence=item.confidence,
+        ))
+    kept = tuple(accepted[:MAX_REMAINDER_SPANS])
+    return kept, rejected, len(accepted) > len(kept) or bool(remaining)
+
+
 def validate_reply(
     response: ProposalResponse,
     *,
@@ -561,6 +728,17 @@ def validate_reply(
         ambiguities = variant_ambiguities + ambiguities
     elif response.variants:
         rejected = [{"raw_id": item.variant_id, "why": "unexpected_kind"} for item in response.variants] + rejected
+    # TRANS03: translations follow the same one-shape-per-kind rule as candidates.
+    translations: tuple[AcceptedTranslation, ...] = ()
+    translations_cut = False
+    if request.kind == REMAINDER_KIND:
+        translations, translation_rejected, translations_cut = validate_translations(
+            response, request=request
+        )
+        rejected = translation_rejected + rejected
+    elif response.translations:
+        rejected = ([{"raw_id": item.source_ko, "why": "unexpected_kind"}
+                     for item in response.translations] + rejected)
     kept_ambiguities = ambiguities[:MAX_AMBIGUITIES]
     kept_rejected = rejected[:MAX_REJECTED]
     overflowed = (
@@ -569,6 +747,7 @@ def validate_reply(
         or len(ambiguities) > len(kept_ambiguities)
         or len(rejected) > len(kept_rejected)
         or variants_cut
+        or translations_cut
     )
     truncated = response.truncated or overflowed
 
@@ -583,13 +762,16 @@ def validate_reply(
     # VAR01: candidates are the answer for their own kind, so "has variants" counts
     # towards `ready`. A reply with neither hints nor candidates is still `empty`,
     # which is what the UI must show instead of an empty card area.
-    answered = bool(suggestions or variants)
+    # TRANS03 extends the same rule to translations: for `remainder_translation`
+    # `suggestions` is empty by construction, so without this the answer would be
+    # `empty` and the cards would be dropped.
+    answered = bool(suggestions or variants or translations)
     return ValidatedProposal(
         status="ready" if answered else "empty", why=None, suggestions=suggestions,
         unresolved_spans=spans, ambiguities=tuple(kept_ambiguities),
         rejected=tuple(kept_rejected), truncated=truncated,
         proposal_id=response.proposal_id, provider=response.provider,
-        variants=variants,
+        variants=variants, translations=translations,
     )
 
 
@@ -655,6 +837,7 @@ def fit_budget(
     """
     suggestions = list(result.suggestions)
     variants = list(result.variants)
+    translations = list(result.translations)
     spans = list(result.unresolved_spans)
     ambiguities = list(result.ambiguities)
     rejected = list(result.rejected)[:MAX_REJECTED]
@@ -677,12 +860,20 @@ def fit_budget(
             for item in variants
         ]
 
+    def translation_items():
+        return [
+            {"source_ko": item.source_ko, "suggested_en": item.suggested_en,
+             "confidence": item.confidence}
+            for item in translations
+        ]
+
     def fits() -> bool:
         candidate = ProposalResponse(
             **{
                 **response.model_dump(mode="python"),
                 "suggestions": candidate_items(),
                 "variants": variant_items(),
+                "translations": translation_items(),
                 "unresolved_spans": spans,
                 "ambiguities": ambiguities,
                 "rejected": rejected,
@@ -697,6 +888,10 @@ def fit_budget(
             # VAR01: a candidate is the largest item, so 3 × 200 chars can never
             # be trimmed by spans alone. Dropping the tail keeps candidates 1..n-1.
             variants.pop()
+        elif translations:
+            # TRANS03: same reasoning — 8 × (200 Korean + 200 English) is the bulk of
+            # the reply, so the tail is dropped before any diagnostic span.
+            translations.pop()
         elif spans:
             spans.pop()
         elif ambiguities:
@@ -711,7 +906,7 @@ def fit_budget(
             )
         dropped = True
 
-    answered = bool(suggestions or variants)
+    answered = bool(suggestions or variants or translations)
     return ValidatedProposal(
         status=result.status if answered or result.status == "unavailable" else "empty",
         why=result.why,
@@ -719,5 +914,5 @@ def fit_budget(
         ambiguities=tuple(ambiguities), rejected=tuple(rejected),
         truncated=result.truncated or dropped,
         proposal_id=result.proposal_id, provider=result.provider,
-        variants=tuple(variants),
+        variants=tuple(variants), translations=tuple(translations),
     )

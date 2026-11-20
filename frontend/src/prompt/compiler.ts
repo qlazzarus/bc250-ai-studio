@@ -73,7 +73,7 @@ function order(selection: SelectionSnapshot): number {
 }
 
 /** Approximation only: CLIP-style word pieces are roughly this long. */
-function estimateTokens(text: string): number {
+export function estimateTokens(text: string): number {
   return Math.ceil(text.split(/[\s,;]+/).filter(Boolean).length * 1.3);
 }
 

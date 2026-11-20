@@ -1,21 +1,34 @@
 # 사전 프롬프트 단일 실행 태스크
 
-갱신일: 2026-11-18 · 기준 HEAD `b5efd2d` · **사전 프롬프트의 활성 상태·우선순위·완료 기준은 이 문서에서만 관리한다.** CURRENT는 구현 설명이고 P5/LLM 문서는 계약 참고자료다. 완료 작업은 [오늘의 archive](archive/prompt-composer/2026-11-18/README.md)로 이동했다.
+갱신일: 2026-11-19 · 기준 HEAD `16f3a34` · **사전 프롬프트의 활성 상태·우선순위·완료 기준은 이 문서에서만 관리한다.** CURRENT는 구현 설명이고 P5/LLM 문서는 계약 참고자료다.
 
-> 2026-11-18 LLM 경로 리뷰(§0): LIVE01/LIVE02/EVAL-UX02를 실제 응답으로 진행하기 전에 고쳐야 할 정합성 결함 5건과 계약 정리 2건을 LLM-R01–R07로 등록했다. **LIVE02 측정은 LLM-R01·R02·R03·R04·R05 이후에 한다.** 그 전에 측정하면 "모델이 틀렸다"와 "서버/요청이 틀렸다"를 구분할 수 없다. → **2026-11-18: R01–R07 구현·로컬 검증 완료. LIVE02의 선행 조건이 충족됐다.**
+**이 문서는 "앞으로 실행할 태스크"만 담는다.** 완료된 태스크의 상세 명세·계약·인계는 [2026-11-18 archive](archive/prompt-composer/2026-11-18/README.md)로 옮겼고, 아래 [완료 원장](#완료-원장)은 ID·날짜·보관 위치만 가리킨다. 완료 작업을 다시 수행하지 않으며, 원장의 링크가 유일한 근거다.
 
 ## 현재 판정과 다음 작업
 
-- UX01–UX05, VERIFY01/02, LLM-C01/C02, LLM-I01–I06, VAR01/02의 코드·로컬 시험 기록은 archive에 보존했다. 같은 구현을 재수행하지 않는다. 실제 LLM/GPU 운영 성공까지 완료라는 뜻은 아니다.
-- EVAL-UX01은 **규칙/fixture 기준선 작성만 완료**다. 사용자 시간·의견과 실제 LLM 평가가 빠져 있어 전체 평가 완료 주장을 철회하고 EVAL-UX02/U11로 추적한다.
-- **RULE01·RULE02·METRIC01은 구현·로컬 검증을 마쳤다**(아래 인계). 부정·다인 오탐 3건이 0건이 됐고, 규칙 제안 경로도 부분 변경 범위를 지키며, precision은 미분류를 분모에서 뺀 이름으로만 보고한다. 남은 갭은 활용형·별칭 누락(RULE03), 실제 LLM 미연결(LIVE01/02), 사전 밖 상황의 부분 반영 안내(VAR03)다.
-- **2026-11-18 리뷰 판정: 경계 설계는 유지, 그 경계를 통과하는 정보와 두 경로의 판정 일관성에 결함이 있다.** LLM이 사전 ID만 고르고 컴파일러가 문장을 만드는 3단 구조는 옳으므로 되돌리지 않는다. 다만 ① 서버 부정 가드가 규칙 경로보다 약해(`없다` 미탐지·절 경계 무시) RULE01이 제거한 오탐이 LLM 경로로 되살아나고, ② 모델에게 ID·카테고리만 주어 한국어 라벨/별칭 122개를 쓰지 못하며, ③ `partial_change`가 현재 선택을 보내지 않아 맞힐 수 없는 요청을 하고 있다. 이 셋은 LIVE02 측정의 전제조건이다.
-- **2026-11-18 갱신: LLM-R01–R07 구현·로컬 검증을 마쳤다**(각 태스크의 "구현 인계" 참조). 이제 LIVE02 측정의 전제조건 5건(R01–R05)이 충족됐다. 단 R04 실측에서 **대량 선택+긴 서술 조합은 8 KiB에서 로컬 거절**되는 잔여 위험이 확인됐다(요청 상한은 올리지 않음).
-- 다음 코드 작업 순서: **RULE03 → VAR03 → U12**. 계약 정리 LLM-R06/R07은 완료. 별도 조사: **LIVE01 → LIVE02 → EVAL-UX02**. LIVE02는 실행 환경이 있어야 가능하며 불가하다고 다른 작업을 막지 않는다.
+- **2026-11-18 완료**: LLM-R01–R07(LLM 경로 정합성), RULE01·RULE02(규칙 제안 오탐·범위), METRIC01(지표 분모) 구현·로컬 검증. 상세는 archive.
+- **다음 코드 작업 순서: TRANS01 → TRANS02 → TRANS03 → TRANS04 → TRANS05 → TRANS06 (모두 완료, §1).** 방향 3(사전 밖 잔여 구절의 번역 제안 필드)을 5개 태스크로 분해했고, TRANS01은 계약 결정, TRANS02–05는 순서대로 구현했다. TRANS03(schema v2 변경)은 TRANS01의 승인 뒤에 착수했다. TRANS06은 TRANS05가 남긴 회귀(모델 계열 변경 시 적용 기록 소실)를 U11 브라우저 확인에서 찾아 수정한 후속 태스크다.
+- **2026-11-19 진행**: TRANS02–TRANS06 구현·로컬 검증을 마쳤다(각 태스크의 인계 참조). schema v2는 TRANS01 결정문의 형태 그대로 채택됐다. TRANS06은 실제 브라우저(CDP, Edge)에서 255건/0실패로 확인했고, 계열 변경 회귀는 변이 검증으로 테스트가 실제로 잡는다는 것까지 확인했다. **여전히 미검증: 실제 LLM 응답의 번역 품질·GPU 품질**이며 LIVE02/EVAL-UX02 범위다. U11의 자동화 가능한 부분은 이제 TRANS06 검사로 덮였고, 남은 것은 화면을 사람이 읽고 판단하는 확인이다.
+- **TRANS01–TRANS05와 무관하게 남은 작업**: RULE03(대기) → VAR03(대기) → U12(대기). 순서는 TRANS 완료 후로 미룰 수 있으나, U12의 선행 조건에 TRANS 태스크가 포함되므로 U12 전에 정리한다.
+- **환경·사용자 대기**: LIVE01(대기) → LIVE02(환경 대기) → EVAL-UX02(대기), U11(사용자 확인 대기). LIVE02는 R01–R05 완료로 선행 조건이 충족됐고 실행 환경만 필요하다. 환경 부재가 다른 태스크를 막지 않는다.
+- Actions DEP와 플랫폼 PLATFORM은 공통 의존 작업으로 후속 표에 유지한다. 사전 프롬프트의 운영 완료로 합산하지 않는다.
 - U11은 사용자 의견 대기, U12는 필수 보완과 평가 범위 정리 후 종료한다. 캡처는 필수 아님. 실제 화면 관찰과 소스 기반 예상 묘사를 구분한다.
-- Actions DEP 및 플랫폼 PLATFORM은 공통 의존 작업으로 후속 표에 유지한다. 사전 프롬프트의 운영 완료로 합산하지 않는다.
 
-확정 계약 참조: [C01/C02와 VAR01 보관본](archive/prompt-composer/2026-11-18/PROMPT_COMPOSER_EXECUTION_TASKS.md). 현재 v1은 사전 ID만 선택으로 승격하고 번역/인물별 귀속/제안 이력 영속화는 지원하지 않는다. 큰 계약 변경은 DATA/SCENE 태스크에서 검토한다.
+확정 계약 참조: [C01/C02와 VAR01 보관본](archive/prompt-composer/2026-11-18/PROMPT_COMPOSER_EXECUTION_TASKS.md), [LLM 경로 리뷰와 R01–R07](archive/prompt-composer/2026-11-18/LLM_PATH_REVIEW_AND_R01_R07.md), [TRANS01 계약 결정문](PROMPT_COMPOSER_TRANS01_CONTRACT.md). v1은 사전 ID만 선택으로 승격한다. **2026-11-19부터 번역 제안은 v2 구성(`remainder`)으로 영속화되며, 인물별 귀속/제안 이력 일반 영속화는 여전히 지원하지 않는다.** 두 사실을 섞어 "제안 이력을 지원한다"고 넓혀 읽지 않는다.
+
+## 완료 원장
+
+완료 태스크의 상세는 archive에 있고 이 문서는 상태만 기록한다. archive는 과거 증거이므로 수정해서 현재 성공을 만들어내지 않는다.
+
+| ID | 완료일 | 보관 위치 |
+| --- | --- | --- |
+| LLM-R01–R07 | 2026-11-18 | [LLM_PATH_REVIEW_AND_R01_R07.md](archive/prompt-composer/2026-11-18/LLM_PATH_REVIEW_AND_R01_R07.md) |
+| RULE01, RULE02, METRIC01 | 2026-11-18 | [RULE01_RULE02_METRIC01.md](archive/prompt-composer/2026-11-18/RULE01_RULE02_METRIC01.md) |
+| 2026-11-18 검증 기록 | 2026-11-18 | [VERIFICATION_2026-11-18_R01_R07.md](archive/prompt-composer/2026-11-18/VERIFICATION_2026-11-18_R01_R07.md) |
+| UX01–UX05, VERIFY01/02, LLM-C01/C02, LLM-I01–I06, VAR01/02 | 2026-11-17 이전 | [2026-11-18 실행 명세](archive/prompt-composer/2026-11-18/PROMPT_COMPOSER_EXECUTION_TASKS.md), [2026-11-17](archive/prompt-composer/2026-11-17/README.md), [2026-11-16](archive/prompt-composer/2026-11-16/README.md) |
+| EVAL-UX01 (규칙/fixture 기준선만) | 2026-11-18 | [PROMPT_COMPOSER_EVAL_UX01.md](archive/prompt-composer/2026-11-18/PROMPT_COMPOSER_EVAL_UX01.md). 사용자 시간·실제 LLM 평가는 EVAL-UX02/U11로 승계 |
+
+**보관본을 인용할 때의 주의**: archive의 완료 표시는 당시 로컬 검증 범위다. LLM-R01–R07의 `L` 106건, `F` 133건, 전체 `backend/tests` 337 passed/96 skipped는 로컬 실행 결과이며 실제 모델 품질·운영 성공을 뜻하지 않는다.
 
 ## 공통 실행 지시문
 
@@ -43,11 +56,11 @@ Scene v1/API/저장 데이터/컴파일 출력 의미, 직접 생성, applied �
 
 | 코드 | 실행 | 용도 |
 | --- | --- | --- |
-| F | `node --experimental-strip-types --test frontend/tests/*.test.mjs` | 프론트 133건 기준(2026-11-18 R04·R07 반영). 데이터·컴파일러·P5·규칙 제안·매칭 helper·LLM 제안 상태 회귀. Python/Pydantic 교차 검증 의존성 필요 |
+| F | `node --experimental-strip-types --test frontend/tests/*.test.mjs` | 프론트 **184건**(2026-11-19 TRANS06 반영. TRANS02–05 기준은 177건, 2026-11-18 기준은 133건). 데이터·컴파일러·P5·규칙 제안·매칭 helper·LLM 제안 상태·잔여 구절·번역 포함·메타데이터 표시(SSR 렌더) 회귀. Python/Pydantic 교차 검증 의존성 필요 |
 | B | `npm --prefix frontend run build` 및 `npm --prefix frontend run lint` | TS·번들·정적 검사 |
 | S | `STUDIO_TEST_PYTHON=.venv/bin/python bash scripts/test-studio.sh` | Studio 131건 기준. 전체 저장소 pytest와 구분 |
 | P | `.venv/bin/python -m pytest backend/tests/test_prompt_composition.py backend/tests/test_coordination_capability.py -q` | 구성 저장과 capability 회귀 |
-| L | `.venv/bin/python -m pytest backend/tests/test_prompt_proposals.py backend/tests/test_proposal_provider.py backend/tests/test_proposal_api.py -q` | §0 태스크(LLM-R01–R07)의 계약·payload·validator 회귀. 2026-11-18 R01–R07 구현 후 **106건 통과** |
+| L | `.venv/bin/python -m pytest backend/tests/test_prompt_proposals.py backend/tests/test_proposal_provider.py backend/tests/test_proposal_api.py -q` | LLM 제안 계약·payload·validator 회귀. LLM-R01–R07 구현 후 **106건 통과**([보관본](archive/prompt-composer/2026-11-18/LLM_PATH_REVIEW_AND_R01_R07.md)) |
 | D | `git diff --check` | 변경 형식 검사 |
 
 기존 건수는 기준선이지 고정 성공 조건이 아니다. 실패 시 실패 이름·명령·환경·원인을 남긴다. 문서만 바꾼 태스크는 링크/명세 검증과 D로 충분하다. 코드 수정 시 해당 동작을 검증하는 테스트를 추가하되 JSX 문자열 검사나 구현 복사 테스트로 UI 검증을 대체하지 않는다.
@@ -65,187 +78,315 @@ ID / 상태 / 날짜 / 기준 HEAD:
 미완료·위험·다음 태스크가 알아야 할 사실:
 ```
 
-## 0. LLM 경로 구조 리뷰와 선행 정합성 태스크 (2026-11-18)
+## 1. 사전 밖 잔여 구절의 번역 제안 (TRANS, 방향 3)
 
-읽기 전용 리뷰 결과다. 제품 코드를 읽고 확인한 사실만 적었고, 모델 응답 품질은 여전히 미측정이다. **목적은 LIVE02에서 "모델이 틀렸다"와 "서버·요청이 틀렸다"를 구분할 수 있게 만드는 것**이다.
-
-### 확인된 파이프라인
+**문제**: 한국어 문장을 입력해도 사전 100개 항목에 걸리는 구절만 최종 프롬프트가 된다. 실측 사례(2026-11-18):
 
 ```text
-원문(한국어) ─┬─→ [규칙 경로·오프라인] proposals.ts + matching.ts → SelectionHint → 사용자가 수락
-              └─→ [LLM 경로·서버] POST /api/v1/prompt/proposals → provider → gate /v1/chat/completions
-                       → parse_reply → validate_reply → fit_budget → cards → 사용자가 수락
-최종 prompt = compileScene() 이 사전 mappings 에서만 조립 (compiler.ts:81)
+입력: "비 오는 밤, 편의점 앞에서 비를 맞으며 기다리는 30살 유럽 여성 금발. 네온 조명이 젖은 바닥에 반사된다"
+사전 커버: 의미 문자 42자 중 6자 (14.3%)  ← "금발", "네온 조명"
+미커버:    36자 (85.7%)  ← "비 오는 밤", "편의점", "기다리는 30살 유럽 여성", "젖은 바닥에 반사된다"
+결과 draft: "blonde hair, neon lighting"
 ```
 
-### 유지할 강점 (변경 금지)
+원인은 모델이 아니라 **사전**이다. `_dictionary_listing`은 active 항목만 보내고 `validate_reply`가 화이트리스트 밖 ID를 거부하므로, 어떤 모델도 사전에 없는 개념을 표현할 수 없다. 따라서 LLM 호출을 늘리는 것만으로는 이 문장이 해결되지 않는다.
 
-| 성질 | 근거 |
-| --- | --- |
-| LLM은 id만 고르고 문장은 컴파일러만 만든다 | `prompt_proposals.py:8`, `compiler.ts:81`. 모델이 문장을 창작할 경로 없음 |
-| 사전이 유일한 id 권위 | `_dictionary_listing`(`proposal_provider.py:126`)이 화이트리스트를 프롬프트에 넣고 `validate_reply`가 재검증 |
-| 2중 검증(서버+클라이언트) | `prompt_proposals.py:412-455` ↔ `proposalCards.ts:128-150`. 스텁·구버전 서버 방어 |
-| revision 지문으로 stale 차단 | `llmProposals.ts:160-171` |
-| 실패가 5xx가 아니라 200+문장 | `proposals.py:107-129` |
-| GPU 상태를 읽기만 함 | `proposal_provider.py:100-111` |
-| prefix 캐시 친화 payload | 고정부(system)·가변부(user) 분리 |
-| 사전 mirror drift 테스트 | `test_proposal_api.py:311-333` |
+**기존 원칙과의 관계**: 이 방향은 [LLM 자동화 문서](PROMPT_COMPOSER_LLM_AUTOMATION.md)의 원칙 2를 어기지 않는다.
 
-### 결함과 태스크 매핑
+> "**원문은 불변.** `free_text_ko`는 저장·표시 시 절대 변형하지 않는다. **LLM 번역/보강은 별도 필드의 제안으로만 존재한다.**"
 
-| # | 결함 | 실측 근거 | 태스크 | 상태 |
-| --- | --- | --- | --- | --- |
-| 1 | 서버 부정 가드가 규칙 경로보다 약함 | `_negated_in_source`는 `없다/없음/없는` 미탐지·절 경계 무시. `사람은 없다`→affirmed, `사람. 안경 없이 걷는다`→negated | **LLM-R01** | 완료 |
-| 2 | 카탈로그가 id+category만 보냄 | 라벨 100·별칭 122개가 모델에게 전달되지 않음. 실측 2,939B(id만) → 5,733B(라벨+별칭) | **LLM-R02** | 완료(5,717B) |
-| 3 | `partial_change`가 현재 선택을 안 보냄 | `build_payload`(`proposal_provider.py:196-243`)에서 `selections`는 variant 분기에만 존재 | **LLM-R03** | 완료 |
-| 4 | 요청 크기 단위 불일치 | 클라 4,000자(`llmProposals.ts:123,218`) vs 서버 8,192바이트(`proposals.py:199`). 실측 2,592자에서 8,194B | **LLM-R04** | 완료(잔여 위험 있음) |
-| 5 | `finish_reason`이 모델 자기신고 | `provider.finish_reason`은 모델이 JSON에 써넣는 값(`prompt_proposals.py:176,491`). 봉투 값은 `reply_bytes`가 버림 | **LLM-R05** | 완료 |
-| 6 | `target_groups` 어휘가 사전과 미검증 | 카탈로그는 `action`/`location`, 요청은 `pose`/`setting`. `DISPLAY_GROUP`(`:67`)이 런타임에만 흡수 | **LLM-R06** | 완료(422 거절) |
-| 7 | `active` 플래그의 단일 소스 없음 | `dictionary.ts:126,134` 하드코딩, mirror는 테스트가 정규식으로 생성. `inactive_entry` 분기가 도달 불가 | **LLM-R07** | 완료(생성 스크립트) |
+따라서 번역 결과는 `free_text_ko`를 덮어쓰지 않고 **새 필드의 제안**으로만 존재하며, 사용자가 명시적으로 포함을 선택해야 최종 프롬프트에 반영된다. 원칙 1(조립은 compiler가 한다)과 원칙 3(적용은 명시적)도 유지한다.
 
-추가로 기록만 남기는 사실:
+**설계 금지선 (TRANS 전체 공통)**
 
-- 규칙이 두 벌씩 존재한다(부정 `matching.ts:43` ↔ `prompt_proposals.py:62`, 잠금/범위 `prompt_proposals.py:412` ↔ `proposalCards.ts:128`, 그룹 `presentation.ts:8` ↔ `prompt_proposals.py:67`, 충돌 `compiler.ts:29`는 클라이언트만). 2중 검증 자체는 의도된 설계이므로 삭제하지 않되, **정본/사본 관계를 코드 주석에 명시**한다(R01·R05에서 함께).
-- 현재 fixture 화면은 `engine == "fake"`면 제안 버튼이 없다(`proposal_provider.py:77-83`). 따라서 precision 100%·미분류 3.3%는 **규칙 엔진 단일 경로** 수치이며 LLM 품질 지표가 아니다.
+- `free_text_ko` 변조 금지. `compileScene`의 기존 출처(`sources`→`draft`) 계산 의미 변경 금지.
+- LLM이 만든 문자열을 사전 `mapping`처럼 취급해 `selections`에 넣는 것 금지. 사전 밖 표현은 끝까지 "사전 밖"으로 식별 가능해야 한다.
+- 자동 적용·자동 저장·자동 생성 금지. 사용자가 포함을 누르지 않으면 최종 프롬프트는 지금과 동일하다.
+- GPU 비교 증거 없이 "번역이 더 좋다"고 주장하지 않는다. TRANS는 기능 경로를 만드는 작업이고 품질 판정은 QUALITY/LIVE 계열이다.
+- 번역 실패·거절 시 기존 동작(현재와 동일한 초안)으로 조용히 폴백한다.
 
-### LLM-R01 — 서버 부정 가드를 규칙 경로와 동등하게 · 완료 (2026-11-18)
+### TRANS01 — 계약 결정: 필드·한도·재현성 기록 · **결정 완료 · v2 채택**
 
-- 선행: 없음. 연결: RULE01(구현 완료). **LIVE02의 선행.**
-- 근거: `matching.ts:42-47`은 어간 `없/아니/않/빼고/제외/말고/금지` + `CLAUSE_BREAK`(`:47`)로 절 경계에서 멈춘다. 서버 `prompt_proposals.py:62-65`는 `없이/아닌/아님/아니/않/안 /못 /말고/빼고/제외`에 `MATCH_AFTER_WINDOW = 8` 고정 창을 쓴다. 그래서 (a) `사람은 없다`는 서버가 affirmed로 통과시키고, (b) `사람. 안경 없이 걷는다`는 다음 절 표지가 앞 절 명사를 오염시켜 정상 제안을 `polarity_conflict`로 보류한다. 둘 다 실행으로 확인했다.
-- 수정: `backend/app/services/prompt_proposals.py`의 `NEGATION_MARKERS`/`_negated_in_source`를 규칙 경로와 같은 의미로 맞춘다. 어간 `없` 추가, 절 경계(`[.!?,、。·\n]`)에서 창을 자른다. `backend/tests/test_prompt_proposals.py`에 양성/부정/혼합/절 경계 케이스를 추가한다.
-- 금지: 규칙 경로(`matching.ts`)의 문구·동작 변경. 두 경로를 한 코드로 합치는 리팩터링(언어가 다르므로 범위 밖).
-- 완료: 아래 케이스가 서버에서도 규칙 경로와 같은 판정을 낸다. `사람은 없다`→held, `없는 사람`→held, `사람은 없고 고양이는 있다`→사람만 held, `사람. 안경 없이 걷는다`→사람 affirmed·안경 held, `안경 없이 짧은 머리의 사람`→짧은 머리 affirmed(기존 테스트 유지). P 및 S 통과.
-- 주의: 이 가드는 어휘 휴리스틱이지 의미 이해가 아니다. 완료 후에도 `글자 없이` 같은 사례를 "해결됨"으로 일반화하지 않는다.
-- **구현 인계 (2026-11-18)**: `MATCH_AFTER_WINDOW` 삭제, `CLAUSE_BREAK`까지의 창 + "가장 가까운 표지가 이긴다"로 통일. `NEGATION_MARKERS`에 `없` 추가. 테스트 3건 추가: `test_negation_guard_keeps_a_positive_half_of_a_mixed_clause`, `test_negation_guard_survives_an_affirmation_before_the_negation`, `test_server_negation_stems_match_the_rule_engine_source`(matching.ts에서 어간 목록을 정규식으로 뽑아 서버 상수와 직접 비교 — 서버 목록이 사본이므로 드리프트가 실패로 드러난다). 기존 `test_negation_guard_stops_at_the_clause_boundary`·`test_negation_guard_reads_the_marker_stem_not_one_inflection`는 그대로 통과. **L 106건·F 133건 통과.**
+- 선행: 없음. **TRANS02–05의 선행이며, 이 태스크의 산출물은 코드가 아니라 결정문이다.**
+- **산출물: [TRANS01 계약 결정문](PROMPT_COMPOSER_TRANS01_CONTRACT.md).** 4개 결정(필드 형태·한도·재현성 기록·어휘 판정)과 실측 근거, 대안, 소유권, 승인 요청이 한 곳에 있다. 결정문은 코드를 수정하지 않았다.
+- 근거: `PromptComposition`은 `extra="forbid"`이고 선택 필드 전체가 32 KiB로 제한된다([schemas.py:75-92](../backend/app/models/schemas.py)). 미러인 [validation.ts](../frontend/src/prompt/validation.ts)가 같은 규칙을 재구현하고 있으며, 제안 요청 본문은 8 KiB다. 필드를 추가하면 세 곳이 동시에 움직인다.
+- **승인 대기 항목은 하나였다: `PromptComposition` v2 채택 여부.** 2026-11-19에 채택되어 TRANS03이 schema 변경을 구현했다. 결정문 §0의 판정 요약과 §8의 승인 요청이 그 입력이고, §8에 이행 기록이 붙었다.
 
-### LLM-R02 — 모델 카탈로그에 라벨·별칭 제공 · 완료 (2026-11-18)
+- 결정 결과 (상세와 측정값은 [결정문](PROMPT_COMPOSER_TRANS01_CONTRACT.md)):
+  1. **필드 형태** → `PromptComposition`에 최상위 `remainder` 배열(구절 단위, 최대 8개). `unresolved` 항목 확장은 재생성 시 소실·원문 전체 1건·8개 절단 때문에 탈락. 구서버 422 위험은 쓰기(`POST /jobs`)에서만 발생하며 `schema_versions` 협상으로 막는다.
+  2. **한도** → 항목 8개 · `source_ko` 200자 · `suggested_en` 200자(모두 기존 `MAX_UNRESOLVED`/`MAX_UNRESOLVED_CHARS` 재사용). 별도 바이트 상한 없음 — **실측상 필드별 상한은 구성을 제한하지 않고 32 KiB 하나가 유일한 실효 상한**이다. 요청 쪽은 **구절 원문이 아니라 오프셋**(`{start, end}`)을 보낸다: 200자 한글 611.9 B vs 오프셋 27.5 B.
+  3. **재현성 기록** → `remainder` 항목마다 `proposal_id`·`proposal_model`·`accepted_at`을 **필수**로 남긴다(항목별인 이유: 한 구성에 여러 호출의 번역이 섞인다). `compiler_version`은 오염시키지 않는다. **schema bump 필요 → 승인 대기.**
+  4. **어휘 판정** → `draft_prompt`에 합치지 않는다. 최종 프롬프트는 `applyDraft` 한 곳에서 `draft` + `\n` + 수락된 번역문으로 만든다(`verbatim` 모드의 기존 선례). sd15 77은 **토큰** 예산이며, 번역문 포함 최종 프롬프트에 같은 `estimateTokens`로 다시 계산해 포함 버튼 옆에 사전 표시한다.
+- 완료: 4개 결정과 근거, 기존 필드로 대체 가능한 대안, schema bump 필요 여부를 결정문 한 곳에 기록. DATA01/DATA02 소유권 경계 명시. **이 태스크에서 스키마·코드를 수정하지 않았다.**
+- 금지: 결정 없이 TRANS03 착수. "일단 optional로 추가"하는 즉흥 확장.
 
-- 선행: LLM-R01. 연결: RULE03(사전 alias 보강)과 같은 데이터를 쓰므로 순서를 붙여 수행. **LIVE02의 선행.**
-- 근거: `_dictionary_listing`(`proposal_provider.py:126-139`)은 `- setting.cafe (setting)`만 보낸다. 사전에는 라벨 100개·별칭 122개가 있고(`dictionary.ts`), 모델은 한국어 원문과 id 사이의 어휘적 다리를 하나도 받지 못한다. 실측 크기: id만 2,939B, id+라벨 4,077B, id+라벨+별칭 5,733B. 8 KiB 상한은 **브라우저→서버 본문**에만 적용되고 시스템 프롬프트는 포함되지 않으므로(`proposal_provider.py:52-54`) 이 증가는 요청 상한과 무관하다.
-- 수정: `config/prompt_dictionary.json`과 `prompt_dictionary.py`의 `DictionaryEntryRef`에 `label_ko`, `aliases`를 추가하고(렌더 표현이 아니라 **검색용 한국어 어휘**임을 docstring에 명시), `_dictionary_listing`이 `- <id> (<display_group>) <label_ko> | <alias> | ...` 형식으로 출력하게 한다. `prompt_dictionary.py`의 "Python은 렌더 표현을 갖지 않는다" 원칙은 유지한다: label/alias는 최종 prompt에 들어가지 않고 모델 입력으로만 쓰인다.
-- 완료: payload 단위 테스트로 카탈로그에 라벨·별칭이 포함되고 id 집합은 불변임을 확인. mirror drift 테스트(`test_proposal_api.py:311`)가 새 필드까지 검증. 토큰·바이트 증가량을 인계에 실측 기록. P·S 통과.
-- 금지: 최종 prompt 문자열에 label/alias가 섞이는 변경. `compileScene` 출력 의미 변경.
-- **구현 인계 (2026-11-18)**: `DictionaryEntryRef`에 `label_ko`/`aliases` 추가(렌더 표현 아님을 docstring에 명시), mirror에 두 필드 생성, `_dictionary_listing`이 `- <id> (<display_group>) <label_ko> | <alias> ...` 출력. 실측 **렌더된 카탈로그 5,717B / 100항목**(수정 전 id+category 2,939B, 리뷰 추정 5,733B와 16B 차이는 표시 그룹·구분자 형식 때문). JSON mirror 파일 자체는 12,063B이지만 그 파일은 모델에 전송되지 않는다. 시스템 프롬프트는 8 KiB 본문 상한 밖이므로 요청 크기 영향 없음. 테스트 3건: 라벨·별칭 포함/무별칭 처리/비활성 미노출, id 집합 불변, 크기 범위(4–9 KB)와 렌더 표현 미포함.
+### TRANS02 — 잔여 구절 추출과 사전 밖 판정 · 구현 완료 · 검증 대기
 
-### LLM-R03 — `partial_change`에 현재 선택 전달 · 완료 (2026-11-18)
+- 선행: 없음(TRANS01과 병행 가능). 순수 클라이언트 계산이라 서버·계약과 무관하다.
+- 근거: 지금은 "사전 밖"이라는 사실이 `unresolved`의 `free_text` 1건(원문 전체)으로만 남아, **어느 부분이 사전에 걸리고 어느 부분이 안 걸렸는지** 화면에서 구분되지 않는다. 실측에서 미커버 85.7%가 한 덩어리로 표시된다.
+- 수정: `frontend/src/prompt/` 에 순수 모듈을 추가해, 원문에서 규칙 경로가 매칭한 span을 제외한 나머지를 구절 단위로 돌려준다. 기존 `matching.ts`의 `matchOccurrences`·`polarityAt`을 재사용하고 새 매칭 규칙을 만들지 않는다.
+- **[TRANS01 결정](PROMPT_COMPOSER_TRANS01_CONTRACT.md) 반영**: 반환하는 구절은 `{start, end}` 오프셋을 함께 가진다. `PhraseOccurrence`가 이미 그 좌표계를 쓰므로([matching.ts:30-38](../frontend/src/prompt/matching.ts)) 새 좌표계를 만들지 않는다. 이 오프셋이 TRANS03 요청 본문이 되고, 구절 원문은 요청에 싣지 않는다(8 KiB 예산). 승인 여부와 무관하게 TRANS02는 지금 착수 가능하다.
 
-- 선행: LLM-R02(같은 payload 함수를 고치므로 순차). **LIVE02의 선행.**
-- 근거: `build_payload`(`proposal_provider.py:196-243`)에서 `selections`는 `VARIANT_KIND` 분기에만 있다. 그래서 `조명만 변경`에서 모델은 "지금 조명이 `lighting.low_key`"임을 모르고, 이미 고른 값을 다시 제안하거나(서버가 조용히 무시, `prompt_proposals.py:425`) `compiler.ts:29`의 충돌 쌍에 걸리는 값을 제안해 카드가 차단된다. 모델이 틀린 게 아니라 정보를 받지 못한 것이다.
-- 수정: `partial_change` 요청에도 `selections`(id+category)와 `locked_ids`를 함께 넣는다. 시스템 프롬프트 규칙에 "이미 선택된 id는 제안하지 않는다. `locked_ids`는 바꿀 수 없다"를 명시한다. 요청 크기 영향은 LLM-R04와 함께 측정한다.
-- 완료: payload 단위 테스트로 `partial_change`에 `selections`가 실림. 100개 선택 시 최악 바이트를 측정해 8 KiB 이내임을 인계에 기록(초과하면 상한 조정을 별도 보고). P·S 통과.
-- 금지: 서버 검증 규칙(잠금·범위·중복) 완화.
-- **구현 인계 (2026-11-18)**: `build_payload`가 모든 kind에 `selections`를 싣고, 비-variant 시스템 프롬프트에 "이미 `selections`에 있는 id 제안 금지 / `locked_ids` 변경 금지 / `target_groups` 밖 제안 금지" 3규칙을 명시. variant 프롬프트에도 `removed_ids`는 `selections`에 있어야 함을 명시. **중요**: 클라이언트는 이미 `proposalBody`에서 `selections`를 보내고 있었으므로 **요청 본문 바이트는 증가하지 않는다**(서버가 payload 복사만 안 했음). 따라서 완료 조건의 "100개 선택 최악 바이트"는 R04의 몫이며, 여기서는 "payload가 요청 필드를 그대로 복사하고 새 필드를 추가하지 않음"을 검증했다(C01 payload 계약 테스트를 의도적으로 확장).
+- 실행: 공백/조사만 남는 구절은 버리고, 최소 길이 미만은 제외한다. 부정 문맥(`polarityAt`이 `negated`)의 구절은 번역 제안 대상에서 제외한다(RULE01·LLM-R01과 같은 판정을 쓰고 새 휴리스틱을 만들지 않는다).
+- 완료: 실측 문장에서 `"비 오는 밤"`, `"편의점 앞에서 비를 맞으며 기다리는 30살 유럽 여성"`, `"젖은 바닥에 반사된다"` 수준의 구절이 나오고, 커버된 `"금발"`·`"네온 조명"`은 제외됨을 테스트로 고정. 부정 문맥 제외 케이스 포함. F·B 통과.
+- 금지: 문장 의미 이해를 주장하는 휴리스틱. 형태소 분석기·새 dependency 도입.
 
-### LLM-R04 — 요청 크기 상한의 단위 정합 · 완료 (2026-11-18)
-
-- 선행: 없음(작음). LLM-R03과 바이트 계산이 겹치므로 함께 수행 권장.
-- 근거: `MAX_FREE_TEXT = 4000`은 문자 수이고 주석은 "서버 상한을 그대로 반영해 422를 피한다"고 하지만, 서버는 `len(raw) > 8192` **바이트**로 413을 낸다(`proposals.py:199`, `proposal_provider.py:372`). 실측: 요청 본문이 8 KiB를 넘는 첫 한글 문자 수는 **2,592자**(8,194B), 4,000자는 12,418B. 즉 2,592–4,000자 구간은 로컬 검사를 통과한 뒤 413을 받는다.
-- 수정: `llmProposals.ts`의 로컬 검사를 `new TextEncoder().encode(text).length > MAX_FREE_TEXT_BYTES`로 바꾸고 상수를 바이트 의미로 개명한다. 주석을 실제 계약과 일치시킨다.
-- 완료: 한글 2,600자·4,000자·영문 4,000자의 `proposalBody` 결과가 서버 상한과 일치함을 프론트 단위 테스트로 확인. 413을 유발하는 로컬 통과 케이스가 0건임을 기록. F·B 통과.
-- 주의: 서버 상한(8 KiB)을 올리지 않는다. 클라이언트를 서버에 맞추는 작업이다.
-- **구현 인계 (2026-11-18)**: `MAX_FREE_TEXT`는 문자 상한으로 남기고(텍스트 영역 계약), `proposalBody`가 **완성된 body 전체**를 `TextEncoder`로 인코딩해 `MAX_REQUEST_BYTES = 8*1024`와 비교한다. 새 테스트 2건: `the request body is refused by its real UTF-8 byte size, not its character count`(한글 4,000자=12,000B 거부·영문 4,000자 통과·영문 9,000자 거부), `a legal but crowded body is refused locally instead of coming back as a 413`(`selections`+`locked_ids`가 예산을 소모하는 케이스: 60+60+한글 1,500자 거부, 5+5+한글 100자 통과). **실측(실제 mirror + 실제 `proposalBody`, 2026-11-18)**: 8 KiB에서 남는 한글 여유는 선택 1개+범위 없음 **2,582자**, 20 선택+20 잠금 **2,144자**, 60+60 **1,224자**, 100+0 **1,017자**, 100 선택+100 잠금 **361자**. 서버 상한은 올리지 않았다. 이 여유 부족은 R04의 범위를 넘으므로 **잔여 위험**으로 남긴다: 대부분의 실제 요청은 선택 수가 적어 문제없지만, 대량 선택+긴 서술 조합은 로컬에서 `too_large`로 거절된다.
-
-### LLM-R05 — `finish_reason`·`model`을 서버 관측값으로 · 완료 (2026-11-18)
-
-- 선행: LLM-R01(같은 모듈). **LIVE02 증거 신뢰성의 전제.**
-- 근거: `provider.finish_reason`과 `provider.model`은 **모델이 JSON 안에 써넣는 값**이다(`prompt_proposals.py:176`, `proposal_provider.py:154,221` 스키마가 문자열로 지시). 실제 HTTP 봉투의 `choices[0].finish_reason`과 `model`은 `reply_bytes`(`proposal_provider.py:256-268`)가 버린다. 그래서 `prompt_proposals.py:491`의 검사는 사실상 "모델이 stop이라고 말했는가"이며, LIVE02가 남겨야 할 alias·버전 증거를 모델이 우길 수 있다.
-- 수정: `reply_bytes`가 `(content, envelope_model, envelope_finish_reason)`을 돌려주게 하고, 서버가 이 값으로 `provider`를 덮어쓴다. 모델 자기신고 값은 진단 필드로만 남기거나 버린다. `finish_reason`이 `stop`이 아니면 기존 `incomplete_reply` 경로를 그대로 탄다.
-- 완료: 봉투가 `length`인데 본문이 `stop`인 응답이 `unavailable`이 됨을 단위 테스트로 확인. 봉투 `model`과 본문 `model`이 다를 때 서버 값이 이김을 확인. 기존 C01-8 테스트 유지. P·S 통과.
-- 주의: 품질 개선이 아니라 **증거 정확성** 작업이다.
-- **구현 인계 (2026-11-18)**: `reply_bytes` → `reply_envelope(body) -> (content, ObservedProvider(model, finish_reason))`. `FINISH_REASONS`로 닫힌 집합 매핑, 미지의 값은 `other`(clean stop 아님). `evaluate(..., observed=)`가 `provider`를 덮어쓴 뒤 기존 `incomplete_reply` 경로를 탄다. **실패 봉투에도 `provider`를 싣도록 `unavailable()`을 확장**했다 — 거절된 응답에서야말로 "어느 모델이 왜 잘렸는지"가 유일한 증거다. 테스트: 봉투 `length` + 본문 `stop` → `unavailable`, API 레벨에서 봉투 `model`이 본문 자기신고를 이김. 기존 픽스처 `chat()`/`chat_response()`에 `finish_reason`/`model` 인자를 추가해 **봉투가 정본**임을 테스트가 드러내게 했다.
-
-### LLM-R06 — `target_groups` 어휘를 사전 카테고리와 대조 · 완료 (2026-11-18)
-
-- 선행: LLM-R02. 연결: LIVE01의 payload 점검 항목을 구현으로 승격.
-- 근거: 카탈로그는 legacy 카테고리(`action`, `location`, `composition`)를 찍고 요청은 표시 그룹(`pose`, `setting`, `camera`)을 쓴다. 서버는 `DISPLAY_GROUP`(`prompt_proposals.py:67`)으로 런타임 흡수만 하고, 요청의 그룹이 실제 사전에 존재하는지는 검증하지 않는다. `VARIANT_GROUPS = {pose, setting}`(`:52`)도 같은 혼동을 안고 있다.
-- 수정: `DISPLAY_GROUP`에서 파생한 허용 그룹 집합을 만들고, 사전에 없는 그룹이 오면 요청 검증 단계에서 거절(권장)하거나 `unsupported_v1`로 답한다. 카탈로그 출력도 표시 그룹으로 통일한다(LLM-R02 형식과 일치).
-- 완료: 사전 카테고리에서 그룹 집합을 파생하는 테스트, 알 수 없는 그룹 요청의 거절 테스트. 카탈로그와 `target_groups`가 같은 어휘를 씀을 payload 테스트로 확인. P·S 통과.
-- 금지: `GROUP_ORDER`(`presentation.ts:8`)와 다른 그룹 이름을 서버가 새로 발명하는 것.
-- **구현 인계 (2026-11-18)**: `display_group(category)`와 `groups_in_use(entries)`를 `prompt_proposals.py`에 추가(활성 항목에서 파생, 하드코딩 없음). `_dictionary_listing`과 variant/scope 판정이 모두 `display_group()`을 거치게 통일. 사전에 없는 그룹은 **`proposals.py` 요청 검증 단계에서 422**로 거절(모델 호출 전). `unsupported_v1` 대신 422를 택한 이유: 그룹 오타는 계약 위반이므로 200 실패 봉투로 감싸면 브라우저가 모델 문제로 표시한다. 테스트 2건: 그룹 파생/`display_group` 매핑, 알 수 없는 그룹 422 + 모델 미호출. 실측 허용 그룹: `appearance, camera, clothing, expression, lighting, mood, pose, setting, style, subject`.
-
-### LLM-R07 — `active`의 단일 소스와 mirror 생성 경로 · 완료 (2026-11-18)
-
-- 선행: LLM-R02(같은 mirror 파일을 손댐).
-- 근거: `dictionary.ts:126,134`가 `active: true`를 하드코딩하고, `config/prompt_dictionary.json`은 파생물인데 생성 스크립트가 없다. drift 테스트(`test_proposal_api.py:311-333`)가 TS 소스를 정규식으로 긁어 `active: True`를 만들어 비교한다. 결과적으로 `inactive_entry` 분기(`prompt_proposals.py:324,422`, `proposalCards.ts:136`)는 현재 사전에서 도달 불가다.
-- 수정: mirror를 생성하는 스크립트(예: `scripts/gen-prompt-dictionary.mjs`)를 추가하고 drift 테스트가 그 스크립트를 쓰게 한다. 또는 "현재 사전은 전 항목 활성"을 계약으로 명시하고 `inactive_entry`를 문서상 미사용으로 표시한다. 둘 중 하나를 고르고 근거를 남긴다.
-- 완료: 선택지 택1과 근거, drift 테스트가 생성 경로를 통과. `inactive_entry`가 도달 불가임을 문서 또는 테스트로 명시. F·P·S 통과.
-- **구현 인계 (2026-11-18)**: 택1 채택 — 생성 스크립트 `scripts/gen-prompt-dictionary.mjs` 추가. `--stdout`으로 같은 텍스트를 출력하고, drift 테스트가 **그 스크립트를 실제 실행해** 커밋된 파일과 JSON 비교한다(테스트가 형식을 재구현해 스스로와 일치하는 일을 방지). 파일은 항목당 한 줄로 생성해 diff가 읽히게 했다. `active`는 `dictionary.ts`의 하드코딩 값에서 그대로 나오며, `test_every_dictionary_entry_is_active_so_inactive_entry_is_unreachable`가 "전 항목 활성 = `inactive_entry` 분기 도달 불가"를 계약으로 고정한다(비활성 항목이 생기면 그 테스트가 실패해 실제 비활성 경로 테스트를 요구). 실행: `node --experimental-strip-types scripts/gen-prompt-dictionary.mjs`.
-
-### 문서 반영 범위
-
-- 이 절과 LLM-R01–R07 명세가 리뷰 갱신의 산출물이다. 리뷰 시점에는 제품 코드·사전·테스트를 수정하지 않았다.
-- **2026-11-18 구현 갱신**: 위 문장은 리뷰 시점의 상태다. 이후 R01–R07을 구현했으므로 제품 코드·사전 마이그레이션·테스트를 수정했다. 변경 파일: `backend/app/services/prompt_proposals.py`, `proposal_provider.py`, `prompt_dictionary.py`, `backend/app/api/proposals.py`, `frontend/src/prompt/llmProposals.ts`, `config/prompt_dictionary.json`, `scripts/gen-prompt-dictionary.mjs`(신규), 그리고 해당 테스트 4개 파일.
-- CURRENT·LLM_AUTOMATION 문서는 이번 구현에서도 손대지 않았다. 두 문서는 계약 참고자료이고 계약은 이 문서 §0이 소유한다. 다만 LLM-R05가 `provider` 관측값의 의미를 바꿨으므로, LIVE02에서 응답 형식을 인용할 때는 이 문서가 아니라 실제 응답을 근거로 삼는다.
-
-## 1. 남은 보완 태스크
-
-### RULE01 — 부정·다인 표현의 규칙 오탐 보완 · 구현 완료
-
-- 근거: `frontend/src/prompt/proposals.ts`의 `text.includes`는 `사람은 없다`와 `사람들`에도 단수 인물을 제안한다. [기준선 보고](archive/prompt-composer/2026-11-18/PROMPT_COMPOSER_EVAL_UX01.md) 사례 1–3.
-- 수정: proposals 및 대응 테스트, 필요시 순수 매칭 helper. 사전/컴파일러/Scene 저장 계약 변경 없음.
-- 실행: 부정·복수 경계를 판정하는 최소 규칙과 모호할 때 제안 보류를 설계. 같은 문장에 긍정·부정이 섞이면 문장 전체 일괄 삭제 금지. 예: `사람은 없고 고양이는 있다`, `안경 없이 웃는 사람`, `사람 둘이 걷는다`.
-- 완료: 기대 ID/금지 ID를 먼저 정의하고 양성·부정·다인 및 혼합 문장 테스트. 원문은 그대로, 불명확한 인물 귀속을 추정하지 않음. F·B, 기존 평가를 다시 계산해 변화와 남은 실패 기록.
+**구현 인계 (2026-11-19)**
 
 ```text
-ID / 상태 / 날짜 / 기준 HEAD: RULE01 / 구현 완료(로컬 검증) / 2026-11-18 / 03a2fa5 이후 작업 트리
+TRANS02 / 구현 완료 · 검증 대기 / 2026-11-19 / 기준 HEAD 16f3a34 + 작업 트리
 변경 파일과 사용자에게 달라지는 동작:
-  신규 frontend/src/prompt/matching.ts, frontend/src/prompt/proposals.ts,
-  frontend/tests/prompt-proposals.test.mjs, frontend/tests/prompt-eval-ux01.test.mjs,
-  scripts/eval-ux01/evaluate.mjs + docs/evidence/prompt-composer-eval-ux01/*.
-  사용자 동작: `사람은 없다`·`사람들`·`두 사람` 문장에서 단수 인물이 더 이상 제안되지 않고,
-  문장에 긍정 절이 남아 있으면 그 항목은 그대로 제안된다. 목록 수는 사례 1–3에서 줄어든다.
-보존한 계약: 사전 ID/버전(1.2.0)·컴파일러 출력·Scene v1 저장 의미·원문 보존. 새 저장 필드 없음.
-  불명확한 인물 귀속은 추정하지 않고, 사전이 제공하는 `subject.two_people`/`subject.group`만 지목한다.
+  - frontend/src/prompt/remainder.ts (신규): coveredRanges·extractRemainder·foldForMatching·
+    isValidRemainderSpan·staleSpans·toCodePointSpan, REMAINDER_LIMIT(8)·REMAINDER_CHARS(200).
+  - frontend/tests/prompt-remainder.test.mjs (신규, 10건).
+  - 사용자 동작 변화 없음: 이 태스크는 순수 계산 모듈만 추가했고 화면은 TRANS04에서 붙는다.
+보존한 계약:
+  - matching.ts의 matchOccurrences·polarityAt을 재사용했고 새 매칭 규칙·새 좌표계를 만들지 않았다.
+    반환 오프셋은 PhraseOccurrence와 같은 UTF-16 `{start, end}`이며 end는 배타다.
+  - compileScene의 sources→draft 계산을 건드리지 않았다.
 실행한 명령과 결과:
-  node --experimental-strip-types --test frontend/tests/*.test.mjs → 131/131 통과
-  npm --prefix frontend run build → 통과 · npm --prefix frontend run lint → 통과(경고 0)
-  node --experimental-strip-types scripts/eval-ux01/evaluate.mjs → 38 기대 / 29 적중(recall 76.3%) /
-  원치 않은 추가 3→0 / 미분류 1
-텍스트 화면 묘사·브라우저 환경·DOM/포커스 관찰:
-  HeadlessChrome(chromium-1228), 1280×900. 12장면 브라우저 팔 재실행에서 제안 목록·칩·초안이
-  Node 팔과 일치(8/8 검사 통과, 클릭 43). 캡처: docs/evidence/prompt-composer-eval-ux01/.
+  - node --test frontend/tests/prompt-remainder.test.mjs → 10 pass.
+텍스트 화면 묘사·브라우저 환경·DOM/포커스 관찰: 없음 — 이 태스크는 UI가 없다(미검증 아님).
 미완료·위험·다음 태스크가 알아야 할 사실:
-  RULE01은 부분일치 오탐만 다룬다. `앉은`/`서 있다`/`흰 배경` 같은 활용형·별칭 누락은 RULE03이다.
-  부정 판정은 절 단위 어휘 휴리스틱이며 문장 의미 이해가 아니다(예: `글자 없이`는 여전히 미표현).
-  남은 미분류 1건은 `portrait-front-closeup`의 `subject.person`으로, 사람이 판정할 항목이라
-  precision 분모에서 제외한다(테스트 통과를 위해 정답으로 바꾸지 않음).
-  후속 보완: 복수/수 항목이 이미 선택된 상태에서도 단수가 되살아나지 않도록 판정 대상은
-  '추가 가능한 항목'이 아니라 '활성 사전 전체'로 두고, 대상이 선택돼 있으면 제안을 생략한다
-  (테스트 1건 추가, 총 131건).
+  - 부정 문맥 제외는 polarityAt(negated) 판정을 그대로 쓴다. RULE01과 다른 판정을 새로 만들지 않았다.
+  - 대소문자 폴딩이 길이를 바꾸는 코드 포인트(U+0130)에서 오프셋이 밀리지 않도록 인덱스 맵을 쓴다.
+  - 반환값은 UTF-16이다. 요청 본문은 코드 포인트여야 하므로 TRANS03의 proposalBody가 변환한다.
 ```
 
-### RULE02 — 규칙 제안에서도 부분 변경 범위 보존 · 구현 완료
+### TRANS03 — 번역 제안의 서버 경로 · 구현 완료 · 실연결 검증 대기
 
-- 선행: RULE01. 근거: 규칙 suggestSelections 요청에는 target_groups가 없어 `조명만` 경로에서 카페가 추가되는 기준선 사례 8. AI partial_change의 범위 검증과 다름.
-- 수정: proposals/PromptBuilder의 규칙 요청·수락 연결과 테스트. 현재 부분 변경 UI 상태를 재사용하고 새 저장 필드 금지.
-- 실행: 부분 변경 모드의 선택 그룹·잠금값을 규칙 후보와 수락 시점에 적용. 전체 장면 모드에서는 기존 탐색 범위를 유지. 모드가 다르면 문구로 알림.
-- 완료: lighting만 허용 시 카페 추가 불가, 대상/의상 보존, 모드 전환·오래된 후보 방어. 기존 AI 경로 동일성, F·B 및 텍스트 상태 관찰표.
+- 선행: TRANS01(필드 형태 확정 — **[결정문](PROMPT_COMPOSER_TRANS01_CONTRACT.md) 승인 필요**), TRANS02(보낼 구절).
+- **승인 전 착수 금지.** 승인 대기 항목은 schema v2 채택 하나이며, 결정문 §8이 승인 요청과 거절 시 동작을 정한다.
+- 근거: 브라우저는 LLM에 직접 접근할 수 없다(`integrated_chat_proxy: False`, `docs/NEXT_PROJECT_LLM_CLIENT.md`). 번역 제안도 기존 `POST /api/v1/prompt/proposals` 경로를 타야 하며, GPU 경합·gate·한도 규칙이 그대로 적용된다.
+- 수정: 새 `kind`(`remainder_translation`)를 추가한다. **TRANS01 결정을 따른다.** `SUPPORTED_KINDS`([proposals.py:41-42](../backend/app/api/proposals.py))와 프론트 `ProposalKind`·`parseReply`가 함께 늘어나야 하며, 모르는 `kind`가 `unsupported_v1`로 답해지는 C01-4 계약은 그대로 유지된다. 요청은 `remainder_spans: [{start, end}]` 오프셋만 받고 서버가 `free_text_ko`에서 자른다(결정 2). 응답은 구조화 스키마 + `extra="forbid"` + 개수/길이 상한(8개·200자·200자)을 지키고, `free_text_ko`는 user 메시지의 데이터로만 취급한다(프롬프트 인젝션 방어, 원칙 8).
+
+- 실행: 시스템 프롬프트에 "사전 ID를 만들지 말고, 주어진 구절만 영어로 옮긴다. 사전 ID를 새로 발명하지 않는다"를 명시. `finish_reason`·`model`은 서버 봉투 관측값을 쓴다(LLM-R05). 실패는 기존처럼 200+문장 봉투로 돌려준다.
+- 완료: 알 수 없는 `kind`가 `unsupported_v1`로 답해지는 기존 계약 유지, 상한 초과 응답 거절, `free_text_ko`가 응답에 의해 변형되지 않음을 테스트로 고정. `L`·`S` 통과.
+- 금지: 새 엔드포인트 신설. 브라우저에서 LLM 직접 호출. 번역 실패 시 5xx.
+
+**구현 인계 (2026-11-19)**
 
 ```text
-ID / 상태 / 날짜 / 기준 HEAD: RULE02 / 구현 완료(로컬 검증) / 2026-11-18 / 03a2fa5 이후 작업 트리
+TRANS03 / 구현 완료 · 실연결 검증 대기 / 2026-11-19 / 기준 HEAD 16f3a34 + 작업 트리
 변경 파일과 사용자에게 달라지는 동작:
-  frontend/src/prompt/proposals.ts(SuggestionReport, ProposalRequest.targetGroups),
-  frontend/src/components/PromptBuilder.tsx(범위 메모·보류 안내), frontend/src/styles.css
-  (.prompt-proposal-list__scope), frontend/tests/prompt-proposals.test.mjs,
-  scripts/eval-ux01/evaluate.mjs, scripts/prompt-composer-browser/suite-contracts.mjs.
-  사용자 동작: 부분 변경 범위를 고른 상태에서 `원문에서 사전 항목 찾기`를 열면 목록이 그 범위만
-  제안하고, 보류한 항목의 개수·이름을 한 줄로 알린다. 범위 때문에 비었을 때도 그 사실을 말한다.
-보존한 계약: Scene v1·저장 필드·AI partial_change 요청/검증 경로·locked_ids 의미.
-  규칙 수락은 기존 `selectEntry` 경로 그대로이고, 범위는 UI 상태에서만 파생한다(새 저장 없음).
+  - backend/app/models/schemas.py: CompositionRemainder 항목(proposal_id 8–64자·proposal_model
+    1–200자·accepted_at `YYYY-MM-DDTHH:MM:SSZ`), PromptCompositionV2, discriminator union.
+    PromptComposition v1은 그대로이며 `remainder`는 여전히 extra="forbid".
+  - backend/app/api/proposals.py: SUPPORTED_KINDS에 remainder_translation. 모르는 kind는 계속
+    unsupported_v1로 답한다.
+  - backend/app/services/prompt_proposals.py·proposal_provider.py: 요청 `remainder_spans` 검증
+    (span은 free_text_ko 안에서 유효·최대 8개), 서버가 직접 원문을 잘라 user 메시지를 만들고
+    응답은 구조화 스키마·extra="forbid"·개수/길이 상한을 지킨다.
+  - frontend/src/prompt/llmProposals.ts: ProposalKind 'remainder_translation', parseTranslations,
+    proposalBody의 translate 분기(UTF-16 → 코드 포인트 변환).
+  - frontend/src/api.ts·validation.ts: v1|v2 타입, v2 검증 미러.
+  - backend/tests/test_prompt_remainder.py(신규 20건), test_proposal_api.py(+번역 경로),
+    test_prompt_composition.py(+v2), frontend/tests/prompt-remainder-request.test.mjs(신규 16건).
+  - 사용자 동작: 번역 제안 요청 버튼이 생긴다. 다만 카드 표시는 TRANS04, 저장은 TRANS05.
+보존한 계약:
+  - 새 엔드포인트 없음. 기존 POST /api/v1/prompt/proposals만 쓰고 gate/한도/GPU 경합 규칙이 그대로다.
+  - 알 수 없는 kind → unsupported_v1 (C01-4). 번역 실패도 200+문장 봉투이며 5xx가 아니다.
+  - free_text_ko는 user 메시지 데이터로만 취급되고 응답으로 변형되지 않는다(테스트로 고정).
+  - finish_reason·model은 서버 봉투 관측값을 쓴다(LLM-R05).
 실행한 명령과 결과:
-  frontend/tests 전체 131/131 · node --experimental-strip-types --test frontend/tests/prompt-proposals.test.mjs 14/14
-  sh scripts/prompt-composer-browser/verify.sh → 225/225 통과(신규 RULE02 7건: 데스크톱 4 + 360px 3 포함)
-  evaluate.mjs 부분 변경 팔: 범위 안 제안 1개(lighting.low_key) · 범위 밖 보류 1개(setting.cafe)
-텍스트 화면 묘사·브라우저 환경·DOM/포커스 관찰:
-  배경만 변경 상태에서 목록 캡션 `“배경만 변경” 범위라 1개 제안(네온 조명)을 목록에서 뺐습니다.`
-  와 빈 목록 문구를 DOM으로 확인(캡처 25b-rule-scope-notice.png). 360×740에서도 같은 줄이
-  288px 폭 안에서 36px 높이로 줄바꿈되고 문서 가로 넘침이 없음을 rect로 측정
-  (25c-rule-scope-360.png). 390px은 미측정.
+  - .venv/bin/python -m pytest backend/tests/test_prompt_remainder.py -q → 20 passed.
+  - .venv/bin/python -m pytest backend/tests/test_proposal_api.py -q → 39 passed.
+  - .venv/bin/python -m pytest backend/tests/test_proposal_provider.py backend/tests/test_prompt_proposals.py -q → 통과(L 묶음 112 passed).
+  - node --test frontend/tests/prompt-remainder-request.test.mjs → 16 pass.
+텍스트 화면 묘사·브라우저 환경·DOM/포커스 관찰: 미검증 — 실제 provider 응답은 LIVE01/LIVE02 범위다.
 미완료·위험·다음 태스크가 알아야 할 사실:
-  범위 판정은 그룹 단위다. 같은 그룹 안에서 잠긴 개별 항목은 "이미 선택됨"으로 빠질 뿐 별도
-  사유를 말하지 않는다. 평가 하네스는 여전히 `카페`를 카드 계층으로도 흘려 defensive
-  `out_of_scope` 차단을 계속 측정한다 — 규칙 경로 누출 증거가 아니다.
+  - 요청은 오프셋만 싣고 응답은 source_ko 원문을 서버가 자기 슬라이스로 되돌려 준다. 클라이언트가
+    보낸 원문과 비교해 신뢰하지 않아도 된다.
+  - accepted_at은 밀리초가 붙으면 422다. 프론트에서 toISOString()을 그대로 쓰면 안 된다(TRANS05).
 ```
+
+### TRANS04 — 제안 표시와 명시적 포함 · 구현 완료 · 브라우저 검증 대기
+
+- 선행: TRANS03. 같은 `PromptBuilder.tsx`를 수정하므로 TRANS02와 순차 수행한다.
+- 근거: 지금 화면은 사전 초안만 보여주고 미커버 구절은 "이 모델로 번역되지 않은 선택 항목" 목록에 원문 1건으로만 나온다([PromptBuilder.tsx:1001-1005](../frontend/src/components/PromptBuilder.tsx)). 사용자가 무엇이 빠졌는지 알고도 넣을 방법이 없다.
+- 수정: 제안 카드에 "사전 밖 구절 + 번역 제안"을 별도 종류로 표시하고, **구절 단위로** 포함/제외를 선택하게 한다. 포함을 누르면 최종 프롬프트에만 반영되고 `free_text_ko`는 그대로 둔다.
+- 실행: 기본값은 **제외**(현재 동작 보존). 포함 시 결과가 "사전 초안 + 사용자가 고른 번역문"임을 적용 전에 명시한다. 되돌리기 1단계를 제공한다. 카드 문구는 "번역 제안이며 원문과 다를 수 있다"를 포함한다.
+- **[TRANS01 결정](PROMPT_COMPOSER_TRANS01_CONTRACT.md) 반영**: 최종 프롬프트 결합은 `applyDraft` 한 곳에서만 한다(`draft` + `\n` + 수락된 번역문). `draft_prompt`·`compiler_version`은 건드리지 않는다. sd15 77토큰 경고는 번역문 포함 **최종 프롬프트**로 같은 `estimateTokens`를 다시 호출해 계산하고, 포함 클릭 **전에** 버튼 옆에 표시한다. 기존 `token_budget` 코드를 재사용하고 새 추정식을 만들지 않는다(결정 4).
+
+- 완료: 포함/제외/되돌리기/원문 불변/최종 프롬프트 외 다른 상태 불변을 확인. 번역이 거절되거나 없을 때 화면이 지금과 동일함을 확인. F·B, 텍스트/DOM 관찰 기록(시각 검증 미실행 시 미검증으로 구분).
+- 금지: 자동 포함. `free_text_ko` 편집. 번역문을 `selections`에 넣어 사전 항목처럼 표시하는 것.
+
+**구현 인계 (2026-11-19)**
+
+```text
+TRANS04 / 구현 완료 · 브라우저 검증 대기 / 2026-11-19 / 기준 HEAD 16f3a34 + 작업 트리
+변경 파일과 사용자에게 달라지는 동작:
+  - frontend/src/prompt/remainderInclusion.ts (신규): translationCards(카드), remainderEntry
+    (proposal_id 8자 미만·빈 source_ko/suggested_en이면 null), acceptedAt(초 단위),
+    includeRemainder/excludeRemainder/isIncluded, finalPrompt, includedEnglish, tokenPreview,
+    pruneRemainder, InclusionList·activeInclusions.
+  - frontend/src/components/PromptBuilder.tsx: "사전에 없는 구절 번역 제안" 버튼(비활성 조건:
+    구절 없음·원문 비었음·요청 중·v1 서버), 번역 카드 패널(한국어/영어/신뢰도, 기본 제외,
+    포함/포함 해제, sd15 newlyOverBudget 경고, truncated 안내, "번역 제안이며 원문과 다를 수
+    있습니다"), 응답이 사라진 뒤에도 남는 "포함한 번역" 목록, 적용 버튼 위의 결합 안내.
+  - frontend/src/styles.css: .prompt-remainder* 클래스(카드·카운트·경고·포함 목록).
+  - frontend/tests/prompt-remainder-inclusion.test.mjs (신규 18건).
+  - 사용자 동작: 번역 카드가 처음 보이고, 포함을 누른 구절만 최종 프롬프트 끝에 붙는다.
+    포함을 누르지 않으면 최종 프롬프트는 지금과 완전히 동일하다.
+보존한 계약:
+  - 기본값은 제외. 포함은 클릭이며 자동 적용·자동 저장·자동 생성이 없다.
+  - free_text_ko는 편집되지 않고, 번역문은 selections에 들어가지 않는다(사전 항목 아님).
+  - 결합 지점은 applyDraft 한 곳뿐이고 구분자는 개행 한 글자다(verbatim 모드 선례). draft_prompt·
+    compiler_version은 건드리지 않는다.
+  - 77토큰 경고는 compiler.ts의 estimateTokens를 다시 호출해 계산하며 새 추정식을 만들지 않았다.
+    포함으로 77을 넘기는 경우에만 newlyOverBudget이 참이다(이미 넘은 초안은 초안 자체 경고 소관).
+  - 원문에서 사라진 구절의 번역은 pruneRemainder로 렌더 시 제외되고, 기록 목록에서는 지우지
+    않는다(구절을 다시 쓰면 되살아난다).
+실행한 명령과 결과:
+  - node --test frontend/tests/prompt-remainder-inclusion.test.mjs → 18 pass.
+  - node --test 'frontend/tests/*.test.mjs' → 177 pass / 0 fail.
+  - npm --prefix frontend run build → tsc -b + vite build 성공(345.64 kB JS).
+  - npm --prefix frontend run lint → eslint 무경고.
+텍스트 화면 묘사·브라우저 환경·DOM/포커스 관찰: 미검증 — 실제 브라우저에서 카드 배치·포커스
+  이동·200% 확대는 확인하지 않았다. U11/AT01 범위로 남긴다.
+미완료·위험·다음 태스크가 알아야 할 사실:
+  - 되돌리기는 별도 undo 상태가 아니라 카드의 "포함 해제"/목록의 "빼기"다(1단계). 새 카드
+    응답이 오면 목록은 유지되고 카드 상태만 다시 계산된다.
+  - inclusion 상태는 {owner, items}로 들고 렌더 시 activeInclusions로 파생한다. effect 안에서
+    setState하지 않기 위한 구조이며, 복원된 v2 스냅샷이 자기 번역을 시작 목록으로 갖게 한다.
+  - v1 서버에서는 요청 버튼과 카드 패널이 아예 뜨지 않는다(포함이 저장 단계에서 사라지므로).
+```
+
+### TRANS05 — 저장 스냅샷·회귀·범위 종료 · 구현 완료 · 운영 회귀 대기
+
+- 선행: TRANS01–04. **[결정문](PROMPT_COMPOSER_TRANS01_CONTRACT.md)이 승인되어 `PromptComposition`에 `remainder`가 실제로 추가된 경우에만 착수한다**(승인 거절 시 이 태스크는 저장 검증 부분을 생략하고 회귀만 수행).
+- 근거: 저장 스냅샷은 `prompt_composition`으로 자산에 실린다([schemas.py:127](../backend/app/models/schemas.py), [api.ts:74-82](../frontend/src/api.ts)). 필드를 추가하면 구 클라이언트 읽기·복원 경로가 영향을 받는다.
+- **[TRANS01 결정](PROMPT_COMPOSER_TRANS01_CONTRACT.md) 반영**: `schema_versions`는 `[1, 2]`를 광고하고 v1/v2를 동시에 받아야 한다. v1 스냅샷은 `[]` 기본값으로 읽되 마이그레이션·재결속하지 않는다. 32 KiB 재측정 시 `remainder` 8개 + 출처 3필드의 기여분은 실측 **+7,606 B**(19,243 → 26,849)임을 기준선으로 쓴다.
+
+- 실행: 저장→복원→재컴파일 왕복, 구 이력(필드 없음) 읽기, 32 KiB 한도 재측정, `validateComposition`과 서버 검증의 일치 확인. U12의 회귀 범위에 TRANS를 포함시킨다.
+- 완료: 왕복·구 이력·한도·검증 일치 테스트. schema bump 여부와 배포 영향 기록. 미검증 항목을 완료로 표시하지 않음.
+- 금지: 기존 스냅샷 재결속. 구 이력의 필드를 추정으로 채우기.
+
+**구현 인계 (2026-11-19)**
+
+```text
+TRANS05 / 구현 완료 · 운영 회귀 대기 / 2026-11-19 / 기준 HEAD 16f3a34 + 작업 트리
+변경 파일과 사용자에게 달라지는 동작:
+  - frontend/src/prompt/builderState.ts: draftComposition(state, remainder = [])가 v1/v2를 고르고
+    (번역이 없으면 v1 그대로), withAppliedDraft가 최종 프롬프트를 한 곳에서 조립하며,
+    v1OnlyWhenUnsupported가 v2 서버 협상 실패 시 사본에서 delete로 remainder를 뗀다.
+    restoreComposition은 기록된 사실만 복원하고 v1에 remainder 키를 만들지 않는다.
+  - frontend/src/prompt/validation.ts: v2 검증(버전 1|2, v1+remainder 거부, 8개 상한, 항목별
+    200자·proposal_id 8–64자·accepted_at 초 단위)과 normalizedComposition의 조건부 remainder.
+  - frontend/src/api.ts: PromptComposition 타입이 v1|v2이며 remainder는 옵션.
+  - frontend/src/App.tsx: capability의 schema_versions로 remainderSupported를 읽고, 제출 시
+    v1OnlyWhenUnsupported(applied, remainderSupported)를 적용하며, v2 스냅샷인데 서버가 v1만
+    광고하면 "이번 저장에는 포함한 번역이 빠집니다" 경고를 화면에 남긴다.
+  - 사용자 동작: 포함한 번역이 있는 구성만 v2로 저장되고(구성 이력·자산에 remainder로 실림),
+    포함이 없으면 저장 본문이 v1과 바이트 단위로 동일하다.
+보존한 계약:
+  - v1 본문은 remainder를 절대 얻지 않는다(서버 extra="forbid"). schema_version은 포함이 있을
+    때만 2가 된다.
+  - v1OnlyWhenUnsupported는 원본을 변형하지 않는다(사본에서 delete). v1 스냅샷은 어느 경로로도
+    바뀌지 않으며, 복원한 v1을 다시 적용해도 v1로 남는다.
+  - draft_prompt·compiler_version은 번역을 흡수하지 않는다. bytes 예산은 32 KiB 하나로 유지되고
+    새 필드용 별도 상한을 만들지 않았다.
+실행한 명령과 결과:
+  - node --test 'frontend/tests/*.test.mjs' → 177 pass / 0 fail(위 파일 18건 포함: TRANS04 7건 + TRANS05 11건).
+  - npm --prefix frontend run build → 성공. npm --prefix frontend run lint → 무경고.
+  - .venv/bin/python -m pytest backend/tests/test_prompt_composition.py -q → 15 passed
+    (v2 retry가 구성을 재컴파일하지 않고 그대로 복사하는 회귀 1건 추가).
+  - .venv/bin/python -m pytest backend/tests/test_coordination_capability.py -q → 통과(P 23 passed).
+  - .venv/bin/python -m pytest backend/tests/test_proposal_api.py backend/tests/test_proposal_provider.py
+    backend/tests/test_prompt_proposals.py -q → 112 passed(L).
+  - .venv/bin/python -m pytest backend/tests/test_prompt_remainder.py -q → 20 passed.
+  - git diff --check → 통과(EOF 빈 줄 정리 후).
+자산 메타데이터 표시: MetadataModal이 v2 스냅샷에서 포함 번역과 출처(proposal_model·proposal_id·
+  accepted_at)를 보여 주고, "초안과 최종 문자열이 다름"의 이유를 포함 번역으로 설명한다. v1은
+  기존 문구 그대로다. 다만 이 화면은 단위 테스트가 없으므로 표시 확인은 U12 회귀 범위다.
+텍스트 화면 묘사·브라우저 환경·DOM/포커스 관찰: 미검증 — 저장→복원 왕복은 단위 테스트로만
+  확인했고 실제 DB·자산 이력 화면에서의 왕복은 U12 회귀 범위다.
+미완료·위험·다음 태스크가 알아야 할 사실:
+  - 32 KiB 재측정은 backend/tests/test_prompt_composition.py::test_remainder_fits_the_measured_budget
+    이 실제 모델로 다시 계산한다(8개 항목 +7,000 B 초과, 총합 ≤ 32 KiB). 필드가 커지면 이 테스트가
+    계약의 여유 주장이 깨진 곳을 알려 준다.
+  - 구 이력(필드 없음)은 v1로 읽히고 remainder를 추정으로 채우지 않는다. 재결속도 하지 않는다.
+  - 배포 영향: 구 서버는 v2를 422로 거부하므로 클라이언트가 schema_versions=[1]을 보고 스스로
+    v1로 내린다. 서버와 클라이언트를 동시에 올릴 필요는 없지만, 클라이언트를 먼저 올리면 번역
+    포함은 저장되지 않고 경고만 보인다.
+  - 알려진 한계(모델 계열 전환): **TRANS06에서 수정됨(§1 TRANS06 참조).** 수정 전에는
+    App.changeBuilderFamily가 applied를 null로 비워 activeInclusions가 빈 목록을 돌려주었고,
+    포함한 번역이 패널에서 사라지며 새 계열 초안을 적용하면 remainder 없는 v1로 기록됐다.
+    최종 프롬프트에 이미 붙은 영어는 그대로 남았다(기록에서 빠지는 문제였고 프롬프트에서
+    빠지는 문제가 아니었다). 포함 목록을 계열 전환 너머로 유지하려면 소유권 규칙을 바꿔야
+    한다는 판단은 맞았고, TRANS06이 epoch를 추가해 그 규칙을 바꿨다.
+```
+
+### TRANS06 — 모델 계열 변경이 적용 기록을 잃지 않게 · 구현 완료 · 브라우저 검증 완료
+
+- 선행: TRANS05. **근거: TRANS05가 남긴 알려진 한계**(모델 계열 전환 시 포함한 번역이 패널에서 사라지고 다음 적용이 v1로 내려가던 문제). U11의 실제 브라우저 확인에서 드러난 회귀다.
+- 원인: `App.changeBuilderFamily`가 `applied`를 `null`로 비웠다. 그러면 `activeInclusions`가 `owner === null`을 "다른 구성"으로 읽어 빈 목록을 돌려주고, 다음 적용은 `remainder` 없는 v1 스냅샷을 기록했다. 화면에서는 적용 상태 문구까지 사라져서 사용자는 기록이 없어진 것처럼 보였다.
+- 수정: 계열 변경은 **초안만** 버리고 적용 기록은 유지한다(`withReboundFamily`). `appliedForFamily`가 계열을 검사하므로 서버로 다른 계열 구성이 나가지 않는다. "아직 적용 전"과 "처음부터 다시 시작"을 구분하기 위해 `compositionEpoch`를 추가했고, `activeInclusions`는 `list.epoch === epoch && list.owner === applied`일 때만 로컬 목록을 쓴다. `restartBuilder`/`restoreComposition`만 epoch를 올린다.
+- 표시: `appliedStatus`가 `familyChanged`를 새로 돌려주고, 상태 패널은 "모델 계열 변경 · 기록 유지"와 함께 패널이 왜 남는지, 다시 적용하면 같은 번역으로 새로 기록된다는 것을 한 문장으로 밝힌다.
+- 금지: 계열 변경에서 `applied`를 비우는 것. `owner === null`만으로 로컬 목록을 유지하는 것(재시작과 구분되지 않음). v1 스냅샷에 `remainder`를 만들어 넣는 것.
+
+**구현 인계 (2026-11-19)**
+
+```text
+TRANS06 / 구현 완료 · 브라우저 검증 완료 / 2026-11-19 / 기준 HEAD 16f3a34 + 작업 트리
+변경 파일과 사용자에게 달라지는 동작:
+  - frontend/src/prompt/remainderInclusion.ts: InclusionList에 epoch 추가,
+    EMPTY_INCLUSIONS = { owner: null, epoch: 0, items: [] },
+    activeInclusions(list, applied, epoch)가 epoch→owner 순으로 판정하고 아니면
+    applied.remainder(v2 한정)로 넘어간다.
+  - frontend/src/prompt/builderState.ts: compositionEpoch 추가, restartBuilder 신설,
+    restoreComposition(composition, epoch = 0)이 epoch+1로 단조 증가, withReboundFamily가
+    applied/provenance를 보존하고 result/generatedFrom/generatedMode만 비운다,
+    appliedInclusions(state)가 v2 기록의 번역을 돌려준다.
+  - frontend/src/prompt/presentation.ts: AppliedStatus에 "familyChanged" 추가.
+    appliedStatus가 applied.target_family !== family일 때 가장 먼저 이 값을 돌려준다.
+  - frontend/src/App.tsx: changeBuilderFamily가 withReboundFamily를 쓰고, reuse 경로는
+    restoreComposition(..., compositionEpoch) 또는 restartBuilder로 분기한다.
+  - frontend/src/components/PromptBuilder.tsx: setRemainder·적용 경로·baseRemainder가
+    compositionEpoch를 함께 넘기고, 상태 패널이 familyChanged 전용 문구를 보여 준다.
+  - 사용자 동작: 계열을 바꿔도 "포함한 번역" 패널과 출처가 남고, 그 계열에서 다시 적용하면
+    같은 번역이 remainder로 다시 기록된다(v2). 최종 프롬프트와 초안 폐기 규칙은 그대로다.
+보존한 계약:
+  - v1 스냅샷은 여전히 remainder를 얻지 않는다. 계열 변경 후 재적용이 v1이 되는 것은 포함이
+    없을 때뿐이고, 포함이 있으면 v2다.
+  - appliedForFamily가 계열을 검사하므로 다른 계열 구성이 제출 본문에 실리지 않는다.
+  - epoch는 단조 증가한다. restore/restart만 올리므로 "적용 전 포함"은 같은 세션으로 남고
+    "다시 시작"은 이전 목록을 물려받지 않는다.
+실행한 명령과 결과:
+  - node --experimental-strip-types --test 'frontend/tests/*.test.mjs' → 184 pass / 0 fail
+    (prompt-remainder-inclusion·prompt-presentation에 TRANS06 회귀 추가).
+  - .venv/bin/python -m pytest backend/tests -q → 374 passed / 96 skipped.
+  - npx tsc -b → 통과. npx eslint . → 무경고. npx vite build → 성공.
+  - .venv/bin/ruff check backend/app backend/tests → All checks passed.
+  - CHROME_PATH="Microsoft Edge" sh scripts/prompt-composer-browser/verify.sh
+    → 255 checks / 0 failed (신규 TRANS06 30건 포함).
+변이 검증(테스트가 실제로 회귀를 잡는지):
+  - App.tsx를 withReboundFamily({ ...old, applied: null }, ...)로 되돌리면 브라우저 검사가
+    12건 실패한다(패널 유지·출처 보존·"재적용은 v2로 기록"=1). 단위 테스트도 함께 실패한다.
+    원복 후 재실행해 255/0을 확인했다.
+  - MetadataModal의 v2 나머지 블록을 비활성으로 되돌리면 prompt-metadata-modal.test.mjs가
+    실패한다. activeInclusions의 epoch 조건을 빼면 remainder 단위 테스트가 실패한다.
+브라우저 검사 내용(scripts/prompt-composer-browser/suite-trans06.mjs, 신규):
+  - 번역 제안 → 포함 → 적용 → 계열 변경 → 패널/출처 유지 → 새 계열에서 재적용 → 제출 본문 확인.
+  - 마지막 POST /jobs 본문을 그대로 읽어 schema_version=2, target_family=flux2,
+    remainder[0]의 source_ko/suggested_en/proposal_id/proposal_model/accepted_at,
+    draft_prompt에 번역이 없다는 것, 최종 prompt가 번역으로 끝난다는 것을 검사한다.
+  - 화면 상태만이 아니라 실제 요청 본문을 보므로 "화면은 맞는데 저장은 v1"인 회귀도 잡는다.
+미검증:
+  - 실제 LLM이 만든 번역의 품질·문장 적합성은 여전히 미검증이다(LIVE02/EVAL-UX02).
+    이 검사는 페이지 안에서 번역 응답을 stub으로 주입하며, 그 사실을 코드 주석에 남겼다.
+  - 실제 DB·자산 이력 화면에서의 v2 왕복은 U12 회귀 범위다.
+다음 태스크가 알아야 할 사실:
+  - suite-contracts.mjs §N의 capabilities stub이 앞 섹션(§M)의 빈 200 스텁을 감싸므로
+    prompt_composition을 복원해 주지 않으면 v2/번역 경로가 통째로 사라진다. TRANS06 착수 중
+    발견해 고쳤다(주석으로 이유를 남김).
+  - run.mjs의 프로필 정리는 maxRetries가 필요하다. 브라우저 종료 직후 rmSync가 ENOTEMPTY로
+    실패해 성공한 실행이 실패처럼 보였다.
+```
+
+## 2. 남은 보완 태스크
+
+아래 태스크는 TRANS01–06과 독립적이거나 후속이다. TRANS가 사전 밖 구절을 다루는 동안 이들은 사전 안쪽 정확도(RULE03)·적용 안내(VAR03)·실연결 검증(LIVE/EVAL)·종료(U12)를 맡는다.
 
 ### RULE03 — 활용형·별칭 누락을 최소 범위로 보완 · 대기
 
@@ -253,37 +394,6 @@ ID / 상태 / 날짜 / 기준 HEAD: RULE02 / 구현 완료(로컬 검증) / 2026
 - 근거: 기준선 사례 4–7의 `앉은`/`서 있다`/`흰 배경` 등 누락. `흰 배경`→`단색 배경`만으로 색까지 보존됐다고 볼 수 없음.
 - 수정: alias 또는 matcher 중 근거가 있는 최소 범위와 테스트. dictionary 변경 시 버전·서버 mirror 생성/동기화 영향까지 기록.
 - 완료: 추가한 alias별 양성/반례, 색·시점·자세 중 사전으로 표현 못 하는 의미는 미반영으로 유지. 기존 스냅샷 재결속 금지. F·B 및 필요한 사전 교차 검증. 기준선 숫자를 맞추기 위한 기대값 삭제 금지.
-
-### METRIC01 — 평가 지표의 명칭·분모 정정 · 구현 완료
-
-- 근거: `scripts/eval-ux01/evaluate.mjs:242`는 `(proposed-unwanted)/proposed`를 precision으로 부르며 미분류 2개도 정답 취급한다. 31/34는 확인된 정밀도가 아님. 기존 80클릭은 계산 모델이고 43클릭은 누락 보정 없는 자동 UI 경로다.
-- 수정: evaluate/scenes 평가 판정 및 대응 테스트·현재 결과 자료. 과거 archive 수치는 그대로 보존.
-- 실행: 미분류를 추가 판정하거나 판정 가능 항목의 정밀도와 미분류 비율을 분리. 미분류 포함 수치는 상한 또는 비금지 제안 비율로 명명. 모델 클릭 비용·실제 UI 클릭·사람 소요 시간 분리.
-- 완료: 분자/분모 예시와 계산 테스트, 12장면 재계산. 테스트 통과용으로 오탐을 정답으로 바꾸지 않음. 아직 측정하지 않은 사용자 효율을 성공으로 표시하지 않음.
-
-```text
-ID / 상태 / 날짜 / 기준 HEAD: METRIC01 / 구현 완료(로컬 검증) / 2026-11-18 / 03a2fa5 이후 작업 트리
-변경 파일과 사용자에게 달라지는 동작:
-  scripts/eval-ux01/evaluate.mjs, frontend/tests/prompt-eval-ux01.test.mjs,
-  docs/evidence/prompt-composer-eval-ux01/{results.json,summary.txt,browser.json,browser-results.json}.
-  화면 동작은 바뀌지 않는다. 바뀌는 것은 보고 이름과 분모다.
-보존한 계약: 제품 코드·사전·컴파일러·Scene 계약·fixture 기대값. archive 수치는 수정하지 않았다.
-  계산 테스트는 기대값을 결과에 맞춰 고치지 않고, 판정 불가 항목을 분모에서 빼는 방식만 검증한다.
-실행한 명령과 결과:
-  지표 이름: precision(분자 적중, 분모 판정 가능 제안 = 제안 − 미분류), nonForbiddenShare(상한),
-  unclassifiedRate. 제거: precisionDecided.
-  현재 값: precision 100.0%(29/29) · 비금지 제안 비율 100.0%(30개 중 1개 미분류) ·
-  미분류 3.3% · 원치 않은 추가 0 · recall 76.3%. 부분 변경 팔의 보류/제안 개수도 함께 집계한다.
-  node --experimental-strip-types --test frontend/tests/prompt-eval-ux01.test.mjs → 통과
-  sh scripts/eval-ux01/browser.sh → 8/8 통과, 클릭 43(자동 UI 경로)
-텍스트 화면 묘사·브라우저 환경·DOM/포커스 관찰:
-  요약 출력 문장 2줄(`규칙 경로 precision …`, `미분류 … 상한은 비금지 제안 비율 …`)을
-  summary.txt로 확인. 브라우저 팔은 12장면 DOM에서 제안·칩·초안을 다시 읽어 Node 팔과 대조했다.
-미완료·위험·다음 태스크가 알아야 할 사실:
-  precision 100%는 "판정 가능한 29개"에서만 성립한다. 미분류 1건은 사람 판정 대기이고,
-  recall 76.3%는 그대로이므로 이 수치를 품질 개선으로 읽으면 안 된다.
-  사람의 소요 시간·실제 LLM 품질은 여전히 미측정(EVAL-UX02/U11).
-```
 
 ### VAR03 — 상황 문장과 실제 적용 부분의 차이 명시 · 대기
 
@@ -317,18 +427,20 @@ ID / 상태 / 날짜 / 기준 HEAD: METRIC01 / 구현 완료(로컬 검증) / 20
 
 - 실행: 현재 설명 입력→규칙/AI 제안→수락/부분 변경/상황 후보→미리보기→적용 흐름을 텍스트로 설명하고 실제 사용자 의견 기록. 360/390px·데스크톱의 실제 관찰/미검증 구분. RULE/VAR 보완 후 영향 부분은 다시 확인.
 - 완료: 반영/보류 결정과 이유. 기존 화면 계측을 최신 소스의 실측으로 재사용하지 않음. 무응답은 승인 아님. 캡처를 필수로 요구하지 않음.
+- **자동화로 덮인 부분(2026-11-19)**: `scripts/prompt-composer-browser/`가 CDP로 실제 브라우저를 구동해 255건을 검사한다(`verify.sh`, Edge로 실행). TRANS06 흐름(번역 제안→포함→적용→계열 변경→유지→재적용→제출 본문)은 이제 자동 검사가 있고, 변이 검증으로 그 검사가 회귀를 실제로 잡는다는 것까지 확인했다(§1 TRANS06 인계). **남은 것은 화면을 사람이 읽고 판단하는 확인**(문구의 자연스러움, 단계 순서가 사용자에게 납득되는지)이며, 이것은 자동 검사로 대체할 수 없다.
 
 ### U12 — 정합성 회귀와 범위별 종료 · 대기
 
-- 선행: RULE01–03, METRIC01, VAR03, LLM-R01–R07 및 U11. 실연결/품질을 포함한 전체 기능 종료는 LIVE02/EVAL-UX02 증거도 필요.
-- 실행: F·B·S·P·D 및 제안 provider/API 테스트. 같은 소스에서 이미 통과한 검사는 재사용 범위를 기록. 저장 스냅샷·retry·최종 직접 수정·원문 보존 확인. §0의 정본/사본 표(부정·잠금·그룹·충돌)가 코드 주석과 일치하는지 대조한다.
+- 선행: RULE01–03, METRIC01, VAR03, LLM-R01–R07 및 U11. **TRANS01–06을 구현했다면 그 회귀도 포함한다.** 실연결/품질을 포함한 전체 기능 종료는 LIVE02/EVAL-UX02 증거도 필요.
+- **부분 완료(2026-11-19)**: TRANS 계열 회귀는 U12의 두 항목으로 앞당겨 처리했다. (1) MetadataModal 표시는 `frontend/tests/prompt-metadata-modal.test.mjs`가 실제 React SSR로 렌더해 v2 출처·포함 번역·초안/최종 차이 설명을 검사한다(소스 grep이 아니라 렌더 결과를 보므로 죽은 분기의 문구에 속지 않는다). (2) `activeInclusions`·`withReboundFamily`·`appliedStatus`의 v1/v2·epoch 규칙은 단위 테스트와 CDP 브라우저 검사로 덮였다. **남은 U12 범위는 실제 DB·자산 이력에서의 v2 왕복**이며, 이는 아직 미검증이다.
+- 실행: F·B·S·P·D 및 제안 provider/API 테스트. 같은 소스에서 이미 통과한 검사는 재사용 범위를 기록. 저장 스냅샷·retry·최종 직접 수정·원문 보존 확인. [LLM 경로 리뷰 보관본](archive/prompt-composer/2026-11-18/LLM_PATH_REVIEW_AND_R01_R07.md)의 정본/사본 표(부정·잠금·그룹·충돌)가 코드 주석과 일치하는지 대조한다.
 - 완료: 로컬 구현/실연결/사용자 검증/운영/GPU 상태를 각각 기록. 미검증을 완료 archive로 숨기지 않음. 완료한 자식 상세만 archive로 옮기고 남은 태스크 유지.
 
 ### 캡처 없는 인계
 
 `태스크·HEAD / 위→아래 화면 순서 / 빈·로딩·오류·수락 후 상태 / 버튼명과 효과 / 변하지 않아야 할 데이터 / 포커스 / 테스트 결과 / 실제 DOM·크기 관찰 또는 미검증 / 다음 ID`를 기록한다. 소스 기반 예상 배치를 브라우저 관찰로 쓰지 않는다. 현재 도구 접근 규칙을 준수한다.
 
-## 2. 운영 릴리스·배포 최적화 (UX 이후)
+## 3. 운영 릴리스·배포 최적화 (UX 이후)
 
 아래 태스크는 각 행이 독립된 작업 명세다. `문서`는 지정 주제의 결과 파일 신규 작성 또는 기존 문서 갱신을 뜻한다.
 
@@ -341,7 +453,7 @@ ID / 상태 / 날짜 / 기준 HEAD: METRIC01 / 구현 완료(로컬 검증) / 20
 | DEP02 / 대기 | DEPLOY-OPT01, DEP01 | 순수 경로 분류 helper와 단위 테스트만 작성. frontend/backend/common/unknown·rename/delete 분류 | lock/config/workflow/API 공유 변경은 보수적 처리. classifier만으로 deploy skip 결정 금지 |
 | DEP03 / 검토 대기 | DEPLOY-OPT01, DEP02 | 부분 아티팩트 vs 검증된 재사용의 설치·백업·복구 설계 및 시간 측정 계획 | 서버 installer 변경 범위/해시 배포 절차/캐시 키와 비밀값 변경 무효화. 설계 검토 전 CI skip 활성화 금지 |
 
-## 3. 계약·모델 품질·토큰
+## 4. 계약·모델 품질·토큰
 
 | ID / 상태 | 상위·선행 | 수정 대상 / 작업 | 검증·완료 산출물 |
 | --- | --- | --- | --- |
@@ -354,7 +466,7 @@ ID / 상태 / 날짜 / 기준 HEAD: METRIC01 / 구현 완료(로컬 검증) / 20
 | TOKEN01 / 대기 | P6-T01, U12 | compiler와 sdcpp/tokenizer 설정의 실제 한도/잘림/분할 증거 조사(문서) | 공식 자료와 설치 버전의 근거, 모르는 규칙 분리. 다운로드/새 dependency 없음 |
 | TOKEN02 / 검토 대기 | P6-T01, TOKEN01 | 최종 prompt·원문·trigger를 검사할 위치와 fallback 설계, 경계 fixture 작성 | 정확 계산/추정 경고 구분. 현 77 근사치를 사실처럼 확대하지 않음 |
 
-## 4. Scene v2·참조 이미지 설계와 LLM 태스크 연결
+## 5. Scene v2·참조 이미지 설계와 LLM 태스크 연결
 
 | ID / 상태 | 상위·선행 | 수정 대상 / 작업 | 검증·완료 산출물 |
 | --- | --- | --- | --- |
@@ -363,8 +475,7 @@ ID / 상태 / 날짜 / 기준 HEAD: METRIC01 / 구현 완료(로컬 검증) / 20
 | IMAGE01 / 대기 | P7-I01, U12 | upload/권한/보관·조건 전처리·엔진 입력의 요구사항 표 작성 | ControlNet/IP-Adapter/img2img 각각 현재 capability와 필요한 새 계약 분리 |
 | IMAGE02 / 검토 대기 | P7-I01, IMAGE01·SCENE01 | 참조 자산 연결·실패 복구·GPU 메모리 평가 계획 | 실제 모델/엔진 검증 전 지원 약속 금지. 업로드 API 구현 없음 |
 
-
-## 5. LLM 자동화 후보·규칙 평가
+## 6. LLM 자동화 후보·규칙 평가
 
 | ID / 상태 | 상위·선행 | 수정 대상 / 작업 | 검증·완료 산출물 |
 | --- | --- | --- | --- |
@@ -377,7 +488,7 @@ ID / 상태 / 날짜 / 기준 HEAD: METRIC01 / 구현 완료(로컬 검증) / 20
 | AUDIT-A8 / 대기 | LLM-A8, QUALITY01 | 이미지 평가 rubric과 LLM 채점 보조 입력/출력·사람 검토 계획 | 실제 이미지 없으면 채점하지 않음. LLM 판단을 품질 사실로 확정하지 않음 |
 | AUDIT-A6 / 검토 대기 | LLM-A6, SCENE01·보관된 C01 계약 | actor 귀속 제안과 불명확성 표시 예시 작성 | 사용자 수락 전 귀속 변경 없음. Scene v1을 임의 확장하지 않음 |
 
-## 6. 접근성·플랫폼 잔여 검증
+## 7. 접근성·플랫폼 잔여 검증
 
 | ID / 상태 | 상위·선행 | 수정 대상 / 작업 | 검증·완료 산출물 |
 | --- | --- | --- | --- |
@@ -385,38 +496,3 @@ ID / 상태 / 날짜 / 기준 HEAD: METRIC01 / 구현 완료(로컬 검증) / 20
 | AT02 / 환경 대기 | P5-C03-AT, U09 | 실제 보조기기에서 이름·상태·오류·분류·선택 해제 낭독 검증 | OS/브라우저/스크린리더·실행 순서·관찰 기록. 자동 axe만으로 대체하지 않음 |
 | PLATFORM01 / 대기 | TEST-PLATFORM01 | 기존 실패 보고에서 48개 실패의 파일/실패명/최초 예외/OS 기능 의존 목록 정리 | 문서의 기존 분류를 가설로 취급. 전체 실패를 자동으로 환경 탓으로 닫지 않음. 기존 실패를 숨기는 skip 추가 금지 |
 | PLATFORM02 / 환경 대기 | TEST-PLATFORM01, PLATFORM01 | 격리 Linux/Fedora에서 같은 커밋·의존성·명령 실행 후 비교 | 0건 확인 또는 실제 결함별 후속 ID 생성. 운영 서비스/권한 변경 없이 실행 가능한 환경 필요 |
-
-## 이번 대조의 검증 (2026-11-18)
-
-- RULE01·RULE02·METRIC01 반영 후: 프론트 F **131/131 통과**, build·lint 통과.
-- 브라우저 `sh scripts/prompt-composer-browser/verify.sh` **225/225 통과**(RULE02 범위 목록 7건 신규: 1280px 4 + 360px 3), `sh scripts/eval-ux01/browser.sh` **8/8 통과**(클릭 43).
-- 제안 schema/provider/API + prompt composition + coordination capability: **105/105 통과** (`.venv/bin/python -m pytest backend/tests/test_prompt_proposals.py backend/tests/test_proposal_provider.py backend/tests/test_proposal_api.py backend/tests/test_prompt_composition.py backend/tests/test_coordination_capability.py -q`).
-- 새 브라우저 실행은 위 두 하네스이며 headless Chromium 1280×900(및 RULE02 360×740 측정 구간)에서만이다. 실제 LLM·GPU·전체 Studio suite는 실행하지 않았다. 로컬 테스트 통과가 실제 모델 품질을 입증하지 않는다.
-- 이번 변경은 제품 코드(`proposals.ts`·`matching.ts`·`PromptBuilder.tsx`·`styles.css`), 테스트, 평가 하네스, 문서, `docs/evidence/` 재생성 결과를 포함한다. 직전 기준선 문서만 갱신한 대조와 달리 브라우저·평가를 다시 실행했고, 그 결과가 위 수치다. 완료된 상세 명세/계약은 2026-11-18 archive에 보존했다.
-
-### 2026-11-18 LLM 경로 리뷰 대조 (§0)
-
-- 리뷰 갱신은 **문서 전용**이었다. 제품 코드·사전·테스트·fixture를 수정하지 않았고 기존 통과 수치를 재실행하지 않았다.
-- 위 리뷰 후 **LLM-R01–R07을 실제로 구현**했고, 그 결과가 다음 절이다.
-- 리뷰 중 실행한 명령과 결과:
-  - `.venv/bin/python -m pytest backend/tests/test_prompt_proposals.py backend/tests/test_proposal_provider.py backend/tests/test_proposal_api.py -q` → **91/91 통과**(§0 태스크의 `L` 기준선).
-  - `.venv/bin/python`으로 `_negated_in_source` 직접 호출: `사람은 없다`→False(미탐지), `사람. 안경 없이 걷는다`→True(절 경계 무시), `안경 없이 짧은 머리의 사람`→False(기존 의도 유지). 세 결과를 LLM-R01 근거로 인용했다.
-  - Node로 카탈로그 3형태 바이트 측정: id만 2,939B, id+라벨 4,077B, id+라벨+별칭 5,733B. 활성 100개·별칭 122개 확인.
-  - Node로 요청 본문 크기 측정: 8 KiB를 넘는 첫 한글 문자 수 2,592자(8,194B), 4,000자에서 12,418B.
-  - `git rev-parse --short HEAD` → `b5efd2d`(기준 HEAD 갱신).
-- 측정하지 않은 것: 실제 모델 응답, 브라우저 화면, GPU·gate 상태. §0은 코드 구조와 순수 함수 실행 결과만 근거로 한다.
-
-### 2026-11-18 LLM-R01–R07 구현 결과
-
-- **변경 파일**: `backend/app/services/prompt_proposals.py`, `backend/app/services/proposal_provider.py`, `backend/app/services/prompt_dictionary.py`, `backend/app/api/proposals.py`, `frontend/src/prompt/llmProposals.ts`, `config/prompt_dictionary.json`, `scripts/gen-prompt-dictionary.mjs`(신규), 테스트 4개 파일.
-- **검증 명령과 결과**:
-  - `L`: `.venv/bin/python -m pytest backend/tests/test_prompt_proposals.py backend/tests/test_proposal_provider.py backend/tests/test_proposal_api.py -q` → **106 passed**(리뷰 기준선 91).
-  - `F`: `node --experimental-strip-types --test frontend/tests/*.test.mjs` → **133 pass / 0 fail**(기준선 131).
-  - `D`: `git diff --check` → 위반 0.
-  - `.venv/bin/python -m ruff check backend` → **All checks passed**.
-  - 전체 `backend/tests` → **337 passed / 96 skipped / 0 failed**. 스킵 96건은 Linux 전용 model-switch 9개 모듈 + 기존 `test_root_namespace.py`이며 `sys.platform` 가드로 처리했다(위 "플랫폼 전용 테스트").
-- **실측 payload**: 실제 mirror 기준으로 렌더된 시스템 프롬프트 카탈로그가 5,717B. 요청 본문은 실제 `proposalBody`로 측정해 선택 100개·범위 없음·한글 1자에서 **5,143B**, 선택 60+잠금 60+한글 1,000자에서 **7,519B**. `selections`·`locked_ids`가 8 KiB 예산을 실제로 소모한다.
-- **실측 여유**: 8 KiB에서 남는 한글 문자 수는 선택/잠금 100+100에서 **361자**, 100+0에서 1,017자, 60+60에서 1,224자, 20+20에서 2,144자, 선택 1개에서 2,582자.
-- **R03의 바이트 영향 = 0**: 브라우저는 이미 `selections`를 보내고 있었고 서버 `build_payload`가 그 필드를 복사하지 않았을 뿐이다. 따라서 R03은 정보 누락을 고친 것이지 요청을 키운 것이 아니다.
-- **남은 위험**: 대량 선택(수십~100)+긴 한글 서술 조합은 8 KiB 로컬 검사에서 `too_large`로 거절된다. 요청 상한을 올리지 않기로 했으므로(R04 주의사항) 이 조합은 의도된 거절이며, 필요하면 `selections` 전송 형식 축소(배열화)를 별도 태스크로 다룬다.
-- 다음 작업은 RULE03이다. LIVE02는 실행 환경이 있을 때 R01–R05 위에서 착수한다.

@@ -457,6 +457,28 @@
 .prompt-variant-undo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 0; }
 .prompt-variant-undo > .quiet { padding: 6px 10px; font-size: .76rem; }
 .prompt-variant-undo > small { color: #8f95a1; }
+/* TRANS04: included translations. Same grid as a variant card so the "included" state
+   is a border and a word (aria-pressed), never colour alone. */
+.prompt-remainder { margin: 10px 0 0; }
+.prompt-remainder__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.prompt-remainder__counts { color: #8f95a1; font-size: .74rem; }
+.prompt-remainder__list { display: grid; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
+.prompt-remainder-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px;
+  padding: 8px; border: 1px solid #383b45; border-left: 3px solid #6b6f7a; border-radius: 6px; background: #20222a; }
+.prompt-remainder-card[data-included] { border-color: #4a6a8f; border-left-color: #6ea8fe; background: #1e2530; }
+.prompt-remainder-card__body { min-width: 0; overflow-wrap: anywhere; }
+.prompt-remainder-card__body > strong { font-size: .8rem; }
+.prompt-remainder-card__en { margin-left: 6px; font-size: .78rem; color: #d5d9e2; }
+.prompt-remainder-card__score { font-size: .72rem; color: #8f95a1; }
+.prompt-remainder-card__warn { margin: 6px 0 0; font-size: .73rem; color: #f4cb84; }
+.prompt-remainder-card > .quiet { padding: 5px 9px; font-size: .74rem; white-space: nowrap; }
+/* The durable control: shown when no card panel is on screen to host "포함 해제". */
+.prompt-remainder-included { margin: 8px 0 0; padding: 8px; border: 1px dashed #41444f; border-radius: 8px; }
+.prompt-remainder-included > strong { font-size: .78rem; }
+.prompt-remainder-included > ul { display: grid; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; font-size: .76rem; }
+.prompt-remainder-included > ul > li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
+.prompt-remainder-included > ul > li > span { min-width: 0; overflow-wrap: anywhere; }
+.prompt-remainder-included > ul > li > .quiet { padding: 3px 8px; font-size: .72rem; }
 .prompt-undo > small { color: #8f95a1; }
 .prompt-warning--action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
 .prompt-warning--action > .quiet { padding: 3px 8px; font-size: .72rem; white-space: nowrap; }

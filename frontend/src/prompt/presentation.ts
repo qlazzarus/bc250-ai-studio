@@ -165,10 +165,19 @@ export function inclusionNotice(state: PromptBuilderState, result: CompileResult
 }
 
 /** One short label for the applied/edited state; unknown history is not claimed as unedited. */
-export type AppliedStatus = "none" | "applied" | "modified" | "unknown" | "selectionChanged";
+export type AppliedStatus = "none" | "applied" | "modified" | "unknown" | "selectionChanged" | "familyChanged";
 
-export function appliedStatus(state: PromptBuilderState, prompt: string): AppliedStatus {
+/**
+ * TRANS06: `familyChanged` exists because a rebind keeps the record but changes what the
+ * server would store. `appliedForFamily` refuses to submit a composition for another
+ * family, so the old "다시 적용하기 전에는 마지막 적용 구성이 저장됩니다" sentence would
+ * be false here — the record is kept for its translations, not because it would be sent.
+ * It is checked before the others: the record no longer describes this family at all, so
+ * "수정됨"/"선택 변경됨" would each describe a detail of a record that is on hold.
+ */
+export function appliedStatus(state: PromptBuilderState, prompt: string, family: string): AppliedStatus {
   if (!state.applied) return "none";
+  if (state.applied.target_family !== family) return "familyChanged";
   if (state.appliedPrompt === null) return "unknown";
   if (state.appliedPrompt !== prompt) return "modified";
   if (state.appliedScene !== null && JSON.stringify(state.scene) !== state.appliedScene) return "selectionChanged";

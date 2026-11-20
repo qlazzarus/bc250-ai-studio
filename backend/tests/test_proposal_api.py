@@ -611,3 +611,121 @@ def test_a_target_group_the_dictionary_lacks_is_a_contract_error(gated):
     # No second model call: the request never reached the provider.
     assert len(chats()) == 1
 
+
+# TRANS03: the `remainder_translation` kind through the real route.
+TRANSLATE_TEXT = "비 오는 밤 편의점 앞에서 젖은 바닥에 반사된다"
+TRANSLATE_PHRASES = ["비 오는 밤", "편의점"]
+
+
+def translate_spans(*phrases):
+    text = TRANSLATE_TEXT
+    return [{"start": text.index(p), "end": text.index(p) + len(p)} for p in phrases]
+
+
+def translate_body(**changes):
+    """A translation request. No `selections`: a translation is dictionary-blind."""
+    payload = {
+        "kind": "remainder_translation",
+        "request_id": REQUEST_ID,
+        "target_family": "sd15",
+        "dictionary_version": "1.2.0",
+        "free_text_ko": TRANSLATE_TEXT,
+        "revisions": body()["revisions"],
+        "remainder_spans": translate_spans(*TRANSLATE_PHRASES),
+    }
+    payload.update(changes)
+    return payload
+
+
+def translate_reply(**changes):
+    payload = reply(kind="remainder_translation", suggestions=[], translations=[
+        {"source_ko": "비 오는 밤", "suggested_en": "a rainy night", "confidence": 0.9},
+        {"source_ko": "편의점", "suggested_en": "a convenience store", "confidence": 0.9},
+    ])
+    payload.update(changes)
+    return payload
+
+
+def chat_calls(calls):
+    return [item for item in calls if item.url.path.endswith("/chat/completions")]
+
+
+def test_remainder_translation_returns_pairs_and_no_suggestions(gated):
+    calls = install(gated.app, lambda request: chat(translate_reply()))
+    value = gated.post("/api/v1/prompt/proposals", json=translate_body()).json()
+    assert value["status"] == "ready"
+    assert value["kind"] == "remainder_translation"
+    # TRANS03: a translation never becomes a dictionary suggestion.
+    assert value["suggestions"] == []
+    assert [item["suggested_en"] for item in value["translations"]] == [
+        "a rainy night", "a convenience store"]
+    # The Korean source is echoed unchanged; the reply cannot rewrite it.
+    assert [item["source_ko"] for item in value["translations"]] == TRANSLATE_PHRASES
+    # The prompt asks for no IDs and carries the phrase as data, not instruction.
+    payload = json.loads(chat_calls(calls)[0].content)["messages"][1]["content"]
+    asked = json.loads(payload)
+    assert asked["phrases"] == TRANSLATE_PHRASES
+    assert "free_text_ko" not in asked
+
+
+def test_remainder_translation_sends_no_dictionary_catalogue(gated):
+    """The 8 KiB request budget must not be spent on IDs a translation cannot use."""
+    calls = install(gated.app, lambda request: chat(translate_reply()))
+    gated.post("/api/v1/prompt/proposals", json=translate_body())
+    system = json.loads(chat_calls(calls)[0].content)["messages"][0]["content"]
+    assert "Dictionary:" not in system
+    assert "Never invent dictionary IDs" in system
+
+
+def test_the_older_kinds_do_not_gain_a_translations_key(gated):
+    """C01/I06/VAR01 replies stay byte-identical: no new key."""
+    install(gated.app, lambda request: chat())
+    value = gated.post("/api/v1/prompt/proposals", json=body()).json()
+    assert "translations" not in value
+
+
+def test_a_failed_translation_request_keeps_an_empty_translations_key(gated):
+    def transport(request):
+        if request.url.path.endswith("/control"):
+            return httpx.Response(200, json={"paused": False, "waiting_requests": 0,
+                                             "active_requests": 0})
+        raise AssertionError("no chat call for a refused request")
+
+    gated.app.state.proposal_client = ProposalProviderClient(
+        gated.app.state.settings, transport=httpx.MockTransport(transport)
+    )
+    value = gated.post("/api/v1/prompt/proposals",
+                       json=translate_body(dictionary_version="1.1.0")).json()
+    assert value["status"] == "unavailable"
+    assert value["why"] == "stale_dictionary"
+    assert value["kind"] == "remainder_translation"
+    assert value["translations"] == []
+
+
+def test_an_unknown_kind_is_still_answered_as_unsupported_v1(gated):
+    """C01-4 is unchanged: a kind this server does not implement is not an error."""
+    calls = install(gated.app, lambda request: chat())
+    value = gated.post("/api/v1/prompt/proposals",
+                       json=body(kind="remainder_summary")).json()
+    assert value["status"] == "unsupported_v1"
+    assert value["why"] == "kind_unsupported_v1"
+    assert chat_calls(calls) == []
+
+
+def test_a_translation_request_over_the_8_kib_body_cap_is_a_413(gated):
+    """TRANS01 §3.3 keeps the existing transport guard; no new error code.
+
+    Offsets are what make this kind cheap, but `free_text_ko` is still the whole
+    sentence: 4,000 Korean characters is ~12 KB, so the transport cap — not the
+    span count — is what a caller has to respect.
+    """
+    calls = install(gated.app, lambda request: chat(translate_reply()))
+    payload = translate_body(free_text_ko="가" * 4000,
+                             remainder_spans=[{"start": 0, "end": 2}])
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    assert len(raw) > 8192
+    response = gated.post("/api/v1/prompt/proposals", content=raw,
+                          headers={"Content-Type": "application/json"})
+    assert response.status_code == 413
+    # Rejected before the provider: the request never reaches the gate or the model.
+    assert chat_calls(calls) == []

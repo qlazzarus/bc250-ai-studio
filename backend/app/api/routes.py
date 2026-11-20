@@ -196,7 +196,7 @@ async def capabilities(request: Request):
         "engine": state(request).settings.engine,
         "job_types": ["image.generate", "image.batch"],
         "durable_sse": True,
-        "prompt_composition": {"schema_versions": [1]},
+        "prompt_composition": {"schema_versions": [1, 2]},
         **request_limits,
         **prompt_proposals,
         "pixel_processing": False,

@@ -19,10 +19,18 @@ export function validateText(text: string, field: string, limit: number, require
 
 // Match Pydantic model_dump defaults before json.dumps(ensure_ascii=False,
 // separators=(',', ':')). Missing unresolved IDs become null on the server.
+//
+// TRANS01 §2.4: `remainder` is only normalized when a v2 composition carries one.
+// A v1 snapshot must not gain the key here either — this function feeds the byte
+// count that decides whether the snapshot can be saved, and adding an empty array
+// would measure a body the server would reject as `extra_forbidden`.
 export function normalizedComposition(composition: PromptComposition) {
+  const remainder = composition.remainder === undefined ? {} : {
+    remainder: composition.remainder.map((item) => ({ ...item })),
+  };
   return { ...composition, selections: composition.selections.map((item) => ({ ...item, rendered: item.rendered ?? null })),
     free_text_ko: composition.free_text_ko ?? "", draft_prompt: composition.draft_prompt ?? "",
-    unresolved: (composition.unresolved ?? []).map((item) => ({ ...item, id: item.id ?? null })) };
+    unresolved: (composition.unresolved ?? []).map((item) => ({ ...item, id: item.id ?? null })), ...remainder };
 }
 export function compositionBytes(composition: PromptComposition): number {
   return utf8Bytes(JSON.stringify(normalizedComposition(composition)));
@@ -35,7 +43,13 @@ export function validateComposition(c: PromptComposition, family: string): Valid
     issues.push(...validateText(value, field, limit));
     if (required && !value.length) add(field, "빈 값은 사용할 수 없습니다.");
   };
-  if (c.schema_version !== 1) add("composition", "지원하는 구성 스키마는 v1입니다.");
+  // TRANS05: the server accepts v1 and v2 simultaneously and advertises both, so the
+  // client must not reject a v2 snapshot it just built. A v2 body without `remainder`
+  // is a server default; a v1 body *with* one is `extra_forbidden`, so the key and the
+  // version have to agree here too.
+  if (c.schema_version !== 1 && c.schema_version !== 2) add("composition", "지원하는 구성 스키마는 v1, v2입니다.");
+  if (c.schema_version === 1 && c.remainder !== undefined) add("composition", "v1 구성에는 번역문을 넣을 수 없습니다.");
+  if (c.schema_version === 2 && (c.remainder?.length ?? 0) > 8) add("remainder", `${c.remainder?.length}/8개: 번역문을 줄여 주세요.`);
   if (c.target_family !== family) add("composition", "모델 계열이 다릅니다. 대상 모델에서 초안을 다시 만들고 적용하세요.");
   text(c.compiler_version, "composition", 100, true);
   text(c.target_family, "composition", 100, true);
@@ -62,6 +76,16 @@ export function validateComposition(c: PromptComposition, family: string): Valid
   }
   const bytes = compositionBytes(c);
   if (bytes > 32768) add("composition", `${bytes}/32768바이트: 선택 또는 추가 설명을 줄여 초안을 다시 적용하세요.`);
+  // TRANS01 §2/§4: every field here is mirrored from `CompositionRemainder`, including
+  // the 8-character `proposal_id` minimum and the exact `accepted_at` pattern. A miss
+  // would only surface as a 422 after the user had already pressed 생성.
+  for (const item of c.remainder ?? []) {
+    text(item.source_ko, "remainder", 200, true);
+    text(item.suggested_en, "remainder", 200, true);
+    text(item.proposal_model, "remainder", 200, true);
+    if (!/^[A-Za-z0-9_-]{8,64}$/.test(item.proposal_id)) add("remainder", "번역 제안 출처가 올바르지 않습니다. 번역을 다시 요청하세요.");
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(item.accepted_at)) add("remainder", "번역 시각 형식이 올바르지 않습니다. 번역을 다시 포함하세요.");
+  }
   return issues;
 }
 

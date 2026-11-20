@@ -1,5 +1,5 @@
 import json
-from typing import Literal
+from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
@@ -72,7 +72,67 @@ class CompositionUnresolved(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
 
 
-class PromptComposition(BaseModel):
+def check_snapshot(model):
+    """The two snapshot checks both schema versions share.
+
+    TRANS01 §3.1: 32 KiB of UTF-8 is the *only* binding size limit. Adding a second
+    per-field byte budget would create a truth that drifts from ``validateComposition``
+    in the browser, so field caps stay semantic (how many cards to show) and this check
+    stays the one that decides what can be saved.
+    """
+    ids = [entry.id for entry in model.selections]
+    if len(ids) != len(set(ids)):
+        raise ValueError("Duplicate composition selection ID")
+    payload = model.model_dump(mode="json")
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    if len(encoded.encode("utf-8")) > 32768:
+        raise ValueError("Prompt composition exceeds 32 KiB")
+
+    def contains_nul(value):
+        if isinstance(value, str):
+            return "\x00" in value
+        if isinstance(value, dict):
+            return any(contains_nul(item) for item in value.values())
+        if isinstance(value, list):
+            return any(contains_nul(item) for item in value)
+        return False
+
+    if contains_nul(payload):
+        raise ValueError("NUL characters are not allowed")
+    return model
+
+
+class CompositionRemainder(BaseModel):
+    """TRANS01 §2: one accepted translation of a phrase the dictionary cannot express.
+
+    ``source_ko`` is the *text*, not an offset. A saved snapshot is a record of what was
+    accepted, and ``free_text_ko`` may be edited afterwards; an offset would then point
+    somewhere else and the record would silently lie. The request side deliberately does
+    the opposite (``RemainderReference``) because there the text is already on the wire.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    source_ko: str = Field(min_length=1, max_length=200)
+    suggested_en: str = Field(min_length=1, max_length=200)
+    # C01-2 provenance vocabulary, reused per item (principle 7). One composition can mix
+    # translations from different calls, so one top-level set could not say which phrase
+    # came from which reply.
+    proposal_id: str = Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    proposal_model: str = Field(min_length=1, max_length=200)
+    # ISO-8601 UTC, second precision: ``YYYY-MM-DDTHH:MM:SSZ``.
+    accepted_at: str = Field(min_length=20, max_length=20,
+                             pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+    @model_validator(mode="after")
+    def check_text(self):
+        if not self.source_ko.strip() or not self.suggested_en.strip():
+            raise ValueError("Remainder text must not be blank")
+        return self
+
+
+class PromptCompositionV1(BaseModel):
+    """The v1 snapshot, unchanged. Saved assets keep validating against this shape."""
+
     model_config = ConfigDict(extra="forbid")
     schema_version: Literal[1]
     compiler_version: str = Field(min_length=1, max_length=100)
@@ -84,24 +144,35 @@ class PromptComposition(BaseModel):
 
     @model_validator(mode="after")
     def validate_snapshot(self):
-        ids = [entry.id for entry in self.selections]
-        if len(ids) != len(set(ids)):
-            raise ValueError("Duplicate composition selection ID")
-        encoded = json.dumps(self.model_dump(), ensure_ascii=False, separators=(",", ":"))
-        if len(encoded.encode("utf-8")) > 32768:
-            raise ValueError("Prompt composition exceeds 32 KiB")
-        def contains_nul(value):
-            if isinstance(value, str):
-                return "\x00" in value
-            if isinstance(value, dict):
-                return any(contains_nul(item) for item in value.values())
-            if isinstance(value, list):
-                return any(contains_nul(item) for item in value)
-            return False
+        return check_snapshot(self)
 
-        if contains_nul(self.model_dump()):
-            raise ValueError("NUL characters are not allowed")
-        return self
+
+class PromptCompositionV2(BaseModel):
+    """v1 plus ``remainder``. ``extra="forbid"`` keeps a v2 key out of a v1 body."""
+
+    model_config = ConfigDict(extra="forbid")
+    schema_version: Literal[2]
+    compiler_version: str = Field(min_length=1, max_length=100)
+    target_family: str = Field(min_length=1, max_length=100)
+    selections: list[CompositionSelection] = Field(max_length=100)
+    free_text_ko: str = Field(default="", max_length=4000)
+    draft_prompt: str = Field(default="", max_length=8000)
+    unresolved: list[CompositionUnresolved] = Field(default_factory=list, max_length=101)
+    # 8 is the server's MAX_UNRESOLVED, i.e. how many uncovered phrases one reply can
+    # describe. No separate byte budget: ``validate_snapshot`` is the only binding limit.
+    remainder: list[CompositionRemainder] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def validate_snapshot(self):
+        return check_snapshot(self)
+
+
+# A discriminated union, not a version field the caller may lie about: `schema_version`
+# selects the model, so a v2 body carrying `remainder` under `schema_version: 1` fails
+# with ``extra_forbidden`` instead of being read as v1 and losing the translations.
+PromptComposition = Annotated[
+    Union[PromptCompositionV1, PromptCompositionV2], Field(discriminator="schema_version")
+]
 
 
 class JobRequest(BaseModel):

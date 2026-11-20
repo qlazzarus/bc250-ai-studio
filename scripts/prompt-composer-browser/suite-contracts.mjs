@@ -333,6 +333,11 @@ export async function runContracts({ page, check, record, sleep, shots }) {
       if (url.includes("/system/capabilities")) {
         const response = await real(input, init);
         const body = await response.json().catch(() => ({}));
+        // The earlier section replaced capabilities with an empty 200 for its own
+        // reload, and this script wraps that wrapper. Without restoring the field here
+        // the app sees "no composition support" and the v2/translate path is absent for
+        // a reason that has nothing to do with the feature under test.
+        body.prompt_composition = body.prompt_composition ?? { schema_versions: [1, 2] };
         body.prompt_proposals = { schema_versions: [1], dictionary_version: "1.2.0",
           timeout_ms: 20000, max_response_bytes: 16384 };
         return new Response(JSON.stringify(body), { status: response.status,
@@ -350,6 +355,9 @@ export async function runContracts({ page, check, record, sleep, shots }) {
           suggestions: window.__proposalReply?.suggestions ?? [{ id: "lighting.neon", matched_phrase: "네온", basis: "quote",
             polarity: "affirmed", actor: null, confidence: 0.9, reason_ko: "" }],
           variants: window.__proposalReply?.variants ?? [],
+          // TRANS06: a translation reply is its own shape; without this the stub could
+          // never answer the translate button and the inclusion panel stays untested.
+          translations: window.__proposalReply?.translations ?? [],
           unresolved_spans: window.__proposalReply?.unresolved_spans ?? [],
           ambiguities: window.__proposalReply?.ambiguities ?? [],
           rejected: [], truncated: window.__proposalReply?.truncated ?? false,

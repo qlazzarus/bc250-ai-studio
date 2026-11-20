@@ -17,6 +17,7 @@ sh scripts/prompt-composer-browser/verify.sh
   APP_URL=http://localhost:4206/ sh scripts/prompt-composer-browser/verify.sh
   ```
 - 환경 변수: `CHROME_PATH`(Chromium 실행 파일), `CDP_PORT`, `APP_URL`, `SHOT_DIR`, `RESULT_FILE`, `OUT`.
+  - macOS에서 Playwright 번들이 없으면 Edge를 쓸 수 있다: `CHROME_PATH="/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"`.
 - `run.mjs`는 `APP_URL` 없이 실행되지 않는다. 격리 서버를 거치지 않는 실수로 운영 주소를 치는 것을 막기 위해서다.
 
 ## 파일
@@ -30,6 +31,7 @@ sh scripts/prompt-composer-browser/verify.sh
 | `suite-messages.mjs` | 메시지 3등급(GAP02), separate/verbatim, 미지원 계열, 8001자 차단 |
 | `suite-keyboard.mjs` | 키보드 순회·조작, 터치 크기, 360/390/1280 반응형 |
 | `suite-contracts.mjs` | 적용·덮어쓰기 취소, 생성, 과거 복원, 422/413, 계열 전환, capability 미지원 |
+| `suite-trans06.mjs` | 번역 제안→포함→적용→모델 계열 변경→기록 유지→재적용, 그리고 실제 `POST /jobs` 본문의 v2 `remainder`·출처 검사 |
 | `run.mjs` | Chromium 기동, 스위트 실행, `results.json` 기록 |
 
 ## 주의

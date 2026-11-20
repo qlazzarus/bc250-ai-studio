@@ -27,7 +27,7 @@ async def test_studio_advertises_coordination_only_for_complete_configuration(ma
         assert "request_limits" not in response
     else:
         assert response["request_limits"] == {"max_body_bytes": max_body_bytes}
-    assert response["prompt_composition"] == {"schema_versions": [1]}
+    assert response["prompt_composition"] == {"schema_versions": [1, 2]}
     assert response["model_switch_coordination"] == {
         "protocol": 1, "enabled": True,
     }

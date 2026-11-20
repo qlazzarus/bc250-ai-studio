@@ -238,12 +238,16 @@ test('restored drafts report the unknown application method instead of guessing'
 test('applied status distinguishes edited, unchanged, selected and unknown history', () => {
   const scene = sceneWith(['subject.person']);
   const state = withGeneratedDraft({ ...structuredClone(initialBuilderState), freeTextMode: 'separate', scene }, compileScene(scene));
-  assert.equal(appliedStatus(state, ''), 'none');
+  assert.equal(appliedStatus(state, '', scene.targetFamily), 'none');
   const applied = withAppliedDraft(state);
-  assert.equal(appliedStatus(applied, applied.result.draft), 'applied');
-  assert.equal(appliedStatus(applied, applied.result.draft + '!'), 'modified');
-  assert.equal(appliedStatus({ ...applied, scene: { ...applied.scene, freeTextKo: '추가' } }, applied.result.draft), 'selectionChanged');
-  assert.equal(appliedStatus(restoreComposition(snapshot()), 'draft'), 'unknown');
+  assert.equal(appliedStatus(applied, applied.result.draft, scene.targetFamily), 'applied');
+  assert.equal(appliedStatus(applied, applied.result.draft + '!', scene.targetFamily), 'modified');
+  assert.equal(appliedStatus({ ...applied, scene: { ...applied.scene, freeTextKo: '추가' } },
+    applied.result.draft, scene.targetFamily), 'selectionChanged');
+  assert.equal(appliedStatus(restoreComposition(snapshot()), 'draft', 'sd15'), 'unknown');
+  // TRANS06: a rebind keeps the record, so its status must not keep claiming the record
+  // would be stored — `appliedForFamily` refuses to send it for another family.
+  assert.equal(appliedStatus(applied, applied.result.draft, 'flux2'), 'familyChanged');
 });
 
 test('background guidance stays collapsed and state text stays visible', () => {

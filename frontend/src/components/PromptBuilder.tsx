@@ -8,11 +8,11 @@ import {
   type ProposalCapability, UNSUPPORTED, proposalActionLabel, proposalFallbackNotice,
 } from "../prompt/proposalCapability";
 import {
-  ERROR_MESSAGES, IDLE, VARIANT_KIND, cancelProposal, dismissProposal,
+  ERROR_MESSAGES, IDLE, TRANSLATION_KIND, VARIANT_KIND, cancelProposal, dismissProposal,
   invalidateProposal, isPending, newRequestId, proposalBody, proposalNotice, reapplyProposal,
   revisionsFor, runProposal, settleProposal, startProposal, unapplyProposal,
   VARIANT_GROUPS,
-  type ProposalRevisions, type ProposalState,
+  type ProposalBody, type ProposalRevisions, type ProposalState,
 } from "../prompt/llmProposals";
 import {
   blockReason, cardConfidence, proposalCards, type ProposalCard,
@@ -30,6 +30,12 @@ import {
 import {
   recordAcceptance, undoScene, undoStatus, type AcceptRecord,
 } from "../prompt/proposalUndo";
+import { extractRemainder, REMAINDER_CHARS, REMAINDER_LIMIT } from "../prompt/remainder";
+import {
+  activeInclusions, EMPTY_INCLUSIONS, excludeRemainder, finalPrompt, includedEnglish,
+  includeRemainder, isIncluded, pruneRemainder, remainderEntry, tokenPreview, translationCards,
+  type AcceptedTranslation, type InclusionList,
+} from "../prompt/remainderInclusion";
 import {
   DISPLAY_GROUP as displayGroup, activeGroups, filterOptions, nextFocusAfterRemoval,
   selectionCounts, recoveryActions, previewControls, inclusionNotice, appliedStatus,
@@ -46,6 +52,14 @@ const labels: Record<string, string> = {
 type Props = {
   family: string;
   compositionSupported: boolean;
+  /**
+   * TRANS05 §2.2: whether the server accepts `schema_version: 2`.
+   *
+   * Detected separately from `compositionSupported`, because a v1-only server still
+   * stores compositions; it just rejects `remainder`. Defaults to `true` so an existing
+   * caller keeps the v2 behaviour instead of silently downgrading.
+   */
+  remainderSupported?: boolean;
   value: string;
   onChange: (value: string) => void;
   state: PromptBuilderState;
@@ -66,8 +80,24 @@ function HelpNote({ summary, children }: { summary: string; children: ReactNode 
   return <details className="prompt-help"><summary>{summary}</summary><p className="prompt-hint">{children}</p></details>;
 }
 
+/**
+ * TRANS05: the proposal that produced the current cards.
+ *
+ * Read from the settled state rather than a local copy, so a card can only be recorded
+ * with the reply it actually came from. `null` when the panel is not a live reply, and
+ * `remainderEntry` then refuses the inclusion instead of recording a guess.
+ */
+function proposalIdOf(state: ProposalState): string | null {
+  return state.phase === "ready" || state.phase === "empty" ? state.reply.proposal_id : null;
+}
+
+function proposalModelOf(state: ProposalState): string | null {
+  return state.phase === "ready" || state.phase === "empty" ? state.reply.provider?.model ?? null : null;
+}
+
 export default function PromptBuilder({
-  family, compositionSupported, value, onChange, state, setState, proposalCapability, sendProposal,
+  family, compositionSupported, remainderSupported = true, value, onChange, state, setState,
+  proposalCapability, sendProposal,
 }: Props) {
   const [open, setOpen] = useState(false);
   /** UX02: the dictionary picker is the detail step, so it starts folded. */
@@ -108,6 +138,33 @@ export default function PromptBuilder({
    * it gets the same one-step undo, decided by the fingerprint rather than a timer.
    */
   const [variantRecord, setVariantRecord] = useState<VariantApplyRecord | null>(null);
+  /**
+   * TRANS04: the translations the user chose to include, in click order.
+   *
+   * Local to the composer, like `acceptRecord`: including a phrase changes the final
+   * prompt and the recorded `remainder`, never the scene or `free_text_ko`. It survives
+   * a new translation reply on purpose — a second request about the same sentence must
+   * not silently drop an earlier inclusion.
+   *
+   * TRANS05: the list belongs to the composition named by `owner`, in the session named
+   * by `epoch`.
+   *
+   * A *restored* generation puts a recorded v2 composition on `state.applied`, and its
+   * translations have to be the starting list — otherwise applying its draft again
+   * would re-record a v2 snapshot with the translations silently missing. Naming the
+   * owner instead of copying it in an effect makes that a derivation: while
+   * `owner === state.applied` the local list is the truth (so an entry hidden by a text
+   * edit comes back when the phrase is retyped), and when a different composition appears
+   * the recorded translations are read from it during render. No setState in an effect,
+   * and nothing to clean up if an apply is refused.
+   *
+   * TRANS06: `owner` alone could not tell "not applied yet" from "started over", because
+   * both have `applied === null`. The epoch does: an inclusion made before the first
+   * apply belongs to this session and survives into it, while a restart or a restore
+   * begins a new one. A model-family rebind is neither — it keeps `applied`, so the list
+   * and its provenance stay attached to the record being re-applied.
+   */
+  const [inclusions, setInclusions] = useState<InclusionList>(EMPTY_INCLUSIONS);
   const undoRef = useRef<HTMLButtonElement | null>(null);
   const capability = proposalCapability ?? UNSUPPORTED;
   const aiEnabled = capability.supported && Boolean(sendProposal);
@@ -133,6 +190,7 @@ export default function PromptBuilder({
   const pending = loading !== null;
   /** VAR02: a variant request in flight has its own cancel label in its own button. */
   const pendingVariant = loading !== null && loading.kind === VARIANT_KIND;
+  const pendingTranslation = loading !== null && loading.kind === TRANSLATION_KIND;
   const statusNotice = proposalNotice(visibleProposal);
   /**
    * LLM-I05 cards. Recomputed from the dictionary and the current selection on every
@@ -213,12 +271,66 @@ export default function PromptBuilder({
     });
   }, [visibleProposal, variantBase, family]);
   const selected = new Set(state.scene.selections.map((item) => item.id));
+  /**
+   * TRANS05: write the list and name the snapshot it belongs to.
+   *
+   * `owner` is the applied snapshot *at click time*, so an inclusion made after a
+   * restore keeps that restore's translations alongside the new one, and an inclusion
+   * made before any apply is adopted by the next one.
+   */
+  const setRemainder = (next: AcceptedTranslation[]) => setInclusions({ owner: state.applied, epoch: state.compositionEpoch, items: next });
+  /**
+   * TRANS05: the un-pruned list for the snapshot on screen.
+   *
+   * `activeInclusions` owns the rule: the local list wins while it names the applied
+   * snapshot (so an entry pruning hides comes back when the phrase is retyped), and a
+   * different snapshot — a restore, a gallery pick — supplies its own record. A v1
+   * snapshot supplies none.
+   */
+  const baseRemainder = useMemo(
+    () => activeInclusions(inclusions, state.applied, state.compositionEpoch),
+    [inclusions, state.applied, state.compositionEpoch],
+  );
+  /**
+   * TRANS04: the inclusions that still describe the sentence on screen.
+   *
+   * `pruneRemainder` is derived, not applied with an effect: the user may edit away the
+   * phrase a translation was written for, and an English line kept for a Korean phrase
+   * that no longer exists would put words in the prompt the model was never told about.
+   */
+  const activeRemainder = useMemo(
+    () => pruneRemainder(baseRemainder, state.scene.freeTextKo), [baseRemainder, state.scene.freeTextKo],
+  );
+  /** TRANS04: the cards of the current translation reply, if that is what arrived. */
+  const translations = useMemo(() => {
+    const settled = visibleProposal;
+    if (settled.phase !== "ready" && settled.phase !== "empty") return null;
+    if (settled.kind !== TRANSLATION_KIND) return null;
+    return translationCards(settled.reply);
+  }, [visibleProposal]);
+  /**
+   * TRANS04: the phrases worth translating, from the rule-based extractor.
+   *
+   * `dictionary` is the whole active catalogue, not the selection: coverage is lexical,
+   * so a phrase the vocabulary can express is never offered for translation even when
+   * the user has not picked it.
+   */
+  const remainderReport = useMemo(() => extractRemainder({
+    freeTextKo: state.scene.freeTextKo, dictionary: DICTIONARY,
+    maxItems: REMAINDER_LIMIT, maxChars: REMAINDER_CHARS,
+  }), [state.scene.freeTextKo]);
   const categories = activeGroups(DICTIONARY);
   const counts = selectionCounts(state.scene.selections);
   const options = useMemo(() => filterOptions(DICTIONARY, query, category), [query, category]);
   const coverage = useMemo(() => (family ? familyCoverage(DICTIONARY, family) : null), [family]);
   const dirty = isDraftStale(state);
-  const candidate = draftComposition(state);
+  /**
+   * TRANS05: the composition the apply path would record. `activeRemainder` is passed
+   * so the v2 snapshot is validated here, before submit, instead of 422ing at the API.
+   * A server that only advertises v1 still validates the v1 body the client would send.
+   */
+  const recordedRemainder = remainderSupported ? activeRemainder : [];
+  const candidate = draftComposition(state, recordedRemainder);
   const separateOnly = state.result?.draft === "" && state.freeTextMode === "separate" && state.scene.freeTextKo.length > 0;
   const draftIssues = state.result ? validateText(separateOnly ? value : state.result.draft, separateOnly ? "prompt" : "draft_prompt", 8000, true) : [];
   const compositionIssues = candidate ? validateComposition(candidate, family) : [];
@@ -228,7 +340,7 @@ export default function PromptBuilder({
   const selectedKey = state.scene.selections.map((item) => item.id).join("\u0000");
   const controls = previewControls(state, family, { blocked, separateOnly, prompt: value, dirty });
   const inclusion = inclusionNotice(state, state.result);
-  const status = appliedStatus(state, value);
+  const status = appliedStatus(state, value, family);
   /**
    * UX04: the Korean summary and the chips read the same rows, so the flat DOM order
    * of the remove buttons (and therefore focus restoration) cannot drift. Summary rows
@@ -354,16 +466,33 @@ export default function PromptBuilder({
   }
 
   function applyDraft() {
-    if (!state.result || (!state.result.draft && !separateOnly) || dirty || blocked || state.result.targetFamily !== family) return;
+    if (!state.result || (!state.result.draft && !separateOnly && recordedRemainder.length === 0) || dirty || blocked || state.result.targetFamily !== family) return;
     if (separateOnly) {
-      setState((current) => withAppliedDraft(current, value));
-      setNotice("추가 설명을 구성 이력에 적용했습니다. 최종 프롬프트는 유지됩니다.");
+      // TRANS05: hand ownership back to the record being written. `withAppliedDraft`
+      // stores exactly `recordedRemainder`, so the derived list after this update is the
+      // same list — and an entry that pruning had hidden stays out of the new record.
+      // TRANS06: `epoch` stays, because this is the same session; setting it to anything
+      // else would make the list below look stale in the same render.
+      setInclusions({ owner: null, epoch: state.compositionEpoch, items: [] });
+      setState((current) => withAppliedDraft(current, value, recordedRemainder));
+      setNotice(recordedRemainder.length
+        ? "추가 설명과 포함한 번역을 구성 이력에 적용했습니다. 최종 프롬프트는 유지됩니다."
+        : "추가 설명을 구성 이력에 적용했습니다. 최종 프롬프트는 유지됩니다.");
       return;
     }
-    if (value && value !== state.result.draft && !window.confirm("현재 프롬프트를 초안으로 바꿉니다. 직접 수정한 내용도 덮어씁니다. 계속할까요?")) return;
-    setState((current) => withAppliedDraft(current));
-    onChange(state.result.draft);
-    setNotice("초안을 최종 프롬프트에 적용했습니다. 필요하면 직접 수정하세요.");
+    // TRANS05: the final prompt is the draft plus the included translations. The
+    // confirmation fires when an edited prompt would be overwritten by that assembly,
+    // which is the same rule the draft-only path used.
+    const assembled = finalPrompt(state.result.draft, includedEnglish(recordedRemainder));
+    if (value && value !== assembled && !window.confirm("현재 프롬프트를 초안으로 바꿉니다. 직접 수정한 내용도 덮어씁니다. 계속할까요?")) return;
+    // TRANS06: same session, so the epoch is unchanged; dropping `owner` hands the list
+    // back to the record this apply is about to write (see the separate-only branch).
+    setInclusions({ owner: null, epoch: state.compositionEpoch, items: [] });
+    setState((current) => withAppliedDraft(current, undefined, recordedRemainder));
+    onChange(assembled);
+    setNotice(recordedRemainder.length
+      ? `초안과 포함한 번역 ${recordedRemainder.length}개를 최종 프롬프트에 적용했습니다. 필요하면 직접 수정하세요.`
+      : "초안을 최종 프롬프트에 적용했습니다. 필요하면 직접 수정하세요.");
   }
 
   function clearScene() {
@@ -540,12 +669,52 @@ export default function PromptBuilder({
   }
 
   /**
+   * TRANS04: include one translation in the final prompt.
+   *
+   * Nothing is written by this click. The included English is appended when the user
+   * applies the draft (`applyDraft`), and the entry recorded in `remainder` carries the
+   * proposal that produced it. `free_text_ko` is untouched: the Korean sentence is the
+   * user's text and the evidence for every offset.
+   */
+  function includeTranslation(card: { key: string; sourceKo: string; suggestedEn: string; confidence: number }) {
+    const entry = remainderEntry({
+      card, proposalId: proposalIdOf(visibleProposal), proposalModel: proposalModelOf(visibleProposal),
+      now: new Date(),
+    });
+    if (entry === null) {
+      setNotice("이 번역은 출처 정보가 없어 저장할 수 없습니다. 번역을 다시 요청하세요.");
+      return;
+    }
+    // The two refusals are separate messages: "already there" and "the list is full"
+    // are different facts, and `includeRemainder` returns the same array for both.
+    // `baseRemainder`, not `activeRemainder`: an entry hidden by an edit must survive
+    // to come back when the phrase is retyped, and appending to the pruned list would
+    // drop it for good.
+    if (isIncluded(baseRemainder, entry.source_ko)) {
+      setNotice("이미 포함한 표현입니다.");
+      return;
+    }
+    if (baseRemainder.length >= REMAINDER_LIMIT) {
+      setNotice(`포함할 수 있는 번역은 최대 ${REMAINDER_LIMIT}개입니다. 하나를 빼고 다시 시도해 주세요.`);
+      return;
+    }
+    setRemainder(includeRemainder(baseRemainder, entry));
+    setNotice(`“${card.sourceKo}” 번역을 포함했습니다. 초안을 적용하면 최종 프롬프트에 함께 들어갑니다.`);
+  }
+
+  /** TRANS04: remove one translation again. The one-step undo of an inclusion. */
+  function excludeTranslation(sourceKo: string) {
+    setRemainder(excludeRemainder(baseRemainder, sourceKo));
+    setNotice(`“${sourceKo}” 번역을 뺐습니다. 초안을 다시 적용하면 최종 프롬프트에서도 빠집니다.`);
+  }
+
+  /**
    * LLM-I04: one explicit attempt, never on typing. The request is built from an
    * immutable snapshot, and the reply is only adopted when both its `request_id` and
    * its revisions still describe this screen. A cancel or a stale answer leaves the
    * text, the selections and the final prompt exactly as they were.
    */
-  async function requestProposal(mode: "scene" | "variant" = "scene") {
+  async function requestProposal(mode: "scene" | "variant" | "translate" = "scene") {
     if (!aiEnabled || !sendProposal) return;
     if (pending) {
       cancelProposalRequest();
@@ -553,6 +722,21 @@ export default function PromptBuilder({
     }
     // `random` and the clock are avoided: an id only needs to be unique per screen.
     const requestId = newRequestId();
+    // TRANS03: a translation names its phrases by offset. `extractRemainder` returns
+    // UTF-16 spans for DOM use; `proposalBody` converts them to code points, so the
+    // conversion is never duplicated here.
+    if (mode === "translate") {
+      const spans = remainderReport.phrases.map((phrase) => ({ start: phrase.start, end: phrase.end }));
+      const built = proposalBody({
+        scene: state.scene, family, dictionaryVersion: DICTIONARY_VERSION, requestId, translate: spans,
+      });
+      if ("code" in built) {
+        setProposal({ phase: "error", message: ERROR_MESSAGES[built.code] });
+        return;
+      }
+      await dispatch(built.body, requestId);
+      return;
+    }
     // LLM-I06: an open partial scope turns the same button into "조명만 변경". The
     // locked IDs are derived from the scene on screen, so the user never types them.
     // VAR02: a situation request is always place/action only, so its scope is derived
@@ -567,25 +751,35 @@ export default function PromptBuilder({
       setProposal({ phase: "error", message: ERROR_MESSAGES[built.code] });
       return;
     }
-    // Abort whatever was still open, then register the new controller before any await
-    // so a cancel click during the send always finds something to abort.
+    await dispatch(built.body, requestId);
+  }
+
+  /**
+   * One send, shared by all four kinds.
+   *
+   * The controller is registered before the first await so a cancel click during the
+   * send always finds something to abort, and `revisionsRef` is read at settle time so
+   * an edit made while the request was open still discards the answer.
+   */
+  async function dispatch(body: ProposalBody, requestId: string) {
+    if (!sendProposal) return;
     const controller = new AbortController();
     proposalAbortRef.current?.abort();
     proposalAbortRef.current = controller;
     setProposal((current) => startProposal(current, {
-      requestId, revisions: built.body.revisions,
-      kind: built.body.kind,
+      requestId, revisions: body.revisions,
+      kind: body.kind,
       // VAR01: candidates keep their scope on the state too, so the client can block a
       // locked or out-of-scope candidate without trusting the reply (VAR02 sends it).
-      scope: built.body.target_groups
-        ? { targetGroups: built.body.target_groups, lockedIds: built.body.locked_ids ?? [] }
+      scope: body.target_groups
+        ? { targetGroups: body.target_groups, lockedIds: body.locked_ids ?? [] }
         : null,
     }));
     const outcome = await runProposal({
-      body: built.body, send: sendProposal, signal: controller.signal, timeoutMs: capability.timeoutMs,
+      body, send: sendProposal, signal: controller.signal, timeoutMs: capability.timeoutMs,
     });
     if (proposalAbortRef.current === controller) proposalAbortRef.current = null;
-    // `revisionsRef`, not `built.body.revisions`: the user may have edited since.
+    // `revisionsRef`, not `body.revisions`: the user may have edited since.
     setProposal((current) => settleProposal(current, {
       requestId, outcome, currentRevisions: revisionsRef.current,
     }));
@@ -619,16 +813,20 @@ export default function PromptBuilder({
     <HelpNote summary="저장 범위 안내">초안을 적용하면 서버 지원 여부에 따라 선택 사항과 초안이 생성 결과에 함께 저장됩니다. 새로고침 전 입력은 저장되지 않습니다.</HelpNote>
     {state.applied && <div role="status" className="prompt-status">
       <strong>{status === "unknown" ? "과거 복원 · 적용 정보 기록 없음"
+        : status === "familyChanged" ? "모델 계열 변경 · 기록 유지"
         : status === "modified" ? "적용 후 수정됨"
         : status === "selectionChanged" ? "적용 후 선택 변경됨"
         : "적용됨"}</strong>
       <details className="prompt-status__detail">
         <summary>자세히</summary>
         <p>{status === "unknown" ? "과거 구성 복원: 적용 당시 문자열과 반영 방식은 별도 기록되지 않았습니다."
+          : status === "familyChanged" ? "모델 계열을 바꿔 이 구성은 지금 계열로 저장되지 않습니다. 포함한 번역과 출처는 패널에 그대로 남고, 지금 계열에서 다시 적용하면 같은 번역으로 새로 기록됩니다."
           : status === "modified" ? "적용 후 최종 프롬프트를 직접 수정했습니다. 구성 이력은 마지막 적용 상태로 저장되며 의미 일치를 보장하지 않습니다."
           : status === "selectionChanged" ? "선택 또는 설명을 편집 중입니다. 다시 적용하기 전에는 마지막 적용 구성이 저장됩니다."
           : "마지막 적용 문자열과 최종 프롬프트가 같습니다. 문자열 일치만 확인하며 의미 일치를 보장하지 않습니다."}</p>
-        <p>구성 이력은 마지막 적용 시점의 선택으로 저장됩니다. 적용 후에는 최종 프롬프트를 직접 수정할 수 있습니다.</p>
+        <p>{status === "familyChanged"
+          ? "이 기록은 포함한 번역의 출처를 잃지 않기 위해 유지됩니다. 지금 계열로 저장되는 구성은 아래 \"적용\"으로 다시 기록하는 것입니다."
+          : "구성 이력은 마지막 적용 시점의 선택으로 저장됩니다. 적용 후에는 최종 프롬프트를 직접 수정할 수 있습니다."}</p>
       </details>
     </div>}
     <div id="prompt-builder-panel" hidden={!open}>
@@ -696,6 +894,26 @@ export default function PromptBuilder({
           : (proposalFallbackNotice(capability)
             ? <p className="prompt-hint">{proposalFallbackNotice(capability)}</p>
             : null)}
+        {/*
+          TRANS04: a fourth explicit request, with its own button for the same reason as
+          the third. It is disabled when the dictionary covers the whole sentence: there
+          is nothing to translate, and a request would only spend a model call to return
+          an empty list.
+
+          Gated on `remainderSupported` as well: without v2 the server refuses the
+          snapshot and the inclusion would be lost at submit, so the request is not
+          offered at all rather than accepted and dropped.
+        */}
+        {aiEnabled && remainderSupported
+          ? <button type="button" className="quiet prompt-proposals__translate"
+              onClick={() => void requestProposal("translate")}
+              disabled={!family || !state.scene.freeTextKo.trim() || pending
+                || remainderReport.phrases.length === 0}
+              title={remainderReport.phrases.length === 0
+                ? "사전이 원문 전체를 표현할 수 있어 번역할 구절이 없습니다." : undefined}>
+              {pendingTranslation ? "번역 제안 취소" : "사전에 없는 구절 번역 제안"}
+            </button>
+          : null}
         {/* LLM-I06: the AI button above is either "전체 장면" or "선택한 그룹만". The
             scope is built from the selection, so the locked IDs never have to be typed. */}
         {aiEnabled && <details className="prompt-scope" open={scopeActive || undefined}>
@@ -868,6 +1086,62 @@ export default function PromptBuilder({
             ? "적용 전 선택으로 한 번에 돌립니다. 원문과 최종 프롬프트는 그대로입니다."
             : `${variantUndo.text}. 지금 선택은 덮어쓰지 않습니다.`}</small>
         </div>}
+        {translations && remainderSupported && translations.cards.length > 0 && <section className="prompt-remainder" id="prompt-remainder" aria-label="번역 제안 카드">
+          <div className="prompt-remainder__head">
+            <strong>번역 제안 {translations.cards.length}개</strong>
+            <span className="prompt-remainder__counts">
+              포함 {activeRemainder.length}/{REMAINDER_LIMIT}
+            </span>
+          </div>
+          {/*
+            TRANS04: the default is unchecked. Today's behaviour is "the phrase is not
+            in the prompt"; a pre-ticked card would silently add words to the image.
+          */}
+          <p className="prompt-hint">번역 제안이며 원문과 다를 수 있습니다. 원문은 바뀌지 않고, 포함을 누른 번역만 초안을 적용할 때 최종 프롬프트 끝에 붙습니다.</p>
+          <ul className="prompt-remainder__list">
+            {translations.cards.map((card) => {
+              const included = isIncluded(activeRemainder, card.sourceKo);
+              // The estimate is for *this* inclusion, so the warning names the click
+              // that would cause it rather than the current total.
+              const preview = included ? null : tokenPreview(state.result?.draft ?? "", includedEnglish(activeRemainder), card.suggestedEn, family);
+              return <li className="prompt-remainder-card" key={card.key} data-included={included || undefined}>
+                <div className="prompt-remainder-card__body">
+                  <strong>{card.sourceKo}</strong>
+                  <span className="prompt-remainder-card__en">→ {card.suggestedEn}</span>
+                  <small className="prompt-remainder-card__score"> · 신뢰도 {Math.round(card.confidence * 100)}%</small>
+                  {preview?.newlyOverBudget && <p className="prompt-remainder-card__warn" data-tone="caution">
+                    포함하면 SD 1.5 텍스트 창을 넘습니다 (약 {preview.tokens}/{preview.limit}). 뒤쪽 내용이 반영되지 않을 수 있습니다.
+                  </p>}
+                </div>
+                <button type="button" className="quiet" aria-pressed={included}
+                  onClick={() => (included ? excludeTranslation(card.sourceKo) : includeTranslation(card))}>
+                  {included ? "포함 해제" : "포함"}
+                </button>
+              </li>;
+            })}
+          </ul>
+          {translations.truncated && <p className="prompt-notice" data-tone="caution">
+            번역 일부를 표시하지 못했습니다. 표시된 번역만 포함할 수 있습니다.
+          </p>}
+          {activeRemainder.length > 0 && <p className="prompt-hint">
+            포함한 번역은 구성 이력에 남습니다. 초안을 다시 적용하면 최종 프롬프트 끝의 번역도 함께 갱신됩니다.
+          </p>}
+        </section>}
+
+        {/*
+          TRANS04: the inclusions may outlive a reply (a second request, a dismissed
+          panel), and their only other visible effect is the end of the final prompt.
+          This list is the durable control, so a phrase is never included with nothing
+          on screen to remove it.
+        */}
+        {activeRemainder.length > 0 && remainderSupported && !(translations && translations.cards.length > 0) && <div className="prompt-remainder-included" role="group" aria-label="포함한 번역">
+          <strong>포함한 번역 {activeRemainder.length}개</strong>
+          <ul>{activeRemainder.map((item) => <li key={item.source_ko}>
+            <span>{item.source_ko} → {item.suggested_en}</span>
+            <button type="button" className="quiet" onClick={() => excludeTranslation(item.source_ko)}>빼기</button>
+          </li>)}</ul>
+        </div>}
+
         {hintsOpen && <div id="prompt-proposals" className="prompt-proposal-list" role="group" aria-label="사전 항목 제안">
           {/*
             RULE02: a scoped request says which proposals it withheld and why. Without
@@ -1013,6 +1287,11 @@ export default function PromptBuilder({
         })}
         {state.result.warnings.some((item) => item.code === "empty") && <p className="prompt-hint">사전 항목을 선택하거나 설명을 입력하면 미리보기가 만들어집니다.</p>}
         <div id="draft-errors" role="status">{issues.map((issue, index) => <p className="prompt-error" key={index}>{issue.field}: {issue.message}</p>)}</div>
+        {/* TRANS04: applying changes the final prompt, so the assembly is named here,
+            next to the button, and not only inside the translation panel. */}
+        {activeRemainder.length > 0 && remainderSupported && <p className="prompt-hint">
+          적용하면 사전 초안 뒤에 포함한 번역 {activeRemainder.length}개가 줄바꿈으로 붙습니다. 영어 초안 기록은 그대로 남습니다.
+        </p>}
         <button type="button" className="quiet" disabled={!controls.canApply} onClick={applyDraft}>{controls.applyLabel}</button>
         </>}
       </section>

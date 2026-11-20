@@ -1,5 +1,7 @@
 import type { SceneSpecification } from "./scene";
 import { sha256Hex } from "./digest.ts";
+import { staleSpans, toCodePointSpan } from "./remainder.ts";
+import type { RemainderSpan } from "./remainder.ts";
 
 /**
  * LLM proposal request lifecycle (LLM-I04).
@@ -50,6 +52,20 @@ export type ProposalVariant = {
   unresolved_ko: string[];
 };
 
+/**
+ * TRANS03: one phrase and its proposed English rendering.
+ *
+ * `source_ko` is echoed by the server from its own slice of `free_text_ko`, so it
+ * always names text that exists in the user's sentence. Nothing here is a dictionary
+ * entry and nothing is applied automatically: TRANS04 makes the user choose, and
+ * TRANS05 records the choice in `PromptComposition.remainder`.
+ */
+export type ProposalTranslation = {
+  source_ko: string;
+  suggested_en: string;
+  confidence: number;
+};
+
 /** The server reply in the C01-3 shape. Failure envelopes omit some fields. */
 export type ProposalReply = {
   proposal_id: string | null;
@@ -62,6 +78,8 @@ export type ProposalReply = {
   suggestions: ProposalSuggestion[];
   /** VAR01: only `situation_variants` replies carry candidates; empty otherwise. */
   variants: ProposalVariant[];
+  /** TRANS03: only `remainder_translation` replies carry translations. */
+  translations: ProposalTranslation[];
   unresolved_spans: ProposalSpan[];
   ambiguities: ProposalAmbiguity[];
   rejected: Record<string, unknown>[];
@@ -112,12 +130,21 @@ export const CANCELLED_MESSAGES = {
   stale_revision: "원문이나 선택이 바뀌어 이전 제안을 버렸습니다. 원문과 최종 프롬프트는 그대로입니다.",
 } as const;
 
-/** C01-2 kinds plus VAR01. All three are built by `proposalBody`. */
+/** C01-2 kinds plus VAR01 and TRANS03. All four are built by `proposalBody`. */
 export const PROPOSAL_KIND = "selection_hint";
 export const PARTIAL_KIND = "partial_change";
 /** VAR01: place/action-only situations. Candidates are shown, never accepted. */
 export const VARIANT_KIND = "situation_variants";
-export type ProposalKind = typeof PROPOSAL_KIND | typeof PARTIAL_KIND | typeof VARIANT_KIND;
+/**
+ * TRANS03: English renderings of phrases the dictionary could not express.
+ *
+ * It is the only kind that carries no dictionary IDs and no `selections`: a
+ * translation cannot depend on the vocabulary, and spending the 8 KiB request budget
+ * on 100 IDs would be waste. The request names its phrases by offset
+ * (`remainder_spans`), never by text — `free_text_ko` is already in the body.
+ */
+export const TRANSLATION_KIND = "remainder_translation";
+export type ProposalKind = typeof PROPOSAL_KIND | typeof PARTIAL_KIND | typeof VARIANT_KIND | typeof TRANSLATION_KIND;
 
 /**
  * C01-2 caps. `MAX_FREE_TEXT` is a *character* cap on the description itself, keeping
@@ -150,6 +177,15 @@ export const MAX_VARIANT_LABEL_CHARS = 40;
 export const MAX_VARIANT_PROMPT_CHARS = 200;
 export const MAX_VARIANT_IDS = 20;
 
+/**
+ * TRANS03 caps. Both numbers are the server's, not a UI preference: 8 is
+ * `MAX_REMAINDER_SPANS` (= `extractRemainder`'s `REMAINDER_LIMIT`, = the composition
+ * field's `max_length`), and 200 is `MAX_REMAINDER_CHARS` (= `REMAINDER_CHARS`).
+ * A trim here must therefore always agree with a trim there.
+ */
+export const MAX_REMAINDER_ITEMS = 8;
+export const MAX_TRANSLATION_CHARS = 200;
+
 export type ProposalBody = {
   kind: ProposalKind;
   request_id: string;
@@ -163,6 +199,12 @@ export type ProposalBody = {
    */
   locked_ids?: string[];
   target_groups?: string[];
+  /**
+   * TRANS03: `remainder_translation` only. Code-point offsets into `free_text_ko`,
+   * never the phrase text — the text is already in the body and re-sending it costs
+   * 33× more per phrase (611.9 B vs 27.5 B), which the 8 KiB cap cannot afford.
+   */
+  remainder_spans?: { start: number; end: number }[];
   revisions: ProposalRevisions;
 };
 
@@ -213,6 +255,12 @@ export type ProposalInput = {
    * The composer does not call this yet: the request button is VAR02.
    */
   variant?: boolean;
+  /**
+   * TRANS03: asks for English renderings of these phrases. The spans are the
+   * UTF-16 offsets `extractRemainder` returns; `proposalBody` converts them to
+   * code points because the server slices with Python string indices.
+   */
+  translate?: RemainderSpan[];
 };
 
 /** VAR01: a candidate may change place and action only — the cast stays fixed. */
@@ -238,6 +286,33 @@ export function proposalBody(
   if (!text.trim()) return { code: "invalid" };
   if (text.length > MAX_FREE_TEXT) return { code: "too_large" };
   if (input.scene.selections.length > MAX_SELECTIONS) return { code: "too_large" };
+  // TRANS03: a translation request is a third, independent shape. It is refused
+  // rather than downgraded when a span outlived the text, because a stale offset
+  // would translate words the user no longer has.
+  const translate = input.translate;
+  if (translate !== undefined) {
+    if (input.variant === true) return { code: "invalid" };
+    if (translate.length === 0 || translate.length > MAX_REMAINDER_ITEMS) return { code: "invalid" };
+    if (staleSpans(text, translate).length > 0) return { code: "invalid" };
+    const spans = translate.map((span) => toCodePointSpan(text, span));
+    // Two spans that collapse onto the same code-point pair name one phrase; the
+    // server refuses duplicates, so the request never leaves the browser.
+    const keys = new Set(spans.map((span) => `${span.start}:${span.end}`));
+    if (keys.size !== spans.length) return { code: "invalid" };
+    const body: ProposalBody = {
+      kind: TRANSLATION_KIND,
+      request_id: input.requestId,
+      target_family: input.family,
+      dictionary_version: input.dictionaryVersion,
+      free_text_ko: text,
+      // A translation does not depend on the vocabulary, so no ID is sent at all.
+      selections: [],
+      remainder_spans: spans,
+      revisions: revisionsFor(input.scene),
+    };
+    if (utf8Bytes(JSON.stringify(body)) > MAX_REQUEST_BYTES) return { code: "too_large" };
+    return { body };
+  }
   const target = input.scope?.targetGroups ?? [];
   // A scope with no target group is not "partial": it keeps the I04 request shape.
   // `partialScope()` already dropped unknown groups, so a non-empty list here names
@@ -512,6 +587,40 @@ export function parseVariants(raw: unknown): { variants: ProposalVariant[]; trun
   return { variants, truncated };
 }
 
+/**
+ * TRANS03: the translation list of a `remainder_translation` reply.
+ *
+ * A pair is dropped rather than repaired: an item missing either half, or longer than
+ * the server cap, would put English next to Korean it does not correspond to. The
+ * server already refuses such replies; this is the client's own copy for a stubbed or
+ * replayed answer, mirroring `readVariant`.
+ */
+export function parseTranslations(raw: unknown): { translations: ProposalTranslation[]; truncated: boolean } {
+  const items = Array.isArray(raw) ? raw : [];
+  const translations: ProposalTranslation[] = [];
+  const seen = new Set<string>();
+  let truncated = false;
+  for (const entry of items) {
+    if (!entry || typeof entry !== "object") { truncated = true; continue; }
+    const item = entry as Record<string, unknown>;
+    const sourceKo = typeof item.source_ko === "string" ? item.source_ko.trim() : "";
+    const suggestedEn = typeof item.suggested_en === "string" ? item.suggested_en.trim() : "";
+    if (!sourceKo || !suggestedEn) { truncated = true; continue; }
+    if (Array.from(sourceKo).length > MAX_TRANSLATION_CHARS
+      || Array.from(suggestedEn).length > MAX_TRANSLATION_CHARS) { truncated = true; continue; }
+    if (seen.has(sourceKo)) { truncated = true; continue; }
+    seen.add(sourceKo);
+    const confidence = typeof item.confidence === "number" && Number.isFinite(item.confidence)
+      ? Math.min(1, Math.max(0, item.confidence)) : 0;
+    translations.push({ source_ko: sourceKo, suggested_en: suggestedEn, confidence });
+  }
+  if (translations.length > MAX_REMAINDER_ITEMS) {
+    truncated = true;
+    translations.length = MAX_REMAINDER_ITEMS;
+  }
+  return { translations, truncated };
+}
+
 /** A reply is adopted only if it has a status v1 defines. Nothing is guessed. */
 export function parseReply(raw: unknown): ProposalReply | null {
   if (!raw || typeof raw !== "object") return null;
@@ -524,6 +633,9 @@ export function parseReply(raw: unknown): ProposalReply | null {
     (Array.isArray(value[key]) ? (value[key] as unknown[]) : []);
   const revisions = value.revisions;
   const kind = text("kind");
+  // TRANS03: translations belong to their own kind, for the same reason.
+  const parsedTranslations = kind === TRANSLATION_KIND
+    ? parseTranslations(value.translations) : { translations: [], truncated: false };
   // VAR01: candidates belong to their own kind. A `selection_hint` reply that carried
   // `variants` would mean something else on screen, so it is read as no candidates at
   // all and the reply is judged on its suggestions only.
@@ -541,13 +653,14 @@ export function parseReply(raw: unknown): ProposalReply | null {
       Boolean(item) && typeof item === "object"
       && typeof (item as { id?: unknown }).id === "string"),
     variants: parsed.variants,
+    translations: parsedTranslations.translations,
     unresolved_spans: list("unresolved_spans").filter((item): item is ProposalSpan =>
       Boolean(item) && typeof item === "object"),
     ambiguities: list("ambiguities").filter((item): item is ProposalAmbiguity =>
       Boolean(item) && typeof item === "object"),
     rejected: list("rejected").filter((item): item is Record<string, unknown> =>
       Boolean(item) && typeof item === "object"),
-    truncated: value.truncated === true || parsed.truncated,
+    truncated: value.truncated === true || parsed.truncated || parsedTranslations.truncated,
     why: text("why"),
     message: text("message"),
     detail: text("detail"),
@@ -583,13 +696,21 @@ export function proposalNotice(state: ProposalState): ProposalNotice | null {
         return { tone: "info",
           text: `상황 후보 ${state.reply.variants.length}개를 받았습니다. 아직 선택에 반영하지 않았습니다.` };
       }
+      // TRANS03: a translation is not a selection either, and TRANS04 keeps it out of
+      // the final prompt until the user explicitly includes it.
+      if (state.kind === TRANSLATION_KIND) {
+        return { tone: "info",
+          text: `번역 제안 ${state.reply.translations.length}개를 받았습니다. 아직 최종 프롬프트에 넣지 않았습니다.` };
+      }
       return { tone: "info",
         text: `제안 ${state.reply.suggestions.length}개를 받았습니다. 아직 선택에 반영하지 않았습니다.` };
     case "empty":
       return { tone: "info",
         text: state.kind === VARIANT_KIND
           ? "바꿀 수 있는 장소·행동 후보를 만들지 못했습니다. 원문은 그대로 남습니다."
-          : "원문에서 사전 항목을 찾지 못했습니다. 원문은 그대로 남습니다." };
+          : state.kind === TRANSLATION_KIND
+            ? "번역 제안을 만들지 못했습니다. 원문은 그대로 남습니다."
+            : "원문에서 사전 항목을 찾지 못했습니다. 원문은 그대로 남습니다." };
     case "unavailable":
       return { tone: "caution",
         text: state.reply.message ?? "이 서버에서는 AI 제안을 지금 사용할 수 없습니다." };
