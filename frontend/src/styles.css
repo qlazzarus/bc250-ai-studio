@@ -281,7 +281,7 @@
    leaves ~165–283px per side, which is narrower than the 230px list the picker
    already scrolls, so a side-by-side layout does not fit here. The regions stay
    stacked; the grid is kept so a future wider layout is a one-line change.
-   See docs/PROMPT_COMPOSER_UX_LAYOUT.md §4. */
+   See docs/PROMPT_COMPOSER_CURRENT.md for the current composer flow. */
 .prompt-builder { container-type: inline-size; container-name: prompt-composer; }
 /* UX01–UX04 rebuilt the stage as a reading order: description → Korean summary vs.
    original text → folded picker → draft. A split column would separate the summary

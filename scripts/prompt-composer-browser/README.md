@@ -1,6 +1,6 @@
 # Prompt composer browser verification
 
-GAP04/U10 회귀 검증용 CDP 하네스. 저장소 의존성을 추가하지 않고 Node 내장 `WebSocket`과 Playwright 번들 Chromium만 사용한다. 결과는 `docs/evidence/prompt-composer-gap04/`에 남는다.
+프롬프트 구성 회귀 검증용 CDP 하네스. 저장소 의존성을 추가하지 않고 Node 내장 `WebSocket`과 Playwright 번들 Chromium만 사용한다. 결과는 `docs/evidence/prompt-composer-gap04/`에 남는다.
 
 ## 실행
 
@@ -40,5 +40,5 @@ sh scripts/prompt-composer-browser/verify.sh
 - `press()`는 keydown **한 번**만 보낸다. keydown과 char를 함께 보내면 Enter가 두 번 활성화되어 버튼이 두 번 눌린다(하네스에서 실제로 겪은 문제).
 - `.focus()` 후 `activeElement`만 비교하면 키보드 도달성을 입증하지 못한다. `tab()`으로 실제 순회한 결과를 기록한다.
 - 결과 판정은 `results.json`의 `pass` 값이다. `pass: null`은 참고 기록이며 실패가 아니다.
-- 이 하네스는 실기기 터치·스크린리더·확대·운영 서버·GPU 품질을 검증하지 않는다(AT01/AT02·P5-L01·P6-Q02 범위).
+- 이 하네스는 실기기 터치·스크린리더·확대·운영 서버·GPU 품질을 검증하지 않는다([남은 검증](../../docs/TODO.md) 참조).
 - **번역문은 stub이다.** 모든 스위트가 페이지 안에서 제안 응답을 가로채므로 이 결과로 번역 품질을 말할 수 없다. `results.json` 첫 항목 `증거 출처`가 `engine`/`llm`/`claim`을 기록하며, `run.mjs`는 fake 엔진에 stub이 아닌 llm 표기를 주면 실행을 거부한다. 실연결 품질은 `scripts/live02_proposals.py`(LIVE02)다.

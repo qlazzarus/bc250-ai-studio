@@ -1,6 +1,6 @@
-# Pixel Studio (Phase 3 foundation)
+# Pixel Studio
 
-Phase 3 uses the existing Studio API, asset storage, authenticated file delivery,
+Pixel Studio uses the existing Studio API, asset storage, authenticated file delivery,
 and single GPU scheduler. It does not introduce another image server or alter the
 installed model files, llama service, or GPU transition settings.
 
@@ -52,13 +52,5 @@ GET      /api/v1/pixel/versions/{version_id}/file
 All routes require the Studio client Bearer key. `POST /process` accepts `width`,
 `height`, `palette_colors`, `remove_solid_background`, `trim`, and `center`.
 
-## Deliberately deferred Phase 3 work
 
-- Creating Pixel Asset candidates directly from a project prompt through the shared
-  GPU queue, including Art Bible prompt composition.
-- Candidate comparison and source-selection UI.
-- More robust background removal than the current solid-corner heuristic.
-- Phaser Atlas PNG/JSON and asset manifest export.
-
-These follow-on units build on the durable project/asset/version identifiers already
-implemented here.
+미구현 후보 생성과 Atlas export는 [TODO](TODO.md)에서 관리한다.

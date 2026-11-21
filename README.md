@@ -1,22 +1,18 @@
 # BC-250 AI Studio
 
-AMD BC-250의 단일 Vulkan GPU를 공유하는 로컬 이미지 생성 플랫폼.
-현재 제공 범위는 **Phase 0 + Phase 2**입니다.
+단일 Vulkan GPU를 공유하는 로컬 이미지 생성 플랫폼이다. FastAPI·SQLite 영속 큐와 React/Vite 웹 화면을 제공한다.
 
-- FastAPI `/api/v1`, API 키·관리자 권한, 모델별 설정·프리셋
-- SQLite/SQLAlchemy + Alembic 영속 큐, 이미지·배치 작업, 취소·재시도
-- 원본 설정·시드·이미지·로그 연결, 네임스페이스별 결과 저장
-- 영속 이벤트 기반 SSE 재연결, 재시작 시 interrupted 복구
-- Fake Engine, stable-diffusion.cpp 인자 배열 어댑터
-- GPU 락, LLM 배수·정지·복구, 실패 시 차단과 관리자 복구
-- React/Vite NSFW Art Studio: 모델·프리셋 인지 입력, 큐, 보호된 갤러리, 메타데이터 재사용
+## 현재 제공 기능
 
-**기본값은 Fake Engine과 manual 정책입니다.** Klein 4B Q4의 단일 BC-250 Vulkan
-테스트는 512×512·4 steps에서 성공했습니다. API 실제 엔진 전환은 여전히 서비스 allowlist,
-LLM admission gate, 최소 polkit 권한 검증이 필요합니다.
-모델·기존 서비스·기존 출력은 수정하지 않습니다.
+- API 키/관리자 권한, 모델별 옵션·프리셋, 이미지·배치 생성과 취소·재시도
+- 영속 이벤트 SSE, 보호된 갤러리·보관·삭제, seed·설정·메타데이터 재사용
+- Fake 엔진과 stable-diffusion.cpp 어댑터, GPU 잠금과 LLM pause·drain·복구
+- 사전 프롬프트 구성, 선택적 LLM 항목·상황·번역 제안, 구성 v1/v2 이력
+- Pixel 프로젝트·Art Bible·의미 자산, Pillow 파생 PNG·버전·승인
 
-## 빠른 실행 (CPU 전용)
+기본 소스 설정은 **fake 엔진과 manual 정책**이다. 일반 키 사용자는 작업과 자산을 공유하며 계정별 격리는 없다. 통합 한글 프롬프트 자동 구성은 최우선 TODO다.
+
+## 로컬 실행
 
 ```sh
 uv sync --extra dev --locked
@@ -26,57 +22,14 @@ export STUDIO_POLICY=image_priority
 ./scripts/dev.sh
 ```
 
-다른 셸에는 같은 `STUDIO_API_KEY`를 전달한 뒤:
+API는 `http://127.0.0.1:8090`, 데이터는 기본적으로 `~/.local/share/bc250-ai-studio`다. 같은 client 키로 `uv run python examples/rp_client.py`를 실행할 수 있다. 실제 GPU 실행은 서버 모델·gate·서비스 권한 설정이 필요하다.
 
-```sh
-uv run python examples/rp_client.py
-```
-
-API 기본 주소: `http://127.0.0.1:8090`. 데이터 기본 위치:
-`~/.local/share/bc250-ai-studio` (저장소 밖). 비밀 키는 커밋하지 않습니다.
-
-## BC-250 배포 및 외부 테스트
-
-[단계별 배포 가이드](docs/DEPLOYMENT.md)에 Fedora 설치·서비스 등록부터 외부 PNG 다운로드까지 정리했습니다.
-
-1. 소스를 전송하고 전용 계정·가상환경·API 키를 생성합니다.
-2. Fake Engine으로 systemd 서비스를 실행합니다.
-3. 먼저 SSH 터널로 외부 접속을 검증합니다. 공개 URL이 필요하면 Caddy HTTPS를 추가합니다.
-4. 인증 → 작업 접수 → SSE → PNG·메타데이터 조회를 확인합니다.
-
-서버 설정 예제: [환경변수](deploy/studio.env.example), [Caddy](deploy/Caddyfile.example).
-웹 UI의 로컬 실행과 SSH 터널 연결은 [frontend/README.md](frontend/README.md)를 참고하세요.
-실제 GPU 테스트에는 별도 LLM 요청 게이트와 승인 절차가 필요합니다.
+프런트 실행은 [frontend/README.md](frontend/README.md)를 따른다. 로컬 API 연결 시 `VITE_STUDIO_TARGET=http://127.0.0.1:8090`을 설정한다. `VITE_STUDIO_API_KEY`는 브라우저 번들에 포함되므로 사이트 접근 범위를 제한하고 관리자 키를 사용하지 않는다.
 
 ## 문서
 
-Prompt Composer의 [현재 구현](docs/PROMPT_COMPOSER_CURRENT.md), [남은 작업](docs/PROMPT_COMPOSER_EXECUTION_TASKS.md), [완료 기록 archive](docs/archive/prompt-composer/2026-11-16/README.md)를 구분해 관리합니다.
+- [전체 문서 목록](docs/README.md): 현재 구성·API·모델·배포·검증
+- [프로젝트 TODO](docs/TODO.md): 미구현 기능과 남은 검증
+- [통합 프롬프트 구현 계획](docs/PROMPT_COMPOSER_UNIFIED_IMPLEMENTATION.md): DeepSeek 4.1 Flash 실행용 최우선 명세
 
-- [AI Studio 개발·배포 재개 및 LLM 작업 분리 검토](docs/STUDIO_RESUME_REVIEW.md) — Studio 수동 배포를 검증했으며 모델 전환 작업은 Client로 인계합니다.
-- [LLM 모델 전환: Client 통합 계획과 기존 자료 안내](docs/LLM_MODEL_SWITCH.md) — UI/API의 구현 주체는 `bc250-llm-client`입니다.
-- [설계 및 로컬 환경 확인](docs/ARCHITECTURE.md)
-- [API 계약](docs/API.md)
-- [모델 레지스트리](docs/MODELS.md)
-- [실행·서버 조사·배포·복구](docs/DEPLOYMENT.md)
-- [단계별 구현 범위](docs/ROADMAP.md)
-- [사전 프롬프트 현재 구현과 다음 개선 순서](docs/PROMPT_COMPOSER_CURRENT.md)
-- [Prompt Composer 앞으로 실행할 태스크와 완료 원장](docs/PROMPT_COMPOSER_EXECUTION_TASKS.md) — 완료된 태스크의 상세 명세는 `docs/archive/prompt-composer/2026-11-18/`에 있다.
-- [Prompt Composer LLM 자동화 제안 설계 (A5/A7 결정론 선행 구현 포함)](docs/PROMPT_COMPOSER_LLM_AUTOMATION.md)
-- [TRANS01 계약 결정: 사전 밖 잔여 구절의 번역 제안 필드·한도·재현성 기록](docs/PROMPT_COMPOSER_TRANS01_CONTRACT.md) — 채택되어 schema v2(TRANS03–05)로 구현됨.
-- [프롬프트 구성·포즈 생성 모드 발전 계획](docs/GENERATION_MODES_DESIGN.md)
-- [프롬프트 구성 작업 계획과 1.2.0 고도화·배포 점검 기록](docs/PROMPT_COMPOSER_EXECUTION_TASKS.md)
-- [테스트 결과와 한계](docs/TESTING.md)
-- [다음 프로젝트 LLM 클라이언트 인계 문서](docs/NEXT_PROJECT_LLM_CLIENT.md)
-- [Pixel Studio 설계·API·후속 범위](docs/PIXEL_STUDIO.md)
-
-Pixel Art·Phaser Export는 Phase 3, 통합 LLM 채팅 프록시는 Phase 4입니다.
-
-```sh
-uv run pytest -q
-uv run ruff check .
-# Prompt-composition contract probe (rejection-only; needs a running API + key).
-STUDIO_API_KEY=<client key> STUDIO_BASE_URL=http://127.0.0.1:18080 \
-  uv run python scripts/probe_studio_prompt_composition.py
-```
-
-> 일부 과거 테스트 문서에서 언급하는 서버 진단 자료와 생성 결과물은 공개 저장소에 포함하지 않습니다.
+문서에는 현재 동작과 TODO만 유지하며 날짜별 태스크 진행 이력은 누적하지 않는다.

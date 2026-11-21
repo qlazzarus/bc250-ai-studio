@@ -1,6 +1,6 @@
 # BC-250 Art Studio web client
 
-The Art Studio is a Vite/React client for the Phase 1 Studio API. It automatically connects to `/api/v1` using the build-time client key, submits jobs with `source: "nsfw"`, shows queue state, and
+The Art Studio is a Vite/React client for the Studio API. It automatically connects to `/api/v1` using the build-time client key, submits jobs with `source: "nsfw"`, shows queue state, and
 displays generated assets and their reproducibility metadata.
 It also supports a recoverable archive view; deletion is available only from that
 view and moves the image plus metadata to the private Studio trash directory.
@@ -38,3 +38,5 @@ For GitHub Actions deployments, set the `BC250_STUDIO_API_KEY` secret in the `pr
 `dist/` is a static site. For a LAN deployment, serve it behind a reverse proxy
 which sends `/api/` to the Studio service on `127.0.0.1:8090`; do not expose the
 Studio service's loopback port directly.
+
+For a local API on port 8090, set `VITE_STUDIO_TARGET=http://127.0.0.1:8090` in `.env.local`. The default proxy target is the SSH tunnel on port 18090. See the [documentation index](../docs/README.md) and [project TODO](../docs/TODO.md).

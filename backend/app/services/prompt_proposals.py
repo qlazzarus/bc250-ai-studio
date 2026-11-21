@@ -1,7 +1,7 @@
 """Structured scene-proposal contract and validator.
 
-This module implements the contract fixed in LLM-C01/C02 of
-``docs/PROMPT_COMPOSER_EXECUTION_TASKS.md``. It is deliberately pure: no network,
+This module implements the proposal contract documented in
+``docs/API.md``. It is deliberately pure: no network,
 no database, no GPU. The dictionary is *injected* as a reference mapping so the
 Python side never keeps a second copy of the operator dictionary.
 
