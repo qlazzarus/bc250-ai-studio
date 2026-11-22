@@ -38,12 +38,39 @@ from app.models.schemas import (
 )
 from app.pixel.service import process_image
 from app.scheduler.runner import TERMINAL
+from app.services.prompt_compose import (
+    COMPOSE_TIMEOUT_SECONDS,
+    compose_advertised,
+)
+from app.services.prompt_compose import (
+    MAX_BRIEF_CHARS as COMPOSE_MAX_BRIEF_CHARS,
+)
+from app.services.prompt_compose import (
+    MAX_CANDIDATES as COMPOSE_MAX_CANDIDATES,
+)
+from app.services.prompt_compose import (
+    MAX_REQUEST_BYTES as COMPOSE_MAX_REQUEST_BYTES,
+)
+from app.services.prompt_compose import (
+    MAX_RESPONSE_BYTES as COMPOSE_MAX_RESPONSE_BYTES,
+)
+from app.services.prompt_compose import (
+    MAX_SELECTIONS as COMPOSE_MAX_SELECTIONS,
+)
 from app.services.prompt_dictionary import cached
 from app.services.prompt_proposals import MAX_RESPONSE_BYTES as PROPOSAL_MAX_RESPONSE_BYTES
 from app.services.proposal_provider import (
     PROPOSAL_TIMEOUT_SECONDS,
     proposals_advertised,
 )
+
+# UCP03 advertises profile version 1 for every family the registry supports, because a
+# family-specific profile is UCP04's job. The number is the *contract* version: clients
+# compare it for staleness, and inventing separate per-family numbers now would have to
+# be changed again when UCP04 defines real profiles. `sd15`, `z-image`, `flux2` and
+# `moss-image` are the families `config/models.yaml` actually serves (§5).
+OUTPUT_PROFILE_VERSIONS = {"sd15": 1, "z-image": 1, "flux2": 1, "moss-image": 1}
+COMPOSE_TIMEOUT_MS = COMPOSE_TIMEOUT_SECONDS * 1000
 
 
 def authenticate(request: Request, authorization: Annotated[str | None, Header()] = None):
@@ -191,6 +218,26 @@ async def capabilities(request: Request):
         }
         if proposals_advertised(s.settings, proposal_dictionary) else {}
     )
+    # UCP03: a separate key from `prompt_proposals` (§5) — a client that only sees the
+    # older key must conclude the integrated path is unavailable, not assume it works.
+    # Advertised only when a request could actually be served: no gate, the `fake`
+    # engine or a missing dictionary all mean "not this deployment".
+    prompt_compose = (
+        {
+            "prompt_compose": {
+                "schema_versions": [1],
+                "dictionary_version": proposal_dictionary.version,
+                "output_profile_versions": dict(OUTPUT_PROFILE_VERSIONS),
+                "max_request_bytes": COMPOSE_MAX_REQUEST_BYTES,
+                "max_response_bytes": COMPOSE_MAX_RESPONSE_BYTES,
+                "timeout_ms": int(COMPOSE_TIMEOUT_MS),
+                "max_candidates": COMPOSE_MAX_CANDIDATES,
+                "max_brief_chars": COMPOSE_MAX_BRIEF_CHARS,
+                "max_selections": COMPOSE_MAX_SELECTIONS,
+            }
+        }
+        if compose_advertised(s.settings, proposal_dictionary) else {}
+    )
     return {
         "phase": 1,
         "engine": state(request).settings.engine,
@@ -199,6 +246,7 @@ async def capabilities(request: Request):
         "prompt_composition": {"schema_versions": [1, 2]},
         **request_limits,
         **prompt_proposals,
+        **prompt_compose,
         "pixel_processing": False,
         "phaser_export": False,
         "integrated_chat_proxy": False,
