@@ -8,7 +8,7 @@
 
 **문서 압축 대상에서 제외한다.** 완료 전에는 이 명세를 삭제하거나 요약본·링크 목록으로 대체하지 않는다. 프로젝트 전체의 과거 히스토리 정리와 이 최우선 구현 명세의 유지 원칙은 별개다. 태스크별 현재 결과·결정·차단 사유는 이 파일에서 관리하고 날짜별 장황한 로그만 누적하지 않는다.
 
-현재 상태는 **UCP01 계약 확정 완료, UCP02·UCP03·UCP04·UCP05·UCP06·UCP07 구현 완료, UCP08 브라우저 자동화 완료(459 checks, 모바일 실기기 대기), UCP09 미착수(실행 환경 없음)**다. UCP09는 실제 llama-server·GPU·모델을 요구하는데 이번 실행 호스트(Apple M1 macOS)에는 셋 다 없어 착수하지 못했고, 그 차단 근거를 「UCP09 환경 확인」 절에 기록했다. UCP03의 실제 llama-server·GPU gate 실연결 검증과 16K 컨텍스트 토큰 소비량 측정도 같은 이유로 대기다. UCP05의 화면 검증은 mock API와 데스크톱 브라우저 레이아웃까지이고, UCP06은 그 화면의 양방향 수정·적용 보호를 통합 테스트로 고정했다. UCP07은 v3 저장·trim·복원·재시도를 API와 순수 모듈 수준에서 고정했고, UCP08이 실제 브라우저(CDP, Edge 158)에서 적용→저장→갤러리 복원까지 클릭으로 확인했다. UCP08의 모바일 실기기(iOS Safari·Android Chrome) 검증은 기기가 없어 대기 상태로 남는다. DeepSeek 4.1 Flash는 코드를 구현할 실행자이며 Studio 런타임 LLM 설정을 바꾸라는 뜻이 아니다. 런타임은 기존 서버의 LLM 연결과 GPU 조정 경로를 사용한다.
+현재 상태는 **UCP01 계약 확정 완료, UCP02·UCP03·UCP04·UCP05·UCP06·UCP07 구현 완료, UCP08 브라우저 자동화 완료(459 checks, 모바일 실기기 대기), UCP09 실환경 점검 완료·compose 단계 차단**이다. 2026-11-23에 BC-250 실호스트(Fedora 43, RADV GFX1013, llama-server `Qwen3.6-35B-A3B` `n_ctx` 16384)에 읽기 전용으로 접속해 배포 버전이 HEAD `a2d9038`와 바이트 단위로 같음을 확인했고, 절차·차단 사유·롤백은 [UCP09 BC-250 검증 절차](UCP09_BC250_VERIFICATION.md)에 기록했다. `/api/v1/prompt/compose`는 **503 `capability_not_advertised`**이며, 원인은 배포 tarball에는 있으나 설치기가 `config/models.yaml`만 복사해 서버에 `config/prompt_dictionary.json`이 없는 것이다(설치기 수정은 완료, **배포는 미실행**). UCP03의 실제 llama-server·GPU gate 실연결 검증과 16K 컨텍스트 토큰 소비량 측정은 compose 단계와 함께 대기다. UCP05의 화면 검증은 mock API와 데스크톱 브라우저 레이아웃까지이고, UCP06은 그 화면의 양방향 수정·적용 보호를 통합 테스트로 고정했다. UCP07은 v3 저장·trim·복원·재시도를 API와 순수 모듈 수준에서 고정했고, UCP08이 실제 브라우저(CDP, Edge 158)에서 적용→저장→갤러리 복원까지 클릭으로 확인했다. UCP08의 모바일 실기기(iOS Safari·Android Chrome) 검증은 기기가 없어 대기 상태로 남는다. DeepSeek 4.1 Flash는 코드를 구현할 실행자이며 Studio 런타임 LLM 설정을 바꾸라는 뜻이 아니다. 런타임은 기존 서버의 LLM 연결과 GPU 조정 경로를 사용한다.
 
 ## 0 DeepSeek 4.1 Flash 실행 지시
 
@@ -782,7 +782,7 @@ v3 미지원 서버에서는 최종 문자열 적용과 직접 생성은 가능�
 | UCP06 | 양방향 수정과 모바일 입력·적용 보호 | UCP05 | 완료 (통합 테스트), 실기기 UCP08 |
 | UCP07 | 구성 v3 저장과 과거 복원 | UCP01, UCP06 | 대기 |
 | UCP08 | 회귀와 반응형·모바일 실기기 검증 | UCP07 | 브라우저 자동화 완료 (459 checks) · 모바일 실기기 대기 |
-| UCP09 | 실제 LLM과 이미지 결과 평가 | UCP08 | **환경 대기** — 실행 호스트에 llama-server·GGUF·GPU 없음(아래 UCP09 환경 확인 참조) |
+| UCP09 | 실제 LLM과 이미지 결과 평가 | UCP08 | **실환경 점검 완료 · compose 차단** — 사전 미배치로 503, [절차](UCP09_BC250_VERIFICATION.md) |
 
 ### UCP01 계약과 검증 사례 확정
 
@@ -1502,6 +1502,8 @@ UCP09로 넘기는 항목: 실제 LLM 응답으로 ①칩 자동 선택의 의�
 
 #### UCP09 환경 확인 (2026-11-23, 실행 전 차단 사유 기록)
 
+> **2026-11-23 갱신**: 아래 표는 **Mac 작업 호스트** 기준의 1차 차단 기록이다. 같은 날 BC-250 실호스트에 읽기 전용으로 접속해 환경을 확인했고, 절차·실측값·남은 차단 사유는 [UCP09 BC-250 검증 절차](UCP09_BC250_VERIFICATION.md)에 있다. 요약: llama-server·GPU·모델은 **모두 존재**하고 `/health` ok(`n_ctx` 16384)이며 배포 backend는 HEAD와 동일하다. 다만 서버에 사전 파일이 없어 `prompt_compose`가 광고되지 않으므로 compose 단계는 **여전히 실행할 수 없고 UCP09는 완료가 아니다**.
+
 UCP09는 **실제 llama-server·GPU·모델**을 전제한다. 이번 실행 환경을 확인한 결과 전제가 성립하지 않아 **착수하지 않았고, 어떤 항목도 완료로 표시하지 않는다**.
 
 | 확인 항목 | 실행한 확인 | 결과 |
@@ -1521,6 +1523,17 @@ UCP09는 **실제 llama-server·GPU·모델**을 전제한다. 이번 실행 환
 의미 보존 평가(인물 수·위치/배경·의상/색상·인물별 귀속·시간/날씨·부정/제외·관계·수동 선택 보호)와 지원 모델별(SD1.5·Flux.2 Klein·Z-Image·MOSS) 실제 이미지 생성도 같은 이유로 대기다. `config/models.yaml`상 `klein-4b-q8`·`z-image-*`·`moss-image-*`는 `validation_status: configured`이며, 설치 여부를 이 호스트에서 확인할 수 없다.
 
 **평가 입력은 이미 저장소에 있다.** `backend/tests/fixtures/ucp04_eval_cases.json`의 4개 고정 사례(붉은 원피스·비 오는 거리 / 두 여성 중 한 명만 모자 / 텅 빈 해변 / 밤 카페 창가의 코트 남성)가 계열별 faithful·drift 프롬프트를 함께 갖고 있고, `backend/tests/test_prompt_compose_meaning.py`가 **규칙 기반**으로 이를 검사한다. 이 파일은 스스로 "실제 모델 판단이 아니다"라고 명시하며, 특히 `test_the_server_cannot_tell_drift_from_a_paraphrase`가 **서버가 drift를 구별하지 못한다**는 사실을 고정한다. 따라서 UCP09에서 이 픽스처를 실제 Qwen 출력에 적용할 때, **규칙 기반 통과는 의미 보존 성공의 증거가 아니다** — 인물별 속성 귀속·관계·부정 조건처럼 사람이 판단해야 하는 항목은 별도 판정표가 필요하다.
+
+#### UCP09 실환경 점검 결과 (2026-11-23, BC-250)
+
+실제 BC-250 호스트에서 읽기 전용으로 확인한 값과, 남은 차단 사유 및 실행 순서는 [UCP09 BC-250 검증 절차](UCP09_BC250_VERIFICATION.md)에 표로 정리했다. 점검 스크립트는 `scripts/ucp09/inspect-bc250.sh`(호스트)와 `scripts/ucp09/verify-tunnel.sh`(터널)이며, 둘 다 변경을 하지 않는다.
+
+- **환경은 갖춰져 있다**: Fedora 43, RADV GFX1013, `sd-cli` 설치, llama-server `/health` ok(`n_ctx` 16384), 이미지 모델 9종 등록(그중 8종 `execution_enabled`).
+- **배포 코드는 현재 HEAD와 같다**: backend 54개 파일 sha256이 전부 일치한다. 즉 운영에서 관찰한 동작이 이 커밋의 동작이다.
+- **compose만 막혀 있다**: `/api/v1/prompt/compose` → `503 not_configured / capability_not_advertised`. 원인은 사전 파일 미배치이고, 이는 **배포 패키징 결함**이다(설치기가 `config/models.yaml`만 복사). 설치기를 고쳤지만 **배포하지 않았다.**
+- **터널은 정상**: `verify-tunnel.sh` 12 checks / 0 failed. 이미지 다운로드까지 같은 origin으로 통과했다.
+
+계약 점검 중 발견한 별도 문제: `scripts/probe_studio_prompt_composition.py`의 "unsupported schema_version" 사례가 `schema_version: 2`를 기대했는데 v2가 허용되면서 **실서버에서 job 2건이 실제로 큐잉**되었다(둘 다 정리: 1건 취소, 1건 완료, GPU 반환). 사례를 `99`로 고쳐 재실행해 15/15 통과, **신규 job 0건**을 확인했다. 점검 도구가 읽기 전용이라는 전제가 깨질 수 있었던 사례로 기록한다.
 
 실제 서비스가 광고하는 compose capability와 기존 운영 연결을 사용한다. 고정 사례의 요청·응답, 지연, 모델·프로필 버전, 사전 자동 선택, 원문 의미 보존을 기록한다. 지원 모델별 대표 장면에 대해 seed와 생성 설정을 고정해 기존 사전 조합 결과와 새 후보 결과를 비교한다. GPU 작업은 기존 조정 정책을 따른다.
 

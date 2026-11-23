@@ -78,6 +78,8 @@ sudo systemctl status bc250-ai-studio.service --no-pager
 
 활성 업데이트 방식은 [Actions 배포](ACTIONS_DEPLOYMENT.md)다. code/config/DB의 일관 백업과 현재 실행 서비스 구성을 함께 보존한다. 이미지 자산은 릴리스 백업에 포함되지 않으므로 별도 데이터 백업 정책이 필요하다.
 
+`config/`는 커밋된 설정 전체가 배포된다. `models.yaml`만 복사하던 이전 설치기에서는 `prompt_dictionary.json`이 누락되어 `prompt_proposals`·`prompt_compose`가 광고되지 않았다(사전 미로드 시 서버는 오류 대신 "미구성"으로 응답하므로 조용히 사라진다). 배포 후 `/api/v1/system/capabilities`에서 `prompt_compose` 존재를 확인한다.
+
 복구가 필요하면 재시작을 반복하기 전에 Studio 상태·journal·생존 이미지 프로세스·gate hold·llama health를 확인한다. 배포 실패는 출력된 백업 경로에서 호환되는 코드·설정·DB를 복원한다. gate나 모델 전환 journal을 삭제해 검사를 우회하지 않는다. `/system/recover`는 이미지 worker 생존 여부 확인 후 실행하며 중단 작업을 다시 시작하는 API가 아니다.
 
 | 증상 | 확인할 항목 |

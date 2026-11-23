@@ -59,8 +59,11 @@ CASES = [
      "family does not match"),
     ("extra composition field", job(prompt_composition=composition(evil=1)), 422,
      "Extra inputs"),
-    ("unsupported schema_version", job(prompt_composition=composition(schema_version=2)), 422,
-     "Input should be 1"),
+    # v1 and v2 are both accepted now, so a 2 is no longer a rejection. Use a
+    # version outside COMPOSITION_SCHEMA_VERSIONS or this case enqueues a real
+    # job on a live server (it did: two contract-probe jobs, 2026-11-23).
+    ("unsupported schema_version", job(prompt_composition=composition(schema_version=99)), 422,
+     "does not match any of the expected tags"),
     ("unknown top-level field", job(prompt_compostion=composition()), 422, "Extra inputs"),
     ("empty prompt", job(prompt="   "), 422, "Prompt must contain text"),
     ("NUL in prompt", job(prompt="a\x00b"), 422, "NUL"),

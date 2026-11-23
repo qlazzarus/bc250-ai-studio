@@ -33,8 +33,11 @@ trap finish EXIT
 # Copy first so later changes to the uploaded file cannot affect extraction.
 install -m 0600 -- "$archive" "$stage/release.tar.gz"
 tar -xzf "$stage/release.tar.gz" -C "$stage"
+# The prompt dictionary is part of the release, not optional data: without it
+# the server stops advertising `prompt_proposals` and `prompt_compose`.
 [[ -f "$stage/pyproject.toml" && -f "$stage/uv.lock" && -f "$stage/backend/app/main.py" \
-    && -f "$stage/frontend/dist/index.html" && -f "$stage/config/models.yaml" ]]
+    && -f "$stage/frontend/dist/index.html" && -f "$stage/config/models.yaml" \
+    && -f "$stage/config/prompt_dictionary.json" ]]
 
 # Never replace code over a model switch that did not reach a terminal state;
 # that state belongs to the worker and cannot be rebuilt from this release.
@@ -81,7 +84,12 @@ sync_needed=false
 cmp -s "$backup/pyproject.toml" "$stage/pyproject.toml" || sync_needed=true
 cmp -s "$backup/uv.lock" "$stage/uv.lock" || sync_needed=true
 
-for item in backend config/models.yaml frontend/dist pyproject.toml uv.lock; do
+# Ship the whole config directory: models.yaml alone left
+# config/prompt_dictionary.json behind, so `prompt_proposals` and
+# `prompt_compose` could never be advertised (the loader treats a missing
+# mirror as "not configured"). The directory only holds committed files, and
+# the local settings.yaml is gitignored so it cannot leak a machine's secrets.
+for item in backend config frontend/dist pyproject.toml uv.lock; do
     rm -rf -- "$app/$item"
     mkdir -p -- "$(dirname "$app/$item")"
     cp -a -- "$stage/$item" "$app/$item"
