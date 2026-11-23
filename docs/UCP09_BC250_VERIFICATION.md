@@ -11,7 +11,7 @@
 | LLM | `Qwen3.6-35B-A3B…IQ2_M.gguf`, `-c 16384`, `n_ctx` 16384, `--reasoning auto` | `/health` ok |
 | 이미지 엔진 | `sd-cli` 83,416,008 bytes, sha256 `810d7659…7ef3b` | 설치됨 |
 | Studio | `sdcpp`, `simulated: false`, `policy: chat_priority` | 기존 코드가 배포됨 |
-| 배포 버전 | HEAD `a2d9038`와 backend 54개 파일 **sha256 전부 일치** | 코드 기준점 = 운영 |
+| 배포 버전 | `a2d9038`(운영)와 backend 54개 파일 **sha256 전부 일치** | 코드 기준점 = 운영 |
 | compose | `/api/v1/prompt/compose` → **503 `capability_not_advertised`** | **차단** |
 | 사전 | `/opt/bc250-ai-studio/config/prompt_dictionary.json` **없음** | 차단 원인 |
 
@@ -25,8 +25,8 @@
 
 ## 배포 전 기준점
 
-- 코드 기준점은 `a2d9038`(main, origin 동기)이다. 이 커밋의 backend가 운영과 바이트 단위로 같으므로 **지금 운영에서 관찰되는 동작이 곧 이 커밋의 동작**이다.
-- 이번 세션의 수정(설치기 `config` 전체 복사, 사전 전제조건, 점검 스크립트, probe 수정)은 **아직 커밋하지 않았다.**
+- 코드 기준점은 `c82bae5`(로컬 `main`, tag `ucp08-baseline`)이다. 그 부모 `a2d9038`은 origin/main과 동기이며 backend가 운영과 바이트 단위로 같아서 **지금 운영에서 관찰되는 동작이 곧 `a2d9038`의 동작**이다.
+- `c82bae5`는 설치기 수정·점검 스크립트·문서만 담는다(제품 런타임 코드 변경 없음). **아직 push하지 않았으므로 운영에는 반영되지 않았다.**
 - 롤백 재료: `/var/backups/bc250-ai-studio.Iwye5Waq` 등 릴리스 백업이 있고, 설치기는 code/config/DB 사본을 만든 뒤 교체한다. **백업 디렉터리는 `0700`이라 열람에 root가 필요하다.**
 - 덮어쓰지 않는 것: `config/models.yaml`은 로컬·서버 sha256이 같아 교체해도 변화가 없다. `.env`·DB·이미지 자산·모델 파일은 설치기 대상이 아니다(`/etc/bc250-ai-studio.env`, `/opt/ai-studio-data`, `/opt/sd-models`).
 - **주의**: 설치기가 `config` 디렉터리를 통째로 교체하므로 서버에만 있는 `config/models.yaml.bak.20261113104948` 같은 과거 파일은 사라진다. 교체 직전 `$app/config`가 백업에 `cp -a`되므로 복구는 가능하지만, 이 파일을 계속 두려면 배포 전에 `/var/backups` 밖으로 옮긴다.
