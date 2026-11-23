@@ -14,6 +14,7 @@
 | 배포 버전 | `a2d9038`(운영)와 backend 54개 파일 **sha256 전부 일치** | 코드 기준점 = 운영 |
 | compose | `/api/v1/prompt/compose` → **503 `capability_not_advertised`** | **차단** |
 | 사전 | `/opt/bc250-ai-studio/config/prompt_dictionary.json` **없음** | 차단 원인 |
+| 설치기 | 호스트 `f1400e90…` ≠ 저장소 `8718137e…` | **배포 차단 (hash guard)** |
 
 ### 차단 사유와 원인
 
@@ -39,6 +40,7 @@
 
 - 수정을 **커밋만 하고 push하지 않으면** 운영은 바뀌지 않는다(기준점 보존).
 - push하면 CI를 통과한 경우에만 설치기가 돌아 **Studio가 재시작**된다(무중단 아님, 진행 중 작업은 `interrupted`로 전환될 수 있음). gate·llama·model-worker는 재시작 대상이 아니다.
+- **설치기를 수정했다면 설치기가 CI의 hash guard에 걸린다.** `deploy/deploy-release.sh`를 바꾼 릴리스는 호스트의 설치기를 먼저 갱신해야 한다(「설치기 배포」 항목).
 - push하기 전에 **CI와 동일한 명령을 로컬에서 먼저 통과시킨다**: `uv run pytest -q scripts/test_studio_static_deploy.py`, `uv run ruff check backend`, `bash -n deploy/deploy-release.sh`.
 - 즉 "커밋과 배포를 분리할 수 없다"는 것은 **push까지 했을 때**의 이야기이고, push 자체는 사용자 승인 사항이다.
 
@@ -56,6 +58,34 @@ scripts/ucp09/verify-tunnel.sh          # 터널 경로 검증, 변경 없음
 - `sudo`는 **비밀번호가 필요**하다. NOPASSWD는 `systemctl restart bc250-llm-client.service`, `bc250-ai-studio-deploy`, `bc250-studio-coordinated-deploy ""` 세 개뿐이다. 따라서 `/opt/ai-studio-data`(0700 ai-studio)와 `/var/backups/*`(0700 root)는 사용자 세션에서 읽을 수 없다.
 - gate의 `/health`·`/status`는 **409**를 돌려준다(게이트 자체 프로토콜). 200이 아니라고 해서 게이트가 죽은 것은 아니다.
 - **배포 테스트가 복사 목록 문자열을 그대로 인용하고 있었다.** `test_backend_and_frontend_are_replaced_together`는 `"for item in backend config/models.yaml frontend/dist"`를 `split`해서 스크립트 일부를 떼어냈다. 목록을 `config` 전체로 넓히자 `split`이 빈 리스트를 돌려주어 **아무것도 검사하지 않고 `IndexError`로 죽었다.** 이는 "검사하는 척하는 테스트"의 전형이라, 복사 목록을 스크립트에서 **파싱**하고 결과 파일 트리로 판정하도록 고쳤다(`scripts/test_studio_static_deploy.py`). 사전이 호스트에 도달하는지 확인하는 테스트도 추가했다.
+
+## 설치기 배포 (hash guard)
+
+CI는 릴리스 업로드 **전에** `/usr/local/sbin/bc250-ai-studio-deploy`의 sha256이 저장소의 `deploy/deploy-release.sh`와 같은지 확인하고, 다르면 다음 메시지로 멈춘다.
+
+```
+Install the reviewed deploy/deploy-release.sh on the server first.
+```
+
+이번에 설치기를 고쳤으므로 이 검사에 걸렸다. 실측 차이:
+
+| 위치 | sha256 | 대응 커밋 |
+| --- | --- | --- |
+| 호스트 `/usr/local/sbin/bc250-ai-studio-deploy` | `f1400e90…ab442775` | `14439eb` (2026-11-15) |
+| 저장소 `deploy/deploy-release.sh` | `8718137e…cf4c364` | `c82bae5` (현재) |
+
+차이는 의도한 2개 hunk뿐이다(+10/−2): `config` 디렉터리 전체 복사, 사전 파일 전제조건.
+
+```sh
+scripts/ucp09/install-deployer.sh            # 스테이징 + 해시 검증, 설치 명령만 출력
+scripts/ucp09/install-deployer.sh --apply    # 스테이징 후 설치 (sudo 비밀번호 필요)
+```
+
+설치기가 root 소유이므로 **sudo 암호가 필요**하다. 이 경로에는 NOPASSWD 규칙이 없다(`sudo -n true`도 실패). 그래서 스크립트는 스테이징·해시 검증까지만 무권한으로 수행하고, 마지막 `install`만 사람이 승인하게 나눠 두었다. root로 실행되는 헬퍼는 **자기가 해시를 다시 검증**하므로 전송이 변조되면 설치하지 않는다(`Refusing: staged installer is …`로 실패, 아무것도 쓰지 않음 — 실측 확인).
+
+기존 설치기는 `bc250-ai-studio-deploy.prev-<timestamp>`로 보존되고, `restorecon`으로 SELinux 컨텍스트(`bin_t`)를 복원한다. 스테이징 파일은 성공 후 호스트에서 삭제된다.
+
+이 검사는 **설치기 자체를 보호하는 장치**이므로 우회하지 않는다(CI에서 검사를 빼거나 `--force`를 추가하지 않는다). 설치기를 바꿀 때마다 이 순서가 필요하다.
 
 ## SSH 터널
 
@@ -86,6 +116,27 @@ ssh -p 2222 -N -T -o ExitOnForwardFailure=yes \
 | 6 | SD1.5 이미지 생성 | **가능** — `realistic-vision-v6`이 `tested` |
 | 7 | 나머지 설치 모델별 생성 | 가능 — `klein-4b-q4`·`pornmaster-klein-9b`·`moss-image-nsfw` tested, `-q8`·`z-image-*`는 configured |
 | 8 | 성능·품질 정리 | 6~7 이후 |
+
+### 사전 배치 절차 (차단 해소 순서)
+
+세 단계이며, 앞 단계가 끝나야 다음이 가능하다.
+
+```sh
+# 1) 설치기를 호스트에 설치한다 (sudo 비밀번호 필요, hash guard 해소)
+scripts/ucp09/install-deployer.sh --apply
+
+# 2) CI를 통과시켜 배포한다. 설치기가 config 전체를 복사하므로 사전이 함께 도착한다.
+#    push 전에 CI와 같은 검사를 로컬에서 먼저 돌린다.
+uv run pytest -q scripts/test_studio_static_deploy.py
+uv run ruff check backend
+git push origin main
+
+# 3) 배포 후 광고 여부를 확인한다.
+curl -sS -H "Authorization: Bearer $CLIENT_KEY" \
+  http://127.0.0.1:18080/api/v1/system/capabilities | grep -o '"prompt_compose"'
+```
+
+1단계를 건너뛰면 CI가 `Install the reviewed deploy/deploy-release.sh on the server first.`로 멈춘다(배포 없음, 운영 무변경).
 
 ### 2단계 실행 (사전 배치 후)
 

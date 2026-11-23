@@ -136,10 +136,13 @@ if [ -f "$d" ]; then
 else
     echo 'dictionary = MISSING -> prompt_proposals and prompt_compose cannot be advertised'
     # The mirror is committed (config/prompt_dictionary.json) and the deploy
-    # tarball contains it; the release installer copies only config/models.yaml,
-    # so the file never lands. Reported here because UCP09 composes through it.
-    if grep -q 'config/models.yaml' /usr/local/sbin/bc250-ai-studio-deploy 2>/dev/null; then
+    # tarball contains it; the installed release installer copies the config
+    # directory, so a missing file means the release was deployed by an older
+    # installer. Point at the copy list itself rather than at any mention of
+    # models.yaml (the current installer names it in a comment too).
+    if grep -q '^for item in .*config/models\.yaml' /usr/local/sbin/bc250-ai-studio-deploy 2>/dev/null; then
         echo '  cause: /usr/local/sbin/bc250-ai-studio-deploy copies only config/models.yaml'
+        echo '  fix:   install the current installer (scripts/ucp09/install-deployer.sh)'
     fi
 fi
 echo 'unit environment file:'

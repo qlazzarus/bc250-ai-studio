@@ -24,6 +24,16 @@ pyproject/uv.lock 변경 때만 의존성을 동기화한다. gate가 같은 che
 
 production 환경에 `BC250_STUDIO_API_KEY`, `BC250_SSH_HOST`, `BC250_SSH_PORT`, `BC250_SSH_USER`, `BC250_SSH_PRIVATE_KEY`, `BC250_SSH_KNOWN_HOSTS`를 설정한다. 서버 root 설치기의 소유권·해시와 제한 sudo를 준비한다. 설치기 자체 변경은 검토한 파일로 서버와 일치시킨 뒤 릴리스를 진행한다.
 
+### 설치기를 수정한 릴리스
+
+4단계의 hash 검사는 **설치기 자체를 보호하는 장치**다. `deploy/deploy-release.sh`를 바꾼 릴리스는 서버 설치기를 먼저 갱신하지 않으면 `Install the reviewed deploy/deploy-release.sh on the server first.`로 멈추고 아무것도 업로드·정지하지 않는다. 순서는 다음과 같다.
+
+1. `scripts/ucp09/install-deployer.sh` — 스테이징·해시 검증 후 설치 명령을 출력한다(무권한).
+2. `scripts/ucp09/install-deployer.sh --apply` — 실제 설치. root 소유이므로 sudo 암호가 필요하다(NOPASSWD 규칙 없음).
+3. `sha256sum /usr/local/sbin/bc250-ai-studio-deploy`가 저장소 해시와 같은지 확인한 뒤 배포한다.
+
+root로 실행되는 헬퍼는 설치 직전에 해시를 다시 검증한다. 기존 설치기는 `.prev-<timestamp>`로 보존되고 `restorecon`으로 SELinux 컨텍스트를 복원한다. 검사를 제거하거나 `--force`를 추가해 우회하지 않는다.
+
 배포 전 이미지 큐 유휴·전환 journal·서비스 정상 여부를 확인한다. `scripts/inspect-studio-resume.sh`는 설치와 서비스 구성을 읽는 보조 도구다. 배포 뒤 Studio 인증 요청·UI·gate/Client 상태를 확인하고 실패 시 호환되는 코드·DB·환경 백업으로 복원한다.
 
 단일 운영자 전제를 다중 사용자·무중단 운영으로 확대하지 않는다. 변경 영역별 최적화와 추가 운영 검증은 [TODO](TODO.md)에서 관리한다.

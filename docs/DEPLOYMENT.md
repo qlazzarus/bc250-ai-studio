@@ -80,6 +80,8 @@ sudo systemctl status bc250-ai-studio.service --no-pager
 
 `config/`는 커밋된 설정 전체가 배포된다. `models.yaml`만 복사하던 이전 설치기에서는 `prompt_dictionary.json`이 누락되어 `prompt_proposals`·`prompt_compose`가 광고되지 않았다(사전 미로드 시 서버는 오류 대신 "미구성"으로 응답하므로 조용히 사라진다). 배포 후 `/api/v1/system/capabilities`에서 `prompt_compose` 존재를 확인한다.
 
+설치기(`deploy/deploy-release.sh`)를 수정한 릴리스는 **호스트 설치기를 먼저 갱신해야 한다**. workflow는 업로드 전에 서버 `/usr/local/sbin/bc250-ai-studio-deploy`의 sha256을 저장소 후보와 비교하고, 다르면 `Install the reviewed deploy/deploy-release.sh on the server first.`로 멈춘다. 이 검사는 설치기 자체를 보호하므로 우회하지 않는다. `scripts/ucp09/install-deployer.sh`가 스테이징·해시 검증을 하고(`--apply`로 설치), root 소유이므로 sudo 암호가 필요하다. 기존 파일은 `.prev-<timestamp>`로 보존된다.
+
 복구가 필요하면 재시작을 반복하기 전에 Studio 상태·journal·생존 이미지 프로세스·gate hold·llama health를 확인한다. 배포 실패는 출력된 백업 경로에서 호환되는 코드·설정·DB를 복원한다. gate나 모델 전환 journal을 삭제해 검사를 우회하지 않는다. `/system/recover`는 이미지 worker 생존 여부 확인 후 실행하며 중단 작업을 다시 시작하는 API가 아니다.
 
 | 증상 | 확인할 항목 |
