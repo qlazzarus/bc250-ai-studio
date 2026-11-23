@@ -25,19 +25,22 @@
 
 ## 배포 전 기준점
 
-- 코드 기준점은 `c82bae5`(로컬 `main`, tag `ucp08-baseline`)이다. 그 부모 `a2d9038`은 origin/main과 동기이며 backend가 운영과 바이트 단위로 같아서 **지금 운영에서 관찰되는 동작이 곧 `a2d9038`의 동작**이다.
-- `c82bae5`는 설치기 수정·점검 스크립트·문서만 담는다(제품 런타임 코드 변경 없음). **아직 push하지 않았으므로 운영에는 반영되지 않았다.**
+- 코드 기준점은 `9a6cf1e`(origin/main, tag `ucp08-baseline`)이다. 그 조상 `a2d9038`은 backend가 운영과 바이트 단위로 같아서 **지금 운영에서 관찰되는 동작이 곧 `a2d9038`의 동작**이다.
+- `c82bae5`·`9a6cf1e`는 설치기 수정·점검 스크립트·문서만 담는다(제품 런타임 코드 변경 없음). `b9dddc5`는 배포 테스트 수정이다.
+- **push는 이미 발생했고, 배포는 CI가 막았다.** `c82bae5`가 push되자 CI의 `pytest scripts/test_studio_static_deploy.py` 단계가 실패했고(`IndexError`), 이후 단계(패키징·배포)가 실행되지 않았다. 확인: 서버 `config/`에 사전이 여전히 없고 Studio `ActiveEnterTimestamp`도 11:58 그대로다. 즉 **테스트가 배포 게이트로 실제 작동했다.**
 - 롤백 재료: `/var/backups/bc250-ai-studio.Iwye5Waq` 등 릴리스 백업이 있고, 설치기는 code/config/DB 사본을 만든 뒤 교체한다. **백업 디렉터리는 `0700`이라 열람에 root가 필요하다.**
 - 덮어쓰지 않는 것: `config/models.yaml`은 로컬·서버 sha256이 같아 교체해도 변화가 없다. `.env`·DB·이미지 자산·모델 파일은 설치기 대상이 아니다(`/etc/bc250-ai-studio.env`, `/opt/ai-studio-data`, `/opt/sd-models`).
+- 배포 스테이지는 `git archive HEAD ... config`로 만들어지므로 **추적되는 파일만** 서버에 도달한다(`config/models.yaml`, `config/prompt_dictionary.json`, `config/settings.example.yaml`). `config/settings.yaml`은 gitignore 대상이라 애초에 포함되지 않는다.
 - **주의**: 설치기가 `config` 디렉터리를 통째로 교체하므로 서버에만 있는 `config/models.yaml.bak.20261113104948` 같은 과거 파일은 사라진다. 교체 직전 `$app/config`가 백업에 `cp -a`되므로 복구는 가능하지만, 이 파일을 계속 두려면 배포 전에 `/var/backups` 밖으로 옮긴다.
 
 ### 배포 위험 (반드시 먼저 확인)
 
-`.github/workflows/deploy.yml`은 **main push에 자동 배포**된다. 이전 커밋 `a2d9038`이 이미 push되어 11:58에 배포되었다. 즉 커밋과 배포를 분리할 수 없다.
+`.github/workflows/deploy.yml`은 **main push에 자동 배포**된다. 다만 배포는 마지막 잡의 마지막 단계라, 그 앞의 테스트·패키징 단계가 실패하면 **배포까지 도달하지 않는다**. 이번에 실제로 그렇게 막혔다(서버 `config/`에 사전 없음, Studio 11:58 그대로).
 
 - 수정을 **커밋만 하고 push하지 않으면** 운영은 바뀌지 않는다(기준점 보존).
-- push하면 설치기가 돌아 **Studio가 재시작**된다(무중단 아님, 진행 중 작업은 `interrupted`로 전환될 수 있음). gate·llama·model-worker는 재시작 대상이 아니다.
-- 따라서 **push 시점에 사용자 승인이 필요하다.**
+- push하면 CI를 통과한 경우에만 설치기가 돌아 **Studio가 재시작**된다(무중단 아님, 진행 중 작업은 `interrupted`로 전환될 수 있음). gate·llama·model-worker는 재시작 대상이 아니다.
+- push하기 전에 **CI와 동일한 명령을 로컬에서 먼저 통과시킨다**: `uv run pytest -q scripts/test_studio_static_deploy.py`, `uv run ruff check backend`, `bash -n deploy/deploy-release.sh`.
+- 즉 "커밋과 배포를 분리할 수 없다"는 것은 **push까지 했을 때**의 이야기이고, push 자체는 사용자 승인 사항이다.
 
 ## 읽기 전용 점검
 
@@ -48,10 +51,11 @@ scripts/ucp09/verify-tunnel.sh          # 터널 경로 검증, 변경 없음
 
 `inspect-bc250.sh`는 `systemctl show/is-active`, `ss -lntp`, `find`, `vulkaninfo --summary`, `/proc/<pid>/cmdline`, loopback GET만 사용한다. sudo를 쓰지 않고, 서비스를 재시작·활성화하지 않으며, job을 넣지 않는다. root 없이 못 읽는 경로는 "unreadable"로 표시하고 권한 상승을 시도하지 않는다.
 
-이번 실행에서 확인된 두 가지 한계:
+이번 실행에서 확인된 세 가지 한계:
 
 - `sudo`는 **비밀번호가 필요**하다. NOPASSWD는 `systemctl restart bc250-llm-client.service`, `bc250-ai-studio-deploy`, `bc250-studio-coordinated-deploy ""` 세 개뿐이다. 따라서 `/opt/ai-studio-data`(0700 ai-studio)와 `/var/backups/*`(0700 root)는 사용자 세션에서 읽을 수 없다.
 - gate의 `/health`·`/status`는 **409**를 돌려준다(게이트 자체 프로토콜). 200이 아니라고 해서 게이트가 죽은 것은 아니다.
+- **배포 테스트가 복사 목록 문자열을 그대로 인용하고 있었다.** `test_backend_and_frontend_are_replaced_together`는 `"for item in backend config/models.yaml frontend/dist"`를 `split`해서 스크립트 일부를 떼어냈다. 목록을 `config` 전체로 넓히자 `split`이 빈 리스트를 돌려주어 **아무것도 검사하지 않고 `IndexError`로 죽었다.** 이는 "검사하는 척하는 테스트"의 전형이라, 복사 목록을 스크립트에서 **파싱**하고 결과 파일 트리로 판정하도록 고쳤다(`scripts/test_studio_static_deploy.py`). 사전이 호스트에 도달하는지 확인하는 테스트도 추가했다.
 
 ## SSH 터널
 
