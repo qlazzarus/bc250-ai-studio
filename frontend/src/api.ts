@@ -80,6 +80,15 @@ export type PromptCompositionRemainder = {
   accepted_at: string;
 };
 
+/**
+ * The v1/v2 composition record (dictionary-builder shape).
+ *
+ * UCP07 note: `schema_version` is narrowed to `1 | 2` because v3 is a *different* record,
+ * not a wider one. A v3 row stores the compose panel's scene, chip sources and apply
+ * history, which this shape has no fields for; describing both with one type would let a
+ * reader call `.selections.map(item => item.label_ko)` on rows that have no `label_ko`.
+ * `AssetMetadata["prompt_composition"]` is the union, and `isLegacyComposition` narrows it.
+ */
 export type PromptComposition = {
   /** 1 for a recorded v1 snapshot, 2 once a translation is included (TRANS01 §2.4). */
   schema_version: 1 | 2;
@@ -100,8 +109,27 @@ export type PromptComposition = {
   remainder?: PromptCompositionRemainder[];
 };
 
+/**
+ * A stored v3 snapshot as a *reader* sees it: enough structure to route on, nothing more.
+ *
+ * It is not `SnapshotV3` from `composeSnapshot.ts` because that type describes what the
+ * composer *writes*, and a stored row may be older, trimmed or damaged. `fromSnapshot`
+ * validates the real content; this type only lets a caller ask "is this v3?" without
+ * `as` casts.
+ */
+export type StoredSnapshotV3 = { schema_version: 3 } & Record<string, unknown>;
+
+export type StoredComposition = PromptComposition | StoredSnapshotV3;
+
+/** Narrows a stored record to the v1/v2 shape. The only sanctioned way to read one. */
+export function isLegacyComposition(
+  value: StoredComposition | null | undefined,
+): value is PromptComposition {
+  return value !== null && value !== undefined && value.schema_version !== 3;
+}
+
 export type AssetMetadata = {
-  prompt_composition?: PromptComposition | null;
+  prompt_composition?: StoredComposition | null;
   asset_id: string;
   model_id: string;
   prompt: string;
@@ -192,8 +220,39 @@ export class StudioApi {
         timeout_ms?: number;
         dictionary_version?: string;
       };
+      /**
+       * UCP03/UCP05: the integrated compose path, advertised as its own key so a client
+       * that only sees `prompt_proposals` concludes compose is unavailable (§5). Absent
+       * means "this deployment cannot compose", which is a normal answer.
+       */
+      prompt_compose?: {
+        schema_versions?: number[];
+        dictionary_version?: string;
+        /** Per-family output profile versions; the key a stale client is refused on. */
+        output_profile_versions?: Record<string, number>;
+        max_request_bytes?: number;
+        max_response_bytes?: number;
+        timeout_ms?: number;
+        max_candidates?: number;
+        max_brief_chars?: number;
+        max_selections?: number;
+      };
       request_limits?: { max_body_bytes?: number };
     }>("/system/capabilities", { signal });
+  }
+  /**
+   * UCP05: one integrated composition.
+   *
+   * The reply is a *union*, not an outcome: `200` carries `ready`/`needs_clarification`,
+   * and a provider problem is a `200` with `status: "unavailable"`, so `response.ok` is
+   * not the success signal. The body is returned unparsed on purpose — the shape is
+   * validated in `composeRequest.ts`, where a malformed reply becomes a typed failure.
+   * HTTP errors still throw, because those are facts about the request (§5).
+   */
+  compose(body: unknown, signal?: AbortSignal) {
+    return this.request<unknown>("/prompt/compose", {
+      method: "POST", body: JSON.stringify(body), signal,
+    });
   }
   /**
    * One explicit proposal attempt (LLM-I03 contract). The reply is 200 even when the

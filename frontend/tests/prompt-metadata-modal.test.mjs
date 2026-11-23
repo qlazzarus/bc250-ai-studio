@@ -15,30 +15,104 @@ import ts from 'typescript';
  * Rendering is therefore the assertion: React 19 renders synchronously to a string, so no
  * DOM or browser is needed.
  *
- * The component is a `.tsx` module and the tests run on Node's type stripping, which does
- * not transform JSX. It is transpiled here with the repo's own TypeScript, and the
- * `react/jsx-runtime` specifier is rewritten to an absolute URL so the data: module can
- * resolve it.
+ * The component is TSX and the tests run on Node's own type stripping, which does not
+ * transform JSX — and which also rejects constructs such as parameter properties, so it
+ * cannot load `api.ts` even though no JSX is involved. The component and everything it
+ * imports are therefore transpiled here with the repo's own TypeScript, and each module is
+ * turned into a `data:` URL. A `data:` URL has no directory, so relative specifiers cannot
+ * be resolved from it; they are replaced with the `data:` URLs of the transpiled imports,
+ * depth first. The graph below is small and acyclic, which is what makes that enough.
  */
 const here = fileURLToPath(new URL('..', import.meta.url));
 const require = createRequire(join(here, 'package.json'));
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 
-async function renderMetadata(data) {
-  const source = readFileSync(join(here, 'src/components/MetadataModal.tsx'), 'utf8');
+const SRC = join(here, 'src');
+
+/** Bare specifiers the modules may use, mapped to absolute URLs. */
+function bareSpecifier(specifier) {
+  if (specifier === 'react/jsx-runtime') return pathToFileURL(require.resolve('react/jsx-runtime')).href;
+  return null;
+}
+
+/** Extension-less relative specifiers, resolved the way the bundler would. */
+function resolveRelative(fromFile, specifier) {
+  const target = resolve(join(fromFile, '..'), specifier);
+  for (const candidate of [target, `${target}.ts`, `${target}.tsx`, join(target, 'index.ts')]) {
+    try {
+      return readFileSync(candidate) ? candidate : null;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error(`cannot resolve ${specifier} from ${fromFile}`);
+}
+
+const transpiled = new Map();
+
+/**
+ * Every module specifier the transpiled `code` actually imports.
+ *
+ * Parsed rather than matched: a regex for `from "…"` also hits the phrase
+ * `from "applied, but we forgot the prompt"` inside a JSDoc comment, and silently
+ * rewriting prose is exactly the kind of failure this test exists to catch.
+ */
+function specifiersOf(code) {
+  const file = ts.createSourceFile('module.js', code, ts.ScriptTarget.ES2022, true, ts.ScriptKind.JS);
+  const found = [];
+  for (const statement of file.statements) {
+    if (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) {
+      const specifier = statement.moduleSpecifier;
+      if (specifier && ts.isStringLiteral(specifier)) found.push(specifier.text);
+    }
+  }
+  return found;
+}
+
+/**
+ * Transpile `file` and every module it imports into a `data:` URL, imports first.
+ *
+ * Type-only imports are erased by the transpiler, so they never reach the resolver — which
+ * matters because `structuredScene.ts` names `./dictionary` for its types alone.
+ */
+function moduleUrl(file) {
+  const cached = transpiled.get(file);
+  if (cached) return cached;
+  if (transpiled.size > 32) throw new Error('import cycle');
+
+  const source = readFileSync(file, 'utf8');
   const { outputText } = ts.transpileModule(source, {
-    compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    fileName: file,
+    compilerOptions: {
+      jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022,
+    },
   });
-  const runtime = pathToFileURL(require.resolve('react/jsx-runtime')).href;
-  const module = outputText.replaceAll('"react/jsx-runtime"', JSON.stringify(runtime));
-  const url = `data:text/javascript;base64,${Buffer.from(module).toString('base64')}`;
+
+  let code = outputText;
+  for (const specifier of specifiersOf(outputText)) {
+    const replacement = specifier.startsWith('.')
+      ? moduleUrl(resolveRelative(file, specifier))
+      : bareSpecifier(specifier);
+    if (replacement === null) throw new Error(`unexpected bare import ${specifier} in ${file}`);
+    // Quotes are part of the pattern so the specifier cannot match inside a longer path.
+    code = code.split(JSON.stringify(specifier)).join(JSON.stringify(replacement));
+  }
+
+  const url = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+  transpiled.set(file, url);
+  return url;
+}
+
+async function renderMetadata(data) {
+  const url = moduleUrl(join(SRC, 'components/MetadataModal.tsx'));
   const { default: Metadata } = await import(url);
   return renderToStaticMarkup(React.createElement(Metadata, {
     data, archived: false, close: () => {}, reuse: () => {},
     changeArchive: async () => {}, destroy: async () => {},
   }));
 }
+
 
 const base = {
   asset_id: 'asset-1', model_id: 'fake', prompt: 'a person', negative_prompt: '',

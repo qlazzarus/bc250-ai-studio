@@ -33,6 +33,24 @@ npm run lint
 npm run build
 ```
 
+## Tests
+
+There is no `test` script. The suite is plain `node:test` over `.mjs` files that import the
+TypeScript sources directly, so it runs without a bundler:
+
+```sh
+node --test tests/*.test.mjs        # from frontend/
+```
+
+Node 22 or newer is required. The tests run `.ts` sources through Node's built-in type
+stripping, and they use `structuredClone` and `node:test`, so an older runtime fails at
+import time rather than on an assertion. `--experimental-strip-types` is only needed on
+Node 22 (from the repo root the documented form is
+`node --experimental-strip-types --test frontend/tests/*.test.mjs`); Node 23+ strips types
+without the flag.
+
+## Deploy
+
 For GitHub Actions deployments, set the `BC250_STUDIO_API_KEY` secret in the `production` environment (or repository secrets) to the server’s `STUDIO_API_KEY`. The workflow supplies it as `VITE_STUDIO_API_KEY` at build time and fails if it is missing. For local builds, set `VITE_STUDIO_API_KEY` yourself. It is embedded in the browser bundle and visible to anyone who can access the site; restrict access to the site accordingly. Existing tabs with a previously saved session key can use it until closed when no build-time key is configured.
 
 `dist/` is a static site. For a LAN deployment, serve it behind a reverse proxy

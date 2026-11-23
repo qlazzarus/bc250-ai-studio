@@ -7,6 +7,8 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.models.schemas import PromptCompositionV3
+
 
 class GenerationOption(BaseModel):
     """A display-only description of one model generation option.
@@ -177,6 +179,17 @@ class Registry:
         if request.prompt_composition and request.prompt_composition.target_family != model["family"]:
             raise ValueError("Prompt composition family does not match model")
         spec = request.model_dump()
+        # UCP07: a v3 snapshot is stored at the size the server actually accepts. The trim
+        # ladder runs here, before the row exists, so `snapshot_trim` is part of the record
+        # rather than a fact a reader has to infer from missing fields.
+        #
+        # `spec` is the plain dump, so the snapshot would arrive as a nested dict with
+        # `applied: null` — the exact form `PromptCompositionV3` refuses on the way back in.
+        # It is validated here (already done once by `JobRequest`, so this is cheap) and
+        # re-serialised through `fit()`, which both lowers the bytes and drops a null
+        # `applied` instead of writing it.
+        if isinstance(request.prompt_composition, PromptCompositionV3):
+            spec["prompt_composition"], _steps = request.prompt_composition.fit()
         lora_enabled = spec.get("lora_enabled")
         if lora_enabled is not None and not model["lora_toggle_supported"]:
             raise ValueError("Model does not support per-job LoRA control")

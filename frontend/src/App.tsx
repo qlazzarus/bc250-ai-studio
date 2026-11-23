@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Asset, type AssetMetadata, type Job, type StudioModel, type SystemStatus, StudioApi } from "./api";
+import { type Asset, type AssetMetadata, type Job, type StudioModel, type SystemStatus, StudioApi, isLegacyComposition } from "./api";
 import { PixelStudio } from "./PixelStudio";
 import Settings from "./types/Settings";
 import { API_KEY, ASSETS_PER_PAGE, JOBS_PER_PAGE } from "./constants";
@@ -12,10 +12,15 @@ import editable from "./lib/editable";
 import fixedValue from "./lib/fixedValue";
 import optionStatus from "./lib/optionStatus";
 import PromptBuilder from "./components/PromptBuilder";
+import ComposePanel from "./components/ComposePanel";
 import { initialBuilderState, appliedForFamily, restartBuilder, restoreComposition, v1OnlyWhenUnsupported, withReboundFamily } from "./prompt/builderState";
 import { changeSceneFamily } from "./prompt/scene";
 import { DICTIONARY, DICTIONARY_VERSION } from "./prompt/dictionary";
 import { readProposalCapability, UNSUPPORTED, type ProposalCapability } from "./prompt/proposalCapability";
+import { readComposeCapability, COMPOSE_UNSUPPORTED, type ComposeCapability } from "./prompt/composeCapability";
+import { type AppliedResult, type ComposeTarget } from "./prompt/composeSession";
+import type { EditSelection, StructuredScene } from "./prompt/structuredScene";
+import { toSnapshot, fromSnapshot, restoreGaps, COMPOSE_COMPILER_VERSION } from "./prompt/composeSnapshot";
 import { characterCount, validateSubmission } from "./prompt/validation";
 import { queueCounts, queueExpanded, queueSummary } from "./lib/queue";
 
@@ -23,6 +28,20 @@ const initialSettings: Settings = {
   modelId: "", prompt: "", negativePrompt: "", preset: "balanced", resolution: "512x512",
   steps: 4, cfgScale: 1, samplingMethod: null, scheduler: null, seed: "-1", batchCount: 1,
 };
+
+/**
+ * UCP05: three Korean examples for the integrated field.
+ *
+ * They exist so the first action is not typing into an empty box, and each one exercises a
+ * different path of the composer: one subject with an attribute, two entities with a
+ * relation, and a scene that needs more than a subject sentence. They are dictionary
+ * phrases, so the rules-only path can also read them.
+ */
+const COMPOSE_EXAMPLES = [
+  "비 오는 골목에 서 있는 여성",
+  "두 사람이 카페 창가에 앉아 있다",
+  "네온 조명 아래 전신 사진",
+];
 
 function App() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
@@ -53,6 +72,13 @@ function App() {
    * to ask this, not `compositionSupported`.
    */
   const [remainderSupported, setRemainderSupported] = useState(false);
+  /**
+   * UCP07: `schema_versions` includes 3, i.e. the server stores scene + chips + the apply
+   * record. Separate from `compositionSupported` for the same reason v2 is: sending a v3
+   * body to a server that advertises `[1, 2]` is a `422` (`extra_forbidden`), so the write
+   * path must ask about the version it is actually writing.
+   */
+  const [compositionV3Supported, setCompositionV3Supported] = useState(false);
   const [maxBodyBytes, setMaxBodyBytes] = useState<number | null>(null);
   /**
    * LLM-I04: default is "absent", so the AI action stays hidden until the server
@@ -60,6 +86,36 @@ function App() {
    * report: the rule-based suggestions keep working.
    */
   const [proposalCapability, setProposalCapability] = useState<ProposalCapability>(UNSUPPORTED);
+  /**
+   * UCP05: the raw `prompt_compose` block, kept instead of a derived answer because the
+   * profile version is per family and the family changes with the model selector. Storing
+   * the raw block lets `readComposeCapability` be re-run for the new family on every model
+   * change, without a second capabilities request.
+   */
+  const [composeBlock, setComposeBlock] = useState<Parameters<typeof readComposeCapability>[0]>(undefined);
+  /** The exact string the compose panel last wrote, for overwrite protection. */
+  const [composedApplied, setComposedApplied] = useState<string | null>(null);
+  /**
+   * UCP07: what the compose panel last *recorded* as applied, plus the scene it ran
+   * against. This is the only ingredient of a v3 snapshot that does not already live here;
+   * it is deliberately not derived from `composedApplied`, which is a string used for
+   * overwrite protection and knows nothing about chips or a scene.
+   */
+  const [composeRecord, setComposeRecord] = useState<{
+    applied: AppliedResult | null;
+    scene: StructuredScene;
+    briefKo: string;
+    selections: EditSelection[];
+  } | null>(null);
+  /**
+   * What a restored v3 record could not supply, or `null` when it supplied everything.
+   *
+   * A separate state from `error` because this is not a failure: the restore succeeded and
+   * the image's prompts are back on screen. The sentences exist so a blank scene or a
+   * missing apply history reads as "the record never had it" rather than "the restore
+   * broke".
+   */
+  const [composeRestoreNotice, setComposeRestoreNotice] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [studio, setStudio] = useState<"art" | "pixel">("art");
@@ -85,6 +141,60 @@ function App() {
       : activeModel?.supported_parameters.includes("negative_prompt"),
   );
   const reportError = useCallback((message: string) => setError(message), []);
+
+  /**
+   * UCP05: the compose target, or `null` when there is nothing to compose for.
+   *
+   * `null` is passed to the panel as an unsupported capability rather than a dummy target:
+   * a target with an empty model ID would be a *valid object* that fails deep inside
+   * `buildComposeBody`, moving the refusal from "no model chosen" to "request could not be
+   * built", which reads to the user as a bug rather than a missing step.
+   */
+  const composeTarget: ComposeTarget | null = activeModel ? {
+    modelId: activeModel.model_id,
+    family: activeModel.family,
+    // The profile version comes from the capability, which is per family. Before the
+    // capabilities call resolves there is none, so `0` means "not yet known" and the
+    // capability gate refuses the request instead of guessing.
+    profileVersion: readComposeCapability(composeBlock, DICTIONARY_VERSION, activeModel.family).profileVersion ?? 0,
+    dictionaryVersion: DICTIONARY_VERSION,
+  } : null;
+  const composeCapability: ComposeCapability = composeTarget
+    ? readComposeCapability(composeBlock, DICTIONARY_VERSION, composeTarget.family)
+    : COMPOSE_UNSUPPORTED;
+
+  /**
+   * The one write path from the compose panel into the image request.
+   *
+   * Both text fields are written in a single `setSettings`, because two sequential updates
+   * would let the panel's `appliedPrompt` prop observe a state where the positive had
+   * changed and the negative had not — which is exactly the mismatch the overwrite check
+   * is meant to detect.
+   */
+  const applyComposedPrompt = useCallback((input: { positive: string; negative: string | null }) => {
+    setPromptDirty(true);
+    // Remember exactly what was written, so the panel can tell "the user typed over this"
+    // from "this is still the candidate I applied" and only confirm in the first case.
+    setComposedApplied(input.positive);
+    setSettings((old) => ({ ...old, prompt: input.positive,
+      negativePrompt: input.negative !== null ? input.negative : old.negativePrompt }));
+  }, []);
+
+  /**
+   * UCP06: undo of one apply, as a *write* the panel cannot perform itself.
+   *
+   * The panel owns the compose session (and knows which applied record to go back to), but
+   * the final prompt fields live here. `appliedPrompt` is passed back with the text because
+   * it decides overwrite protection: restoring a previously applied candidate means the
+   * field is panel-written again, while restoring the user's own typing means it is not.
+   * `promptDirty` is left alone — the user's work is being put back, not discarded.
+   */
+  const restoreComposedPrompt = useCallback((input: {
+    positive: string; negative: string; appliedPrompt: string | null;
+  }) => {
+    setComposedApplied(input.appliedPrompt);
+    setSettings((old) => ({ ...old, prompt: input.positive, negativePrompt: input.negative }));
+  }, []);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     if (!api) return;
@@ -174,11 +284,14 @@ function App() {
     api.capabilities(controller.signal).then((data) => {
       setCompositionSupported(Boolean(data.prompt_composition?.schema_versions?.includes(1)));
       setRemainderSupported(Boolean(data.prompt_composition?.schema_versions?.includes(2)));
+      setCompositionV3Supported(Boolean(data.prompt_composition?.schema_versions?.includes(3)));
       setProposalCapability(readProposalCapability(data.prompt_proposals, DICTIONARY_VERSION));
+      setComposeBlock(data.prompt_compose);
       const limit = data.request_limits?.max_body_bytes;
       setMaxBodyBytes(typeof limit === "number" && Number.isSafeInteger(limit) && limit > 0 ? limit : null);
     }).catch(() => {
-      setCompositionSupported(false); setRemainderSupported(false); setMaxBodyBytes(null); setProposalCapability(UNSUPPORTED);
+      setCompositionSupported(false); setRemainderSupported(false); setCompositionV3Supported(false); setMaxBodyBytes(null); setProposalCapability(UNSUPPORTED);
+      setComposeBlock(undefined);
     });
     return () => controller.abort();
   }, [api]);
@@ -197,6 +310,19 @@ function App() {
   function chooseModel(modelId: string) {
     const model = models.find((item) => item.model_id === modelId);
     if (!model || !model.execution_enabled || !changeBuilderFamily(model.family)) return;
+    /*
+     * UCP08: the compose apply record dies with the model it was made for.
+     *
+     * `composeRecord` is the only ingredient that turns a submission into a v3 snapshot, and
+     * `toSnapshot` guards the *family* but not the model: a `klein-4b-q4` → `klein-4b-q8`
+     * switch is the same family, so the record survived and the next submit wrote
+     * `target_model_id: klein-4b-q8` with `applied` from the Q4 run. That prompt was never
+     * generated for Q8, and the panel has already expired those candidates for the same
+     * reason. Clearing it makes the submission fall back to the earlier record this file
+     * still holds instead of claiming an apply the new model never ran. The prompt text is
+     * untouched — it is the user's work, not the panel's.
+     */
+    setComposeRecord(null);
     const preset = model.presets.balanced || Object.values(model.presets)[0];
     setSettings((old) => ({ ...old, modelId, prompt: old.prompt, negativePrompt: old.negativePrompt,
       preset: model.presets.balanced ? "balanced" : Object.keys(model.presets)[0],
@@ -230,7 +356,23 @@ function App() {
       batch_count: settings.batchCount, preset: settings.preset,
     };
     const applied = appliedForFamily(builder, activeModel?.family ?? "", compositionSupported);
-    if (applied && compositionSupported) body.prompt_composition = v1OnlyWhenUnsupported(applied, remainderSupported);
+    // UCP07: v3 records the scene, the chips' sources and the apply record, so it is
+    // preferred when the server advertises it *and* the compose panel has an apply to
+    // record. `toSnapshot` returns null without one, and the v1/v2 path below is the
+    // fallback rather than a v3 body describing an apply that never happened.
+    const snapshot = compositionV3Supported && composeRecord && activeModel && composeTarget
+      ? toSnapshot({
+          edit: { ...composeRecord, choices: [], targetModelId: activeModel.model_id,
+            targetFamily: activeModel.family, profileVersion: composeTarget.profileVersion,
+            dictionaryVersion: DICTIONARY_VERSION },
+          scene: composeRecord.scene,
+          applied: composeRecord.applied,
+          target: composeTarget,
+          compilerVersion: COMPOSE_COMPILER_VERSION,
+        })
+      : null;
+    if (snapshot) body.prompt_composition = snapshot;
+    else if (applied && compositionSupported) body.prompt_composition = v1OnlyWhenUnsupported(applied, remainderSupported);
     if (cfgEditable) body.cfg_scale = settings.cfgScale;
     if (negativeEnabled && settings.negativePrompt) body.negative_prompt = settings.negativePrompt;
     if (editable(samplingOption) && settings.samplingMethod) body.sampling_method = settings.samplingMethod;
@@ -290,14 +432,57 @@ function App() {
     if (settings.prompt && settings.prompt !== item.prompt && !window.confirm("현재 최종 프롬프트를 선택한 결과의 프롬프트로 바꿉니다. 계속할까요?")) return;
     const model = models.find((entry) => entry.model_id === item.model_id);
     if (model && !changeBuilderFamily(model.family)) return;
+    /*
+     * UCP07: a v3 record is a *compose* record — scene, chip sources, apply history — and it
+     * has no `SceneSpecification` shape, so it cannot go through `restoreComposition`. It is
+     * read with `fromSnapshot`, whose whole job is to say what the record does and does not
+     * prove:
+     *
+     * - the applied prompts come from `applied` when the record has one, and from nothing
+     *   else otherwise. For a v1/v2 row the English is a *draft*, so it is restored as the
+     *   prompt (as before) but never claimed as an apply;
+     * - a record the module refuses (dangling entity, unknown version) restores nothing and
+     *   says why, instead of half-restoring;
+     * - `restoreGaps` names what a v1/v2 or trimmed record cannot supply, so an empty
+     *   chip list on screen is explained rather than mistaken for "there were no chips".
+     *
+     * The compose panel is deliberately *not* repopulated from a restored record: it holds
+     * its own session and its own candidates, and reviving candidates generated against an
+     * older dictionary, profile or model would put a pressable button on screen whose prompt
+     * the current dictionary can no longer justify. A restore is a starting point for a new
+     * composition, not a resurrected reply.
+     */
+    if (!isLegacyComposition(item.prompt_composition) && item.prompt_composition) {
+      const read = fromSnapshot(item.prompt_composition);
+      if (!read.ok) {
+        setError(read.message);
+        return;
+      }
+      const gaps = restoreGaps(read.restored);
+      setComposeRecord(null);
+      setBuilder((old) => restartBuilder(old));
+      setComposeRestoreNotice(gaps.length ? gaps.join(" ") : null);
+      setSettings({ modelId: item.model_id,
+        prompt: read.restored.applied?.positivePrompt ?? item.prompt,
+        negativePrompt: read.restored.applied?.negativePrompt ?? item.negative_prompt,
+        preset: item.preset, resolution: `${item.width}x${item.height}`, steps: item.steps,
+        cfgScale: item.cfg_scale, samplingMethod: item.sampling_method ?? null,
+        scheduler: item.scheduler ?? null, seed: String(item.seed), batchCount: 1 });
+      setMetadata(null); setSelectedAsset(null);
+      return;
+    }
     // TRANS06: both branches start a new composition session (the inclusion list is keyed
     // by epoch), and both carry the epoch forward so it never repeats. A generation with a
     // recorded composition restores it — v2 supplies its own translations; v1 supplies
     // none and is never upgraded here. A generation without one is an explicit restart.
     // The read is from `builder`, whose epoch is the newest value even though the family
     // rebind above is still pending in the queue.
-    setBuilder((old) => item.prompt_composition
-      ? restoreComposition(item.prompt_composition, old.compositionEpoch)
+    setComposeRestoreNotice(null);
+    // The guard above already returned for a v3 record, so this is the v1/v2 path. Written
+    // as an explicit check rather than a comment so the type system enforces it.
+    const legacy = item.prompt_composition;
+    setBuilder((old) => isLegacyComposition(legacy)
+      ? restoreComposition(legacy, old.compositionEpoch)
       : restartBuilder(old));
     setSettings({ modelId: item.model_id, prompt: item.prompt, negativePrompt: item.negative_prompt,
       preset: item.preset, resolution: `${item.width}x${item.height}`, steps: item.steps,
@@ -356,11 +541,31 @@ function App() {
           </select></label>
           {!compositionSupported && <p className="prompt-notice" data-tone="caution">서버가 구성 이력 저장을 지원하지 않거나 확인할 수 없습니다. 최종 프롬프트만 저장됩니다.</p>}
           {remainderDowngraded && <p className="prompt-notice" data-tone="caution">서버가 번역 기록(v2)을 지원하지 않아 이번 저장에는 포함한 번역이 빠집니다. 최종 프롬프트에는 그대로 남습니다.</p>}
+          {composeRestoreNotice && <p className="prompt-notice" data-tone="caution" role="status">{composeRestoreNotice}<button type="button" onClick={() => setComposeRestoreNotice(null)}>닫기</button></p>}
           <PromptBuilder compositionSupported={compositionSupported} remainderSupported={remainderSupported} family={activeModel?.family ?? ""} value={settings.prompt}
             onChange={(prompt) => { setPromptDirty(true); setSettings((old) => ({ ...old, prompt })); }}
             state={builder} setState={setBuilder}
             proposalCapability={proposalCapability}
             sendProposal={proposalCapability.supported ? (body, signal) => api.proposals(body, signal) : undefined} />
+          {/*
+            UCP05: the integrated path sits between the dictionary builder and the final
+            prompt field. It is *additive* — every control above and below still works, and
+            `QuickCompose` only writes `settings.prompt`/`negativePrompt` when the user
+            presses one candidate's apply button.
+          */}
+          <ComposePanel
+            capability={composeCapability}
+            target={composeTarget}
+            negativeSupported={negativeEnabled}
+            prompt={settings.prompt}
+            negative={settings.negativePrompt}
+            appliedPrompt={composedApplied}
+            onApply={applyComposedPrompt}
+            onRestore={restoreComposedPrompt}
+            onAppliedChange={setComposeRecord}
+            send={composeCapability.supported ? (body, signal) => api.compose(body, signal) : undefined}
+            examples={COMPOSE_EXAMPLES}
+          />
           <label>최종 프롬프트<textarea aria-invalid={showPromptIssues && promptIssues.length > 0} aria-describedby="prompt-errors" value={settings.prompt} onChange={(event) => { setPromptDirty(true); setSettings({ ...settings, prompt: event.target.value }); }} onBlur={() => setPromptBlurred(true)} placeholder="장면, 피사체, 조명, 스타일을 설명하세요." rows={5} /></label>
           <div id="prompt-errors" role="status"><p className="prompt-hint">{characterCount(settings.prompt)}/8000자</p>{promptHint && <p className="prompt-hint">{promptHint}</p>}{showPromptIssues && promptIssues.map((issue, index) => <p className="prompt-error" key={index}>{issue.message}</p>)}</div>
           <label className={negativeEnabled ? "" : "disabled"}>Negative prompt<textarea aria-invalid={negativeIssues.length > 0} aria-describedby="negative-errors" disabled={!negativeEnabled} value={settings.negativePrompt} onChange={(event) => setSettings({ ...settings, negativePrompt: event.target.value })} placeholder={negativeEnabled ? "제외할 요소를 입력하세요." : "이 모델의 현재 CFG에서는 negative prompt를 사용할 수 없습니다."} rows={2} /></label>

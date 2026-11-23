@@ -58,18 +58,34 @@ from app.services.prompt_compose import (
     MAX_SELECTIONS as COMPOSE_MAX_SELECTIONS,
 )
 from app.services.prompt_dictionary import cached
+from app.services.prompt_profiles import profile_versions
 from app.services.prompt_proposals import MAX_RESPONSE_BYTES as PROPOSAL_MAX_RESPONSE_BYTES
 from app.services.proposal_provider import (
     PROPOSAL_TIMEOUT_SECONDS,
     proposals_advertised,
 )
 
-# UCP03 advertises profile version 1 for every family the registry supports, because a
-# family-specific profile is UCP04's job. The number is the *contract* version: clients
-# compare it for staleness, and inventing separate per-family numbers now would have to
-# be changed again when UCP04 defines real profiles. `sd15`, `z-image`, `flux2` and
-# `moss-image` are the families `config/models.yaml` actually serves (§5).
-OUTPUT_PROFILE_VERSIONS = {"sd15": 1, "z-image": 1, "flux2": 1, "moss-image": 1}
+# UCP04: the versions come from the profiles themselves, so the advertised number and the
+# number `resolve_target` compares against cannot disagree — a hand-maintained copy here is
+# exactly how a client ends up told version 1 while the server requires 2.
+OUTPUT_PROFILE_VERSIONS = profile_versions()
+
+# UCP07: the versions whose *storage* path is implemented, not merely whose schema parses.
+#
+# v3 was already accepted by `JobRequest` before UCP07 (the discriminated union at HEAD
+# includes `PromptCompositionV3`), but two things were missing and this constant's comment
+# is the record of them:
+#
+# 1. a snapshot without `applied` was stored as `applied: null`, which the v3 model refuses
+#    on the way back in — so one such job made `GET /jobs` and `GET /jobs/{id}` answer 500
+#    for the whole queue. `serialize_snapshot` now drops the key instead of writing null.
+# 2. nothing lowered an over-budget snapshot, so a legal-but-too-large v3 body stored a row
+#    that could not be read back. `PromptCompositionV3.fit()` runs the fixed ladder and
+#    records the steps in `snapshot_trim`.
+#
+# Both are fixed in the same commit as this advertisement: a capability is a promise that a
+# submission with this version will be readable afterwards, and only now is that true.
+COMPOSITION_SCHEMA_VERSIONS = (1, 2, 3)
 COMPOSE_TIMEOUT_MS = COMPOSE_TIMEOUT_SECONDS * 1000
 
 
@@ -243,7 +259,7 @@ async def capabilities(request: Request):
         "engine": state(request).settings.engine,
         "job_types": ["image.generate", "image.batch"],
         "durable_sse": True,
-        "prompt_composition": {"schema_versions": [1, 2]},
+        "prompt_composition": {"schema_versions": COMPOSITION_SCHEMA_VERSIONS},
         **request_limits,
         **prompt_proposals,
         **prompt_compose,

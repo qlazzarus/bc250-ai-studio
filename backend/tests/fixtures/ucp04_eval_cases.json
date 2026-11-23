@@ -1,0 +1,113 @@
+{
+  "meta": {
+    "version": 1,
+    "evidence_kind": "structural fixture and lexical meaning cases; not image-quality evidence",
+    "limits": [
+      "A verdict here is a substring check against the terms this file declares, not a reading of the sentence. A paraphrase that keeps the scene is not recognised as faithful unless it happens to use those terms, and a drift that avoids them is not caught.",
+      "No image was generated for any case. A passing run says the fixtures are well formed and that the server cannot decide meaning; it says nothing about visual quality.",
+      "Real model behaviour is not exercised: every prompt here was written by hand to describe a specific failure mode."
+    ]
+  },
+  "cases": [
+    {
+      "case_id": "rain-street-dress",
+      "brief_ko": "붉은 원피스를 입은 여성이 비 오는 거리에 서 있다",
+      "anchors": ["woman", "red dress", "rainy street"],
+      "prompts": {
+        "tags": [
+          {"id": "faithful", "expect": "faithful", "violates": null,
+           "text": "a woman, red dress, rainy street, standing"},
+          {"id": "location-drift", "expect": "drift", "violates": "location",
+           "text": "a woman, red dress, bright cafe",
+           "drops": ["rainy street"], "adds": ["cafe"]},
+          {"id": "clothing-drift", "expect": "drift", "violates": "clothing",
+           "text": "a woman, blue coat, rainy street",
+           "drops": ["red dress"], "adds": ["blue coat"]},
+          {"id": "count-drift", "expect": "drift", "violates": "person_count",
+           "text": "two women, red dress, rainy street",
+           "drops": ["woman"], "adds": ["two women"]}
+        ],
+        "sentence": [
+          {"id": "faithful", "expect": "faithful", "violates": null,
+           "text": "A woman in a red dress stands on a rainy street."},
+          {"id": "location-drift", "expect": "drift", "violates": "location",
+           "text": "A woman in a red dress stands in a bright cafe.",
+           "drops": ["rainy street"], "adds": ["cafe"]},
+          {"id": "clothing-drift", "expect": "drift", "violates": "clothing",
+           "text": "A woman in a blue coat stands on a rainy street.",
+           "drops": ["red dress"], "adds": ["blue coat"]},
+          {"id": "count-drift", "expect": "drift", "violates": "person_count",
+           "text": "Two women in red dresses stand on a rainy street.",
+           "drops": ["woman"], "adds": ["two women"]}
+        ]
+      }
+    },
+    {
+      "case_id": "two-women-one-hat",
+      "brief_ko": "두 명의 여성이 나란히 서 있고 한 명만 모자를 쓰고 있다",
+      "anchors": ["two women", "hat"],
+      "forbids": ["both"],
+      "prompts": {
+        "tags": [
+          {"id": "faithful", "expect": "faithful", "violates": null,
+           "text": "two women, standing side by side, one of them wearing a hat"},
+          {"id": "attribution-drift", "expect": "drift", "violates": "attribution",
+           "text": "two women, both wearing hats",
+           "drops": [], "adds": ["both wearing"]}
+        ],
+        "sentence": [
+          {"id": "faithful", "expect": "faithful", "violates": null,
+           "text": "Two women stand side by side; one of them wears a hat."},
+          {"id": "attribution-drift", "expect": "drift", "violates": "attribution",
+           "text": "Two women stand side by side; both of them wear hats.",
+           "drops": [], "adds": ["both of them"]}
+        ]
+      }
+    },
+    {
+      "case_id": "empty-beach",
+      "brief_ko": "아무도 없는 텅 빈 해변",
+      "anchors": ["beach", "no people"],
+      "prompts": {
+        "tags": [
+          {"id": "faithful", "expect": "faithful", "violates": null,
+           "text": "empty beach, no people"},
+          {"id": "negation-drift", "expect": "drift", "violates": "negation",
+           "text": "empty beach, a single person walking",
+           "drops": ["no people"], "adds": ["single person"]}
+        ],
+        "sentence": [
+          {"id": "faithful", "expect": "faithful", "violates": null,
+           "text": "An empty beach with no people."},
+          {"id": "negation-drift", "expect": "drift", "violates": "negation",
+           "text": "An empty beach with a single person walking along the water.",
+           "drops": ["no people"], "adds": ["single person"]}
+        ]
+      }
+    },
+    {
+      "case_id": "night-cafe-coat",
+      "brief_ko": "밤에 카페 창가에 앉아 있는 코트를 입은 남성",
+      "anchors": ["man", "coat", "cafe", "night"],
+      "prompts": {
+        "tags": [
+          {"id": "faithful", "expect": "faithful", "violates": null,
+           "text": "a man, long coat, sitting by a cafe window, night"},
+          {"id": "time-drift", "expect": "drift", "violates": "time",
+           "text": "a man, long coat, sitting by a cafe window, noon",
+           "drops": ["night"], "adds": ["noon"]}
+        ],
+        "sentence": [
+          {"id": "faithful", "expect": "faithful", "violates": null,
+           "text": "A man in a long coat sits by a cafe window at night."},
+          {"id": "time-drift", "expect": "drift", "violates": "time",
+           "text": "A man in a long coat sits by a cafe window at noon.",
+           "drops": ["night"], "adds": ["noon"]},
+          {"id": "clothing-drift", "expect": "drift", "violates": "clothing",
+           "text": "A man in a bright sweater sits by a cafe window at night.",
+           "drops": ["coat"], "adds": ["sweater"]}
+        ]
+      }
+    }
+  ]
+}

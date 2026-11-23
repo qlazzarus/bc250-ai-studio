@@ -372,7 +372,12 @@ test('the composer keeps the record on a rebind and threads the epoch', () => {
   assert.doesNotMatch(app, /applied: null, generatedMode: null, appliedScene: null, appliedPrompt: null/);
   // The restart path is the one that starts a new session.
   assert.match(app, /restartBuilder\(old\)/);
-  assert.match(app, /restoreComposition\(item\.prompt_composition, old\.compositionEpoch\)/);
+  // UCP07: the v3 record is read with `fromSnapshot` and never reaches `restoreComposition`,
+  // so the v1/v2 path restores the narrowed `legacy` value. The epoch is still threaded, and
+  // the guard is asserted so a later edit cannot silently widen it back to every version.
+  assert.match(app, /restoreComposition\(legacy, old\.compositionEpoch\)/);
+  assert.match(app, /if \(!isLegacyComposition\(item\.prompt_composition\) && item\.prompt_composition\) \{/);
+
   // Every inclusion write names the session it belongs to.
   assert.match(source, /activeInclusions\(inclusions, state\.applied, state\.compositionEpoch\)/);
   assert.match(source, /setInclusions\(\{ owner: state\.applied, epoch: state\.compositionEpoch, items: next \}\)/);

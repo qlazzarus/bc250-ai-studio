@@ -556,3 +556,194 @@
   .jobs-title { align-items: flex-start; }
   .jobs-counts { order: 3; width: 100%; }
 }
+
+/* ---------------------------------------------------------------------------
+   UCP05: integrated Korean-scene → English-candidate composer.
+
+   Layout is driven by the *container* width, not the viewport: this panel sits
+   inside `.panel.composer`, whose width is 355–638px depending on the workspace
+   column (see the measurement note above `.prompt-builder`). A viewport query
+   would report 1440px while the panel is 530px wide.
+
+   `container-type: inline-size` here also means the panel gets its own query
+   context rather than inheriting `prompt-composer`, so the two composers cannot
+   influence each other's breakpoints.
+
+   Sizes are the spec's floors, not suggestions: 44×44 CSS px for any standalone
+   control (§3 touch), 16px for input text (below that iOS Safari zooms on focus
+   and the soft keyboard then hides the field). Nothing here sets a fixed height
+   or locks body scroll, so an open soft keyboard can still reach every control.
+   --------------------------------------------------------------------------- */
+.compose { container-type: inline-size; container-name: compose; margin: 4px 0 16px; min-width: 0; display: grid; gap: 12px; }
+.compose > * { min-width: 0; }
+.compose-heading { margin: 0; font-size: .72rem; font-weight: 800; letter-spacing: .1em; color: #8f95a1; text-transform: uppercase; }
+
+/* Input block. One Korean field, plus the dictionary as a second entry point. */
+.compose-input { display: grid; gap: 0; min-width: 0; }
+.compose-brief { min-width: 0; }
+/* 16px, not `inherit`: below 16px iOS Safari zooms the whole page on focus. */
+.compose-brief textarea { font-size: 16px; line-height: 1.5; min-height: 88px; resize: vertical; }
+.compose-meta { margin: 4px 0 10px; color: #8f95a1; font-size: .75rem; line-height: 1.5; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.compose-examples { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.compose-examples .quiet { text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.compose-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.compose-generate { flex: 1 1 190px; min-height: 44px; border: 0; border-radius: 9px; padding: 11px 16px;
+  color: #17111f; background: linear-gradient(110deg, #d1adff, #a47cff); font-weight: 900; }
+.compose-generate:disabled { opacity: .5; cursor: not-allowed; }
+.compose-status { margin: 4px 0 0; min-height: 1.2em; color: #b9c6d4; font-size: .78rem; line-height: 1.5; overflow-wrap: anywhere; }
+.compose-fallback { margin: 6px 0 0; padding: 6px 9px; border: 1px solid #6b5a33; border-radius: 6px;
+  color: #f4cb84; background: #2a2418; font-size: .78rem; line-height: 1.5; overflow-wrap: anywhere; }
+
+/* Dictionary: an in-flow expanded panel. Opening, searching or picking never
+   unmounts it and never scrolls the page, so query/group/selection survive. */
+.compose-dictionary { border: 1px solid #41444f; border-radius: 8px; padding: 10px; background: #1b1d24; min-width: 0; }
+.compose-dictionary input[type="search"] { font-size: 16px; }
+.compose-groups { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
+.compose-groups button { min-height: 44px; padding: 6px 11px; border: 1px solid #41444f; border-radius: 7px;
+  background: transparent; color: #ced2db; font-size: .78rem; }
+.compose-groups button[aria-pressed="true"] { color: #17111f; background: #c5a2ff; border-color: #c5a2ff; font-weight: 800; }
+.compose-group-count { margin-left: 5px; font-variant-numeric: tabular-nums; opacity: .8; }
+.compose-options { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.compose-option { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; width: 100%;
+  min-height: 44px; padding: 8px 10px; text-align: left;
+  border: 1px solid #41444f; border-radius: 7px; background: #191b21; color: #eef0f4; font-size: .82rem; }
+.compose-option > span { min-width: 0; overflow-wrap: anywhere; }
+.compose-option small { color: #8f95a1; font-size: .72rem; }
+.compose-option[aria-pressed="true"] { border-color: #a78bfa; background: #241f33; }
+/* A veto is stated in words (`· 제외됨`), so the dimmed style is reinforcement only. */
+.compose-option[data-excluded] { opacity: .72; border-style: dashed; }
+.compose-empty { padding: 6px 0; color: #8f95a1; font-size: .8rem; }
+.compose-empty-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+
+/* Interpretation: summary, chosen chips, vetoed chips, unmapped details. */
+.compose-scene, .compose-clarify { border: 1px solid #41444f; border-radius: 8px; padding: 12px; background: #1b1d24; min-width: 0; }
+.compose-summary { margin: 8px 0 10px; color: #e6e8ef; font-size: .86rem; line-height: 1.55; overflow-wrap: anywhere; }
+.compose-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.compose-chip { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
+  max-width: 100%; padding: 4px 4px 4px 10px; border: 1px solid #4a4d59; border-radius: 99px;
+  background: #20222a; color: #e6e8ef; font-size: .76rem; font-weight: 600; }
+.compose-chip[data-pinned] { border-color: #c5a2ff; }
+.compose-chip__label { min-width: 0; overflow-wrap: anywhere; }
+.compose-chip__entity, .compose-chip__unmapped, .compose-chip__badge {
+  padding: 1px 6px; border-radius: 99px; font-size: .66rem; font-weight: 800; letter-spacing: .02em; }
+/* Every state is written out; the tint only supports the word. */
+.compose-chip__badge { background: #343742; color: #cfd4e0; }
+.compose-chip__entity { background: #2b3340; color: #a8c6ee; }
+.compose-chip__unmapped { background: #2a2418; color: #f4cb84; }
+/* 44px hit areas on a pill: the pill grows instead of the finger missing. */
+.compose-chip > button { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 99px; background: transparent; color: #cfd4e0; font-size: .74rem; font-weight: 700; }
+.compose-chip > button[aria-pressed="true"] { color: #17111f; background: #c5a2ff; }
+.compose-excluded { margin-top: 10px; }
+.compose-excluded strong { display: block; margin-bottom: 4px; color: #9aa1ad; font-size: .74rem; }
+.compose-excluded ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.compose-excluded li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 2px 0; color: #9aa1ad; font-size: .78rem; }
+.compose-excluded .quiet { min-height: 44px; }
+.compose-scene > .quiet { margin-top: 10px; min-height: 44px; }
+
+/* UCP06: an exclusion the brief contradicts. A list of *choices*, so it reads as a
+   question block rather than an error — nothing is wrong, the user just has to pick. */
+.compose-clashes { margin-top: 10px; padding: 8px 10px; border-radius: 6px;
+  border: 1px solid #6b5a33; background: #2a2418; color: #f4cb84; }
+.compose-clashes > strong { display: block; margin-bottom: 2px; font-size: .78rem; }
+.compose-clashes ul { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.compose-clashes li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 6px; font-size: .78rem; overflow-wrap: anywhere; }
+.compose-clashes__actions { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.compose-clashes .quiet { min-height: 44px; }
+
+/* Attribution select. It is an input, so the 44px rule applies to the control itself
+   rather than to a pill-shaped button. */
+.compose-chip__attribute { display: inline-flex; align-items: center; gap: 4px; }
+.compose-chip__attribute-label { color: #9aa1ad; font-size: .68rem; font-weight: 700; }
+.compose-chip__attribute select { min-height: 44px; font-size: 16px; border-radius: 8px;
+  border: 1px solid #4a4d59; background: #191b21; color: #eef0f4; padding: 2px 6px; }
+
+/* Alerts, in the three categories the spec separates: advisory (amber),
+   reduced (amber, explicit count) and failure (red). Text, not colour, carries
+   the category; `data-category` is only a hook. */
+.compose-alerts { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.compose-alert { padding: 7px 10px; border-radius: 6px; border: 1px solid #3b4450; background: #1d232c;
+  color: #b9c6d4; font-size: .78rem; line-height: 1.5; overflow-wrap: anywhere; }
+.compose-alert > strong { display: block; margin-bottom: 2px; }
+.compose-alert[data-tone="caution"] { color: #f4cb84; background: #2a2418; border-color: #6b5a33; }
+.compose-alert[data-tone="error"] { color: #ffb6b6; background: #2e1d20; border-color: #7f4048; }
+.compose-notice { margin: 0; padding: 6px 9px; border-radius: 6px; border: 1px solid #3b4450;
+  background: #1d232c; color: #b9c6d4; font-size: .78rem; line-height: 1.5; overflow-wrap: anywhere; }
+.compose-notice > strong { display: block; margin-bottom: 2px; }
+.compose-notice > ul { margin: 4px 0; padding-left: 20px; white-space: pre-wrap; }
+.compose-notice > span { display: block; margin-top: 4px; }
+.compose-notice[data-tone="caution"] { color: #f4cb84; background: #2a2418; border-color: #6b5a33; }
+
+
+
+/* Clarification. Blocking by construction: the candidate list below it stays
+   visible but `planApply` refuses, so nothing is hidden and nothing applies. */
+.compose-question { margin: 0 0 10px; padding: 10px; border: 1px solid #4a4d59; border-radius: 8px; min-width: 0; }
+.compose-question:last-child { margin-bottom: 0; }
+.compose-question legend { padding: 0 4px; color: #eef0f4; font-size: .84rem; line-height: 1.45; overflow-wrap: anywhere; }
+.compose-question__why { display: block; margin-top: 2px; color: #8f95a1; font-size: .72rem; font-weight: 400; }
+.compose-question .quiet { width: 100%; min-height: 44px; margin-top: 6px; text-align: left; white-space: normal; }
+
+/* Candidates. Vertical cards by default, never a carousel: card order is the
+   reading order at every width. Apply sits after the body it applies. */
+.compose-results { display: grid; gap: 10px; min-width: 0; }
+.compose-results:focus-visible { outline: 2px solid #d1adff; outline-offset: 3px; }
+.compose-candidate { display: grid; gap: 6px; padding: 12px; border: 1px solid #41444f; border-radius: 8px;
+  background: #1b1d24; min-width: 0; }
+.compose-candidate[data-applied] { border-color: #88e6a8; }
+.compose-candidate:focus-visible { outline: 2px solid #d1adff; outline-offset: 3px; }
+.compose-candidate h4 { margin: 0; font-size: .85rem; line-height: 1.4; overflow-wrap: anywhere; }
+.compose-candidate__difference { margin: 0; color: #b9bfcb; font-size: .78rem; line-height: 1.45; overflow-wrap: anywhere; }
+/* The English body is the thing being chosen, so it is never truncated. */
+.compose-candidate__prompt { margin: 2px 0; padding: 8px 9px; border-radius: 6px; background: #14161b;
+  color: #f2f4f9; font-size: .82rem; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+.compose-candidate__negative { margin: 0; color: #f4cb84; font-size: .76rem; line-height: 1.45; overflow-wrap: anywhere; }
+.compose-candidate__block { color: #ffb6b6; }
+.compose-candidate__preserved { margin: 0; padding-left: 18px; color: #8f95a1; font-size: .74rem; line-height: 1.45; }
+.compose-candidate__diff { margin: 2px 0 0; color: #9aa1ad; font-size: .74rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+/* UCP06 undo. Sits under the result list because it undoes the apply that list records. */
+.compose-undo { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 10px; }
+.compose-undo .quiet { min-height: 44px; }
+.compose-undo .compose-meta { margin: 0; flex: 1 1 240px; }
+.compose-undo .compose-meta[data-tone="caution"] { color: #f4cb84; }
+.compose-candidate__applied { margin: 0; color: #88e6a8; font-size: .76rem; font-weight: 800; }
+.compose-apply { width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid #c3a0ff; border-radius: 8px;
+  background: transparent; color: #e7dcff; font-size: .84rem; font-weight: 800; }
+.compose-apply:hover { background: #241f33; }
+
+/* Focus is always visible and never the only signal: every control below is a
+   native <button>/input, so Enter/Space work without custom key handling. */
+.compose button:focus-visible, .compose input:focus-visible, .compose textarea:focus-visible {
+  outline: 2px solid #d1adff; outline-offset: 2px; }
+.compose button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Container breakpoints, per the UCP01 table. The panel never exceeds ~638px in
+   this workspace, so `>= 640px` is the first width where two columns fit. */
+@container compose (max-width: 359px) {
+  .compose-chip { border-radius: 10px; }
+  .compose-candidate h4, .compose-candidate__prompt { font-size: .8rem; }
+}
+@container compose (max-width: 459px) {
+  /* The apply button drops below the body it applies, as the spec's 360–459 row says. */
+  .compose-apply { margin-top: 2px; }
+  .compose-examples .quiet { flex: 1 1 100%; }
+}
+@container compose (min-width: 460px) {
+  .compose-chips { gap: 7px; }
+  .compose-examples .quiet { flex: 0 1 auto; }
+}
+@container compose (min-width: 640px) {
+  /* Scene summary and candidates side by side; the input, dictionary, alerts and
+     clarification stay full width. Unreachable in the current workspace (the
+     composer tops out ~638px) but kept so a wider panel needs no new rule. */
+  .compose { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: start; }
+  .compose > * { grid-column: 1 / -1; }
+  .compose-scene { grid-column: 1; }
+  .compose-results { grid-column: 2; }
+  .compose-candidate { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+  .compose-candidate > *:not(.compose-apply) { grid-column: 1; }
+  .compose-apply { grid-column: 2; grid-row: 1 / span 8; width: auto; min-width: 132px; align-self: stretch; }
+}

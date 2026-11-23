@@ -6,6 +6,7 @@ import { runKeyboard } from "./suite-keyboard.mjs";
 import { runContracts } from "./suite-contracts.mjs";
 import { runTrans06 } from "./suite-trans06.mjs";
 import { runU12 } from "./suite-u12.mjs";
+import { runUcp08 } from "./suite-ucp08.mjs";
 import { adjustOpen, closeAdjust, openAdjust, pickEntry, stageOrder, waitAdjustOpen, waitSearchFocus } from "./ui.mjs";
 
 export async function runSuite({ page, browser, sessionId, check, record, sleep, shots }) {
@@ -180,4 +181,7 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
   // U12 needs the v2 capability stub from §N, so it must run after it — and it reloads
   // too, so nothing above can leak a half-built record into the storage checks.
   await runU12({ page, check, record, sleep, shots });
+  // UCP08 replaces the capability/endpoint stubs with its own and reloads, so it runs
+  // last: its v3 submit must not inherit a v2 `remainder` stub from §N.
+  await runUcp08({ page, check, record, sleep, shots });
 }

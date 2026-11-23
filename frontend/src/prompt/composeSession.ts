@@ -109,10 +109,13 @@ export const canCompose = (edit: ComposeEdit): boolean =>
  * - `invalid_reply`  — the shape was wrong; retrying the same input should not help.
  * - `conflict`       — the server refused a stale dictionary/profile/revision.
  * - `expired`        — the reply arrived for a model profile that is no longer selected.
+ * - `build_failed`   — the request could not be built (no capability, no target, empty
+ *                      input, over-limit). Nothing was sent, so retrying unchanged fails
+ *                      the same way; the message names the field to fix.
  */
 export type ComposeFailure =
   | "truncated" | "partial" | "timed_out" | "provider_error"
-  | "invalid_reply" | "conflict" | "expired";
+  | "invalid_reply" | "conflict" | "expired" | "build_failed";
 
 export type ComposeCandidate = {
   candidateId: string;
@@ -229,13 +232,28 @@ export function settleComposition(
     ...result,
     selections: mergeSelections(state.edit.selections, result.selections),
   };
+  /**
+   * The merged chips are written into `edit`, not only into `draft`.
+   *
+   * UCP05 shipped with them in `draft` alone, and that made the whole AI half of the panel
+   * inert: the chip list renders `edit.selections`, so a chip the server chose never
+   * appeared, and `composeRevisions` kept hashing the *pre-reply* set — which is why the
+   * apply check stayed consistent while showing nothing. Adopting them is what UCP06's
+   * "canonical scene stays in step with the chips" requirement actually needs.
+   *
+   * The revisions are then rebuilt from the new edit. Without that, the very next
+   * `draftIsStale` call would report the fresh reply as stale, because `state.revisions`
+   * would still describe the selection set we just replaced.
+   */
+  const edit: ComposeEdit = { ...state.edit, selections: draft.selections };
+  const revisions = composeRevisions(edit, state.target);
   if (result.questions.length > 0) {
-    return { phase: "needs_clarification", edit: state.edit, draft,
+    return { phase: "needs_clarification", edit, draft,
       applied: state.applied, requestId: state.requestId,
-      revisions: state.revisions, target: state.target, questions: result.questions };
+      revisions, target: state.target, questions: result.questions };
   }
-  return { phase: "ready", edit: state.edit, draft, applied: state.applied,
-    requestId: state.requestId, revisions: state.revisions, target: state.target,
+  return { phase: "ready", edit, draft, applied: state.applied,
+    requestId: state.requestId, revisions, target: state.target,
     warnings: result.warnings, tokens: result.tokens };
 }
 
@@ -280,10 +298,19 @@ export function draftIsStale(
  * Applied is deliberately *not* derived from `draft`: the user may apply candidate B of
  * a reply, then edit the brief, then apply candidate A of a newer reply. What was
  * executed is a fact about the past, so it is recorded as one.
+ *
+ * `negativePrompt` is passed in rather than read from the candidate because the candidate's
+ * negative is not always what gets written. When the model cannot take a negative prompt,
+ * `planApply` refuses once and then applies positive-only; recording the candidate's own
+ * negative would put a string in `applied.negative_prompt` that never reached the engine,
+ * and a v3 restore would then show a negative prompt the image was not made with. Callers
+ * pass `null` in that case — the loss is already announced by the apply notice.
  */
 export function applyCandidate(
   state: ComposeState,
-  input: { candidateId: string; providerModel: string; appliedAt: string; resultId: string },
+  input: { candidateId: string; providerModel: string; appliedAt: string; resultId: string;
+    /** What was written; defaults to the candidate's own negative only for non-lossy callers. */
+    negativePrompt?: string | null },
 ): ComposeState {
   if (state.phase !== "ready" && state.phase !== "needs_clarification") return state;
   const candidate = state.draft.candidates.find((item) => item.candidateId === input.candidateId);
@@ -294,7 +321,9 @@ export function applyCandidate(
     providerModel: input.providerModel,
     appliedAt: input.appliedAt,
     positivePrompt: candidate.positivePrompt,
-    negativePrompt: candidate.negativePrompt,
+    negativePrompt: "negativePrompt" in input
+      ? input.negativePrompt ?? null
+      : candidate.negativePrompt,
     summaryKo: state.draft.summaryKo,
   };
   return { ...state, applied };
@@ -315,6 +344,39 @@ export function applyCandidate(
 export function undoApply(state: ComposeState, previous: AppliedResult | null): ComposeState {
   if (state.applied === null) return state;
   return { ...state, applied: previous };
+}
+
+/**
+ * The record to restore alongside an undone prompt, or `null` if it no longer describes it.
+ *
+ * Undo restores two independent things: the prompt fields the user had, and the applied
+ * record that went with them. They only belong together when the record's own text *is* the
+ * restored text. Undoing the first apply puts the user's own typing back, and that typing
+ * has no applied candidate behind it — keeping the record would make the candidate card
+ * claim "적용됨" for text it never produced, and `toSnapshot` would then store an `applied`
+ * record whose `positive_prompt` differs from the prompt that was actually sent.
+ *
+ * **Both fields are compared, not just the positive one.** The negative prompt is part of
+ * what was executed (v3 stores `applied.negative_prompt`), so a record kept because the
+ * positives happened to match would still let `toSnapshot` write a negative the user never
+ * ran — the same corruption, one field over. The user can edit the negative field between
+ * applies without touching the positive, and that is exactly when the old record stops
+ * describing the screen.
+ *
+ * `null` and `""` are treated as equal: a v3 record omits `negative_prompt` when there is
+ * none, so an empty field and an absent key are the same fact ("no negative prompt"), and
+ * refusing to match them would drop a record that is in fact still accurate.
+ */
+export function appliedForRestoredPrompt(
+  applied: AppliedResult | null,
+  restored: { positive: string; negative: string | null },
+): AppliedResult | null {
+  if (applied === null) return null;
+  const negative = (value: string | null | undefined) => value ?? "";
+  return applied.positivePrompt === restored.positive
+    && negative(applied.negativePrompt) === negative(restored.negative)
+    ? applied
+    : null;
 }
 
 
@@ -387,6 +449,58 @@ export function settleConflict(
       : "입력이 바뀌어 요청이 만료되었습니다. 다시 생성하세요.";
   return { phase: "failed", edit: state.edit, draft: state.draft,
     applied: state.applied, failure: "conflict", message, detail: input.code };
+}
+
+/**
+ * UCP05: write the user's edit into the session state.
+ *
+ * `ComposeState.edit` is the single source of truth for what the user typed. The first
+ * UCP05 draft kept a second copy in the React tree and they diverged on every path that
+ * changed one without the other (a family rebind moved the target but not the letters).
+ * One copy, one writer: every handler routes through here.
+ */
+export function withEdit(state: ComposeState, edit: ComposeEdit): ComposeState {
+  return { ...state, edit };
+}
+
+/**
+ * UCP05: a model or profile change, expressed as a *derivation* instead of a transition.
+ *
+ * `expireForTarget` is the write-side transition and is still used when the caller owns
+ * the change. This is the read-side counterpart for the model selector, which is a prop:
+ * writing state from an effect that watches a prop is exactly what the rest of this
+ * module avoids (`invalidateProposal` does the same thing for revisions).
+ *
+ * Two outcomes, both keeping everything the user decided:
+ *
+ * - an in-flight request is a stale cancel, because its reply now describes another model;
+ * - a settled draft becomes `expired`. The draft is *kept* rather than blanked so the
+ *   screen does not go empty under the user, and `planApply` refuses it — that is the
+ *   "re-validate applicability on model change" rule, enforced at the apply boundary
+ *   rather than trusted to the transition.
+ */
+export function invalidateForTarget(
+  state: ComposeState,
+  currentTarget: ComposeTarget,
+): ComposeState {
+  if (state.phase !== "pending" && state.phase !== "ready"
+      && state.phase !== "needs_clarification") return state;
+  if (sameTarget(state.target, currentTarget)) return state;
+  const edit = {
+    ...state.edit,
+    targetModelId: currentTarget.modelId,
+    targetFamily: currentTarget.family,
+    profileVersion: currentTarget.profileVersion,
+    dictionaryVersion: currentTarget.dictionaryVersion,
+  };
+  if (state.phase === "pending") {
+    return { phase: "cancelled", edit, draft: state.draft,
+      applied: state.applied, requestId: state.requestId };
+  }
+  return { phase: "failed", edit, draft: state.draft, applied: state.applied,
+    failure: "expired",
+    message: "모델이나 출력 프로필이 바뀌어 이전 후보를 적용할 수 없습니다. 다시 생성하세요.",
+    detail: null };
 }
 
 /** Cancel token for an in-flight request, so a component can abort its own fetch. */

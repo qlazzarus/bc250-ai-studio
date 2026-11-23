@@ -1,4 +1,7 @@
-import type { PromptComposition } from "../api";
+import type { PromptComposition, StoredSnapshotV3 } from "../api";
+// The `.ts` extension is required: `frontend/tests` load `src` through Node's native type
+// stripping, which does not guess extensions, and `validation.ts` is imported there.
+import { TRIM_STEPS } from "./composeSnapshot.ts";
 
 export type ValidationIssue = { field: string; message: string };
 export const characterCount = (text: string) => Array.from(text).length;
@@ -34,6 +37,182 @@ export function normalizedComposition(composition: PromptComposition) {
 }
 export function compositionBytes(composition: PromptComposition): number {
   return utf8Bytes(JSON.stringify(normalizedComposition(composition)));
+}
+
+/** Scene limits mirrored from `SceneV3`; `known` is the set of defined entity IDs. */
+function validateSceneV3(
+  value: unknown,
+  selections: unknown[],
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const scene = typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>) : {};
+  const items = (item: unknown): unknown[] => (Array.isArray(item) ? item : []);
+  const objects = (item: unknown) =>
+    items(item).filter((entry): entry is Record<string, unknown> =>
+      typeof entry === "object" && entry !== null && !Array.isArray(entry));
+
+  const entities = objects(scene.entities);
+  if (entities.length > 8) issues.push({ field: "scene", message: `${entities.length}/8개: 장면 개체를 줄여 주세요.` });
+  const known = new Set(entities
+    .map((entity) => (typeof entity.entity_id === "string" ? entity.entity_id : ""))
+    .filter((id) => id.length > 0));
+  const owns = (id: unknown) => typeof id === "string" && known.has(id);
+
+  // Every reference into the scene has to resolve: a selection, a relation endpoint, an
+  // unmapped detail, or an ambiguity option pointing at a missing entity is a 422 later.
+  for (const entry of selections) {
+    if (typeof entry === "object" && entry !== null && !Array.isArray(entry)) {
+      const selection = entry as Record<string, unknown>;
+      if (selection.entity_id !== undefined && !owns(selection.entity_id)) {
+        issues.push({ field: "selections", message: `${String(selection.id ?? "")}: 장면에 없는 개체를 가리킵니다.` });
+      }
+    }
+  }
+  const relations = objects(scene.relations);
+  if (relations.length > 12) issues.push({ field: "scene", message: `${relations.length}/12개: 관계를 줄여 주세요.` });
+  for (const relation of relations) {
+    for (const endpoint of [relation.subject_entity_id, relation.object_entity_id]) {
+      if (typeof endpoint === "string" && !known.has(endpoint)) {
+        issues.push({ field: "scene", message: `관계가 장면에 없는 개체를 가리킵니다: ${endpoint}` });
+      }
+    }
+  }
+  for (const item of objects(scene.unmapped_details)) {
+    if (typeof item.entity_id === "string" && !known.has(item.entity_id)) {
+      issues.push({ field: "scene", message: `미변환 항목이 장면에 없는 개체를 가리킵니다: ${item.entity_id}` });
+    }
+  }
+  for (const ambiguity of objects(scene.ambiguities)) {
+    for (const option of items(ambiguity.options)) {
+      if (typeof option === "string" && !known.has(option)) {
+        issues.push({ field: "scene", message: `선택지가 장면에 없는 개체를 가리킵니다: ${option}` });
+      }
+    }
+  }
+  return issues;
+}
+
+/** `applied` is present-and-complete or absent: a `null` would be a third, meaningless state. */
+function validateAppliedV3(value: unknown): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (value === undefined) return issues;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    issues.push({ field: "composition", message: "적용 기록의 형식이 올바르지 않습니다." });
+    return issues;
+  }
+  const applied = value as Record<string, unknown>;
+  const text = (field: string, limit: number, required: boolean) => {
+    const entry = applied[field];
+    if (typeof entry !== "string") {
+      if (required) issues.push({ field: "applied", message: "적용 기록이 불완전합니다. 초안을 다시 적용하세요." });
+      return;
+    }
+    issues.push(...validateText(entry, "applied", limit, required));
+  };
+  for (const field of ["result_id", "candidate_id", "provider_model"]) text(field, 200, true);
+  text("applied_at", 20, true);
+  text("positive_prompt", 8000, true);
+  text("negative_prompt", 4000, false);
+  text("summary_ko", 600, false);
+  if (typeof applied.applied_at === "string"
+      && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(applied.applied_at)) {
+    issues.push({ field: "applied", message: "적용 시각 형식이 올바르지 않습니다." });
+  }
+  return issues;
+}
+
+/**
+ * UCP07: validate a v3 snapshot. It is a *different record* from v1/v2, not a wider one.
+ *
+ * This exists because `validateComposition` describes the dictionary-builder shape:
+ * `free_text_ko`, `draft_prompt`, `unresolved`, `selections[].label_ko`. A v3 body has none
+ * of those, so routing one through it threw a `TypeError` and generation was impossible
+ * from the UI once a v3 draft was applied.
+ *
+ * The checks mirror the server's, in the server's order of importance:
+ *
+ * - the family must match, or the job is refused with 422 before it is queued;
+ * - a snapshot needs Korean text or a chosen selection (UCP01 fix A): a veto alone records
+ *   nothing to generate;
+ * - a chosen selection needs `pinned`, an excluded one must not carry it, and no selection
+ *   may attribute to an entity the scene does not define;
+ * - `applied` is present-and-complete or absent, never `null`;
+ * - `snapshot_trim` may only name steps from the fixed ladder.
+ *
+ * The 32 KiB cap is deliberately *not* enforced here. The server trims an oversize v3
+ * record with that ladder and reports it in `snapshot_trim`; refusing in the browser would
+ * block a body the server is able to store, and the user would have no way to submit it.
+ */
+export function validateSnapshotV3(c: StoredSnapshotV3, family: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const add = (field: string, message: string) => issues.push({ field, message });
+  const isObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
+  const items = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+  const text = (value: unknown, field: string, limit: number, required = false) => {
+    if (typeof value !== "string") {
+      if (required) add(field, "빈 값은 사용할 수 없습니다.");
+      return;
+    }
+    issues.push(...validateText(value, field, limit, required));
+  };
+
+  text(c.compiler_version, "composition", 100, true);
+  text(c.dictionary_version, "composition", 100, true);
+  text(c.target_model_id, "composition", 100, true);
+  text(c.target_family, "composition", 100, true);
+  if (typeof c.target_family === "string" && c.target_family !== family) {
+    add("composition", "모델 계열이 다릅니다. 대상 모델에서 초안을 다시 만들고 적용하세요.");
+  }
+  if (typeof c.profile_version !== "number" || c.profile_version < 1) {
+    add("composition", "출력 프로필 버전이 없습니다. 초안을 다시 적용하세요.");
+  }
+  // v3 records `brief_ko` where v1/v2 recorded `free_text_ko` + `draft_prompt`.
+  text(c.brief_ko, "brief_ko", 4000);
+
+  const selections = items(c.selections);
+  if (selections.length > 100) add("selections", `${selections.length}/100개: 선택을 줄여 주세요.`);
+  const ids = new Set<string>();
+  for (const entry of selections) {
+    if (!isObject(entry)) { add("selections", "선택 항목의 형식이 올바르지 않습니다."); continue; }
+    const id = typeof entry.id === "string" ? entry.id : "";
+    if (!id) add("selections", "선택 항목에 ID가 없습니다.");
+    else if (ids.has(id)) add("selections", `중복 ID ${id}: 항목을 다시 선택하세요.`);
+    ids.add(id);
+    text(entry.id, "selections", 100, true);
+    const source = entry.source;
+    if (source === "excluded") {
+      // An excluded chip keeps nothing, so a pin or an owner on it is a contradiction.
+      if (entry.pinned !== undefined) add("selections", `${id}: 제외한 항목에는 고정 표시를 넣을 수 없습니다.`);
+      if (entry.entity_id !== undefined) add("selections", `${id}: 제외한 항목에는 개체 귀속을 넣을 수 없습니다.`);
+    } else if (source === "auto" || source === "manual") {
+      if (typeof entry.pinned !== "boolean") add("selections", `${id}: 고정 여부가 없습니다. 다시 선택하세요.`);
+      if (entry.entity_id !== undefined) text(entry.entity_id, "selections", 100, true);
+    } else {
+      add("selections", `${id}: 선택 종류가 올바르지 않습니다.`);
+    }
+  }
+  // Fix A: chips without a brief are a valid composition; a veto without either is not.
+  const chosen = selections.some((entry) => isObject(entry) && entry.source !== "excluded");
+  if (!String(c.brief_ko ?? "").trim() && !chosen) {
+    add("composition", "한글 설명이나 선택한 항목이 하나는 있어야 합니다.");
+  }
+
+  issues.push(...validateSceneV3(c.scene, selections));
+  issues.push(...validateAppliedV3(c.applied));
+  for (const step of items(c.snapshot_trim)) {
+    if (!(TRIM_STEPS as readonly unknown[]).includes(step)) {
+      add("composition", `알 수 없는 축소 단계입니다: ${String(step)}`);
+    }
+  }
+  return issues;
+}
+
+/** Routes a stored record to the validator that describes its version. */
+export function validateCompositionBody(c: StoredSnapshotV3, family: string): ValidationIssue[] {
+  if (c.schema_version === 3) return validateSnapshotV3(c, family);
+  return validateComposition(c as unknown as PromptComposition, family);
 }
 
 export function validateComposition(c: PromptComposition, family: string): ValidationIssue[] {
@@ -92,7 +271,7 @@ export function validateComposition(c: PromptComposition, family: string): Valid
 export function validateSubmission(body: Record<string, unknown>, family: string, maxBodyBytes: number | null): ValidationIssue[] {
   const issues = validateText(String(body.prompt ?? ""), "prompt", 8000, true);
   issues.push(...validateText(String(body.negative_prompt ?? ""), "negative_prompt", 4000));
-  if (body.prompt_composition) issues.push(...validateComposition(body.prompt_composition as PromptComposition, family));
+  if (body.prompt_composition) issues.push(...validateCompositionBody(body.prompt_composition as StoredSnapshotV3, family));
   const bytes = utf8Bytes(JSON.stringify(body));
   if (maxBodyBytes !== null && bytes > maxBodyBytes) issues.push({ field: "request", message: `${bytes}/${maxBodyBytes}바이트: 전체 요청이 너무 큽니다. 프롬프트나 구성을 줄여 주세요.` });
   return issues;

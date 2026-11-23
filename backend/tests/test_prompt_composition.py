@@ -8,6 +8,19 @@ from fastapi.testclient import TestClient
 from test_api import FailOnce
 
 
+def advertised_versions():
+    """The advertised list, read from the one constant that decides it.
+
+    A literal `[1, 2, 3]` here would have to be edited on every version bump, and the
+    failure mode of forgetting is a green suite that no longer describes the contract.
+    The *order* is still asserted, because a client reads the list.
+    """
+    from app.api.routes import COMPOSITION_SCHEMA_VERSIONS
+
+    assert list(COMPOSITION_SCHEMA_VERSIONS) == sorted(COMPOSITION_SCHEMA_VERSIONS)
+    return list(COMPOSITION_SCHEMA_VERSIONS)
+
+
 def composition():
     return {
         "schema_version": 1,
@@ -24,7 +37,7 @@ def composition():
 
 def test_snapshot_retry_asset_and_events(settings):
     with TestClient(create_app(settings, engine=FailOnce()), headers=HEADERS) as client:
-        assert client.get('/api/v1/system/capabilities').json()['prompt_composition']['schema_versions'] == [1, 2]
+        assert client.get('/api/v1/system/capabilities').json()['prompt_composition']['schema_versions'] == advertised_versions()
         original = composition()
         response = client.post('/api/v1/jobs', json={'model_id': 'fake', 'prompt': 'edited final',
                                                      'prompt_composition': original})
@@ -375,12 +388,12 @@ def test_a_restarted_server_still_refuses_a_v1_body_with_remainder(tmp_path):
     )
     with TestClient(create_app(settings), headers=HEADERS) as client:
         assert client.get('/api/v1/system/capabilities').json()[
-            'prompt_composition']['schema_versions'] == [1, 2]
+            'prompt_composition']['schema_versions'] == advertised_versions()
 
     assert (settings.data_dir / 'database' / 'studio.sqlite3').is_file()
     with TestClient(create_app(settings), headers=HEADERS) as client:
         assert client.get('/api/v1/system/capabilities').json()[
-            'prompt_composition']['schema_versions'] == [1, 2]
+            'prompt_composition']['schema_versions'] == advertised_versions()
         bad = composition()
         bad['remainder'] = [REMAINDER]
         assert client.post('/api/v1/jobs', json={

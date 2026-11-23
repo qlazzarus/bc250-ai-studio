@@ -1,4 +1,44 @@
-import { type AssetMetadata } from "./../api";
+import { isLegacyComposition, type AssetMetadata, type StoredSnapshotV3 } from "./../api";
+import { fromSnapshot } from "../prompt/composeSnapshot";
+
+/** Reads a stored string, so a damaged row renders as blank rather than `[object Object]`. */
+const text = (value: unknown): string => (typeof value === "string" ? value : "");
+
+/**
+ * UCP07: the v3 record, shown as what it *records* rather than as prose about a draft.
+ *
+ * Everything printed here is read from the stored row through `fromSnapshot`, so a record
+ * this client cannot interpret is reported as unreadable instead of being rendered with
+ * blanks. Two facts are stated explicitly because they are easy to misread:
+ *
+ * - the prompts below come from `applied`, i.e. they are what was executed. The row's
+ *   `final prompt` (shown above this block) may differ if the user edited the field after
+ *   applying — that is not a contradiction, it is two different facts;
+ * - `snapshot_trim` is a *loss* list. If it is non-empty the record is incomplete, and this
+ *   block says so rather than presenting the trimmed scene as the original.
+ */
+function SnapshotDetails({ data }: { data: StoredSnapshotV3 }) {
+  const read = fromSnapshot(data);
+  if (!read.ok) return <p>{read.message}</p>;
+  const { restored } = read;
+  const chips = restored.edit.selections;
+  const excluded = chips.filter((item) => item.source === "excluded");
+  const pinned = chips.filter((item) => item.pinned);
+  const manual = chips.filter((item) => item.source === "manual");
+  return <>
+    <p>스키마 v3 · 컴파일러 {text(data.compiler_version)} · {restored.edit.targetFamily} · 프로필 v{restored.edit.profileVersion}</p>
+    <p>선택: 수동 {manual.length} · 고정 {pinned.length} · 제외 {excluded.length} · 전체 {chips.length}
+      {excluded.length > 0 && ` (제외: ${excluded.map((item) => item.id).join(", ")})`}</p>
+    <p>장면: 개체 {restored.scene.entities.length} · 관계 {restored.scene.relations.length} · 미매핑 {restored.scene.unmappedDetails.length} · 모호성 {restored.scene.ambiguities.length}</p>
+    {restored.scene.entities.length > 0 && <p>개체별 속성: {restored.scene.entities
+      .map((entity) => `${entity.entityId}(${entity.kind}) ${entity.attributesKo.join("·") || "속성 없음"}`)
+      .join(" / ")}</p>}
+    {restored.applied === null
+      ? <p>적용 이력: 없음. 이 기록에는 실제로 실행된 후보가 남아 있지 않으며, 최종 프롬프트에서 역산하지 않습니다.</p>
+      : <p>적용: 후보 {restored.applied.candidateId} · {restored.applied.providerModel} · {restored.applied.appliedAt}</p>}
+    {restored.trimmed && <p>저장 시 축소됨: {restored.snapshotTrim.join(", ")}. 축소된 필드는 원래 값이 남아 있지 않습니다.</p>}
+  </>;
+}
 
 function Metadata({ data, archived, close, reuse, changeArchive, destroy }: { data: AssetMetadata; archived: boolean; close(): void; reuse(item: AssetMetadata): void; changeArchive(restore: boolean): Promise<void>; destroy(): Promise<void> }) {
   return (
@@ -29,6 +69,7 @@ function Metadata({ data, archived, close, reuse, changeArchive, destroy }: { da
             )}
         </dl>
         {data.prompt_composition && <details><summary>프롬프트 구성 이력</summary>
+          {isLegacyComposition(data.prompt_composition) ? <>
           <p>사전 선택: {data.prompt_composition.selections.map((item) => item.label_ko).join(", ") || "없음"}</p>
           {data.prompt_composition.selections.some((item) => item.mapping_status !== "mapped") && <p>
             미변환: {data.prompt_composition.selections.filter((item) => item.mapping_status !== "mapped")
@@ -50,6 +91,7 @@ function Metadata({ data, archived, close, reuse, changeArchive, destroy }: { da
           </> : <p>자유 입력 반영 방식·적용 당시 문자열·당시 경고·출처: 별도 기록 없음. 추가 설명은 번역되지 않은 원문입니다.</p>}
           <p>사전 버전: {[...new Set(data.prompt_composition.selections.map((item) => item.dictionary_version))].join(", ") || "선택 없음"}</p>
           <p>컴파일러 {data.prompt_composition.compiler_version} · {data.prompt_composition.target_family} · 스키마 v{data.prompt_composition.schema_version}</p>
+          </> : <SnapshotDetails data={data.prompt_composition} />}
         </details>}
         <div className="metadata-actions">
             <button className="quiet" onClick={() => void changeArchive(archived)}>

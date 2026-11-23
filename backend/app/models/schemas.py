@@ -1,7 +1,15 @@
 import json
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 SamplingMethod = Literal[
     "euler",
@@ -98,6 +106,31 @@ class CompositionSceneEnvironment(BaseModel):
     composition_ko: str | None = Field(default=None, max_length=200)
     style_ko: str | None = Field(default=None, max_length=200)
     mood_ko: str | None = Field(default=None, max_length=200)
+
+    @model_serializer(mode="wrap")
+    def omit_unstated(self, handler):
+        """Write only the keys that were actually stated (UCP07 §4: 빈 문자열은 키 생략).
+
+        The defaults are ``None``, so dumping a scene with no environment at all would
+        otherwise emit six ``null`` keys. Three things are wrong with that:
+
+        - the stored record disagrees with the contract's own examples, which write
+          ``"environment": {}`` (§5 scene, §6 clarification). The table says "at most six
+          keys, unstated ones omitted", and a row full of ``null``s says the opposite.
+        - ``null`` and *absent* stop being distinguishable from *explicitly cleared*. That
+          is the empty/absent conflation UCP01 fix B exists to prevent: a reader cannot
+          tell "the model never named a location" from "something lowered the location".
+        - it is 137 B of padding on *every* v3 row the client never sent. `fit()` measures
+          the padded form, so nothing is stored illegally, but the budget is spent on keys
+          that carry no information — and `snapshot_trim` is how this record is *supposed*
+          to report an absent environment.
+
+        Omitting is lossless because the keys are optional: absent and ``None`` mean the
+        same thing here, and ``""`` means "not stated" per the class docstring.
+        """
+        dumped = handler(self)
+        return {key: value for key, value in dumped.items()
+                if value is not None and value != ""}
 
 
 class CompositionSceneUnmapped(BaseModel):
@@ -201,21 +234,30 @@ class CompositionUnresolved(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
 
 
-def check_snapshot(model):
+def check_snapshot(model, enforce_bytes: bool = True):
     """The two snapshot checks both schema versions share.
 
     TRANS01 §3.1: 32 KiB of UTF-8 is the *only* binding size limit. Adding a second
     per-field byte budget would create a truth that drifts from ``validateComposition``
     in the browser, so field caps stay semantic (how many cards to show) and this check
     stays the one that decides what can be saved.
+
+    ``enforce_bytes=False`` is for the v3 model only, and it is what makes the trim ladder
+    reachable at all. v3 is the one version whose oversize form is *repairable*: the fixed
+    ladder lowers it and records what it lowered. Measuring the cap here would refuse the
+    body during validation, so ``PromptCompositionV3.fit()`` would never see it and
+    ``snapshot_trim`` could only ever be written as ``[]`` — the ladder would be dead code
+    behind a check that fires first. v3 therefore defers the verdict to ``fit()``, which
+    runs the ladder and raises with the final byte count if even that is not enough.
     """
     ids = [entry.id for entry in model.selections]
     if len(ids) != len(set(ids)):
         raise ValueError("Duplicate composition selection ID")
     payload = model.model_dump(mode="json")
-    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-    if len(encoded.encode("utf-8")) > 32768:
-        raise ValueError("Prompt composition exceeds 32 KiB")
+    if enforce_bytes:
+        encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        if len(encoded.encode("utf-8")) > 32768:
+            raise ValueError("Prompt composition exceeds 32 KiB")
 
     def contains_nul(value):
         if isinstance(value, str):
@@ -395,7 +437,69 @@ class PromptCompositionV3(BaseModel):
                 if item.entity_id not in known:
                     raise ValueError(
                         f"Selection names an unknown entity: {item.entity_id}")
-        return check_snapshot(self)
+        # The byte budget is deliberately *not* measured here: `fit()` is where an
+        # oversize v3 record is lowered, and a refusal at this point would mean the
+        # ladder never runs. See `check_snapshot(enforce_bytes=...)`.
+        return check_snapshot(self, enforce_bytes=False)
+
+    def fit(self):
+        """Lower this snapshot into the byte budget and record what was lowered.
+
+        UCP07: called on the *dump* of a validated snapshot, immediately before it is
+        stored. Two facts make this the right place rather than a route handler:
+
+        1. the trim is a property of the snapshot, not of the endpoint that saves it —
+           every writer (submit, retry copy) must produce the same shape;
+        2. `snapshot_trim` is part of the record, so it has to be written by whoever
+           decides the trimming happened.
+
+        Returns the trimmed payload (a plain dict, ready to store) and the step list.
+        ``scene`` is re-validated after trimming, because dropping entities is what can
+        dangle a reference and a dangling reference must be a hard failure, not a row
+        that later reads back as invalid.
+
+        An existing ``snapshot_trim`` is *unioned*, not replaced. Re-saving a restored
+        trimmed record reaches here again (restore -> apply -> submit), and by then the
+        record is usually already small enough, so ``fit_payload`` reports ``steps == []``.
+        Writing that empty list over the stored one would make the row claim it was never
+        trimmed while its evidence, options and extra attributes are still missing — the
+        one fact UCP01 fix B relies on to avoid reading absence as emptiness.
+        """
+        from app.services.prompt_snapshot import LADDER, fit_payload
+
+        payload = self.model_dump(mode="json")
+        kept = [name for name in LADDER if name in self.snapshot_trim]
+        payload, steps, size = fit_payload(payload)
+        if size > 32768:
+            raise ValueError(
+                f"Prompt composition exceeds 32 KiB even after trimming: {size} B")
+        # Ladder order, not arrival order: the list is read as "these fields are absent,
+        # in the order they were given up", so it has to stay canonical.
+        merged = [name for name in LADDER if name in kept or name in steps]
+        payload["snapshot_trim"] = merged
+        # The trimmed payload must still be a valid snapshot. Validating here means a
+        # ladder bug is caught at save time instead of making the job unreadable later.
+        PromptCompositionV3.model_validate(payload)
+        return payload, merged
+
+    @model_serializer(mode="wrap")
+    def serialize_snapshot(self, handler):
+        """Write ``applied`` by presence, never as ``null``.
+
+        UCP07: the contract makes the *key's presence* the fact "this was executed", and
+        ``applied: null`` a third state that means nothing — so ``reject_explicit_null_applied``
+        refuses it on the way in. Dumping a not-yet-applied snapshot would emit exactly that
+        forbidden form, and the stored row then fails to validate when it is read back
+        (``GET /jobs`` answered 500 for every job once one such row existed).
+
+        Dropping the key here rather than storing an empty object keeps the "not applied
+        yet" fact visible to a reader: there is no value to interpret, and ``snapshot_trim``
+        stays the only list of things that were left out.
+        """
+        data = handler(self)
+        if isinstance(data, dict) and data.get("applied") is None:
+            data.pop("applied", None)
+        return data
 
 
 # A discriminated union, not a version field the caller may lie about: `schema_version`

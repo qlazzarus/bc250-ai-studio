@@ -21,6 +21,7 @@ from app.services.prompt_compose import (
     compose_revisions,
 )
 from app.services.prompt_dictionary import load_dictionary
+from app.services.prompt_profiles import PROFILE_VERSION, PROFILES, profile_for, profile_versions
 from conftest import HEADERS
 from fastapi.testclient import TestClient
 
@@ -50,7 +51,8 @@ def dictionary():
     return load_dictionary(root / "config/prompt_dictionary.json")
 
 
-def revisions(brief=BRIEF, selections=None, choices=()):
+def revisions(brief=BRIEF, selections=None, choices=(), *, model_id=MODEL_ID,
+              family=FAMILY, profile_version=PROFILE_VERSION):
     """The fingerprint the browser would send, computed the same way on both sides."""
     payload = [{"id": item["id"], "source": item.get("source", "auto"),
                 "pinned": item.get("pinned"), "entity_id": item.get("entity_id")}
@@ -58,12 +60,13 @@ def revisions(brief=BRIEF, selections=None, choices=()):
     parsed = [ComposeRequest.model_validate({
         "schema_version": 1, "request_id": REQUEST_ID,
         "input_revision": "sha256:" + "0" * 64,
-        "dictionary_version": dictionary().version, "target_model_id": MODEL_ID,
-        "target_family": FAMILY, "profile_version": 1, "selections": payload})
+        "dictionary_version": dictionary().version, "target_model_id": model_id,
+        "target_family": family, "profile_version": profile_version,
+        "selections": payload})
     ][0]
     return compose_revisions(brief_ko=brief, selections=parsed.selections,
-                             choices=list(choices), target_model_id=MODEL_ID,
-                             target_family=FAMILY, profile_version=1,
+                             choices=list(choices), target_model_id=model_id,
+                             target_family=family, profile_version=profile_version,
                              dictionary_version=dictionary().version)
 
 
@@ -74,13 +77,21 @@ def body(**changes):
         {"id": "style.illustration", "source": "excluded"},
     ])
     brief = changes.pop("brief_ko", BRIEF)
+    # UCP04: the fingerprint covers the target, so a test that switches family must have
+    # its revision computed for that family — otherwise the request would fail the
+    # revision check before reaching the rule under test.
+    model_id = changes.get("target_model_id", MODEL_ID)
+    family = changes.get("target_family", FAMILY)
+    profile_version = changes.get("profile_version", PROFILE_VERSION)
     rev = revisions(brief=brief, selections=selections,
-                    choices=changes.get("clarification_choices", ()))
+                    choices=changes.get("clarification_choices", ()),
+                    model_id=model_id, family=family,
+                    profile_version=profile_version)
     payload = {
         "schema_version": 1, "request_id": REQUEST_ID, "input_revision": rev["input"],
         "dictionary_version": dictionary().version,
-        "target_model_id": MODEL_ID, "target_family": FAMILY,
-        "profile_version": 1, "candidate_count": 3, "brief_ko": brief,
+        "target_model_id": model_id, "target_family": family,
+        "profile_version": profile_version, "candidate_count": 3, "brief_ko": brief,
         "selections": selections, "clarification_choices": [],
     }
     payload.update(changes)
@@ -97,13 +108,13 @@ def raw_body(**changes):
     brief = changes.pop("brief_ko", "")
     rev = compose_revisions(brief_ko=brief, selections=_shaped(selections), choices=[],
                             target_model_id=MODEL_ID, target_family=FAMILY,
-                            profile_version=1,
+                            profile_version=PROFILE_VERSION,
                             dictionary_version=dictionary().version)
     payload = {
         "schema_version": 1, "request_id": REQUEST_ID, "input_revision": rev["input"],
         "dictionary_version": dictionary().version,
         "target_model_id": MODEL_ID, "target_family": FAMILY,
-        "profile_version": 1, "candidate_count": 3, "brief_ko": brief,
+        "profile_version": PROFILE_VERSION, "candidate_count": 3, "brief_ko": brief,
         "selections": selections, "clarification_choices": [],
     }
     payload.update(changes)
@@ -196,8 +207,9 @@ def test_capability_is_advertised_separately_from_prompt_proposals(gated):
     assert value["prompt_compose"] == {
         "schema_versions": [1],
         "dictionary_version": "1.2.0",
-        "output_profile_versions": {"sd15": 1, "z-image": 1, "flux2": 1,
-                                    "moss-image": 1},
+        # UCP04: advertised versions come from the profiles, so this is the same number
+        # a request must send. `fake` is test-only and never advertised.
+        "output_profile_versions": profile_versions(),
         "max_request_bytes": 24576,
         "max_response_bytes": 49152,
         "timeout_ms": 60000,
@@ -921,4 +933,366 @@ def test_an_unadvertised_capability_is_503(settings):
     assert response.json()["why"] == "not_configured"
 
 
+# --------------------------------------------------------------------------------------
+# UCP04: per-family output profiles and candidate validation.
+# --------------------------------------------------------------------------------------
+
+
+def test_the_advertised_versions_are_the_profiles_the_server_requires(gated):
+    # The advertised number and the number `resolve_target` compares against come from one
+    # source. If they could drift, a client would be told a version the server rejects.
+    value = gated.get("/api/v1/system/capabilities").json()
+    assert value["prompt_compose"]["output_profile_versions"] == profile_versions()
+    assert value["prompt_compose"]["output_profile_versions"] == {
+        "sd15": PROFILE_VERSION, "z-image": PROFILE_VERSION,
+        "flux2": PROFILE_VERSION, "moss-image": PROFILE_VERSION,
+    }
+    # `fake` is test-only and compose is gated on a non-fake engine, so it is never
+    # advertised: promising it would advertise a family no deployment serves.
+    assert "fake" not in value["prompt_compose"]["output_profile_versions"]
+
+
+def test_a_stale_profile_version_is_a_409_naming_both_versions(gated):
+    # UCP03 accepted any integer >= 1, so `stale_profile` was in the failure vocabulary but
+    # unreachable. It is a 409 like a stale dictionary: the body is well formed, the client
+    # is simply describing output rules this build no longer applies.
+    calls = install(gated.app, lambda request: chat())
+    response = gated.post("/api/v1/prompt/compose",
+                          json=body(profile_version=PROFILE_VERSION - 1))
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail.startswith("stale_profile")
+    assert str(PROFILE_VERSION) in detail
+    assert calls == []
+
+
+def test_a_future_profile_version_is_also_stale(gated):
+    # Not `>= server`: a newer number is just as unusable as an older one, and silently
+    # accepting it would let a client run under rules this server does not implement.
+    response = gated.post("/api/v1/prompt/compose",
+                          json=body(profile_version=PROFILE_VERSION + 1))
+    assert response.status_code == 409
+    assert response.json()["detail"].startswith("stale_profile")
+
+
+def test_the_profile_guidance_reaches_the_system_prompt(gated):
+    captured = {}
+
+    def handler(request):
+        captured.update(json.loads(request.content))
+        return chat()
+
+    install(gated.app, handler)
+    gated.post("/api/v1/prompt/compose", json=body())
+    system = captured["messages"][0]["content"]
+    # `flux2` reads relationship sentences joined with `; ` — the compiler's own convention
+    # for the natural-language families. The prompt must ask for that, not for a generic
+    # English prompt and not for an sd15 tag list.
+    assert "one or two English sentences" in system
+    assert "Do not turn the scene into a tag list" in system
+    assert "short English tag phrases" not in system
+    assert "(word:1.2)" in system
+    # The discriminator: no token hint for a family whose encoder window is unknown.
+    guidance = system.split("How this model family reads a prompt:")[1]
+    assert "tokens" not in guidance.split("Reply with the JSON object only")[0]
+
+
+def test_the_sd15_guidance_asks_for_tags_and_a_character_budget(gated):
+    # The other half: `sd15` is the one family here that reads a tag list and is the only
+    # one with a known window, so its guidance must say both.
+    captured = {}
+
+    def handler(request):
+        captured.update(json.loads(request.content))
+        return chat()
+
+    install(gated.app, handler)
+    gated.post("/api/v1/prompt/compose",
+               json=body(target_model_id="realistic-vision-v6", target_family="sd15"))
+    system = captured["messages"][0]["content"]
+    assert "short English tag phrases" in system
+    assert "roughly 77 tokens" in system
+    # The window is stated as an aim, not a measurement: no tokenizer exists in this
+    # repository, so the prompt must not present a measured number.
+    assert "only partly read" in system
+
+
+def test_the_payload_states_the_profile_the_server_will_enforce(gated):
+    captured = {}
+
+    def handler(request):
+        captured.update(json.loads(request.content))
+        return chat()
+
+    install(gated.app, handler)
+    gated.post("/api/v1/prompt/compose", json=body())
+    user = json.loads(captured["messages"][1]["content"])
+    profile = profile_for(FAMILY)
+    assert user["output_profile"] == {
+        "family": FAMILY, "version": profile.version,
+        "prompt_style": profile.prompt_style, "joiner": profile.joiner,
+        "token_window": profile.token_window,
+        "max_positive_chars": profile.max_positive_chars,
+    }
+    # The schema the model is shown carries the same character limits, so "asked for" and
+    # "rejected for" cannot disagree.
+    assert f"<= {profile.max_positive_chars} chars" in captured["messages"][0]["content"]
+
+
+def test_identical_candidates_collapse_and_say_why(gated):
+    # Two identical prompts are one prompt. §5 allows returning fewer; what it does not
+    # allow is pretending the list is complete, so the collapse is named separately from a
+    # rejection: `duplicate_candidates` says the model repeated itself.
+    same = "a woman in a red dress on a rainy street"
+    payload = reply(candidates=[
+        {"candidate_id": "candidate-1", "title_ko": "첫째", "difference_ko": "첫째",
+         "positive_prompt": same},
+        {"candidate_id": "candidate-2", "title_ko": "둘째", "difference_ko": "둘째",
+         "positive_prompt": f"  {same.upper()}  "},
+    ])
+    install(gated.app, lambda request: chat(payload))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    # Case and surrounding whitespace do not make a second candidate.
+    assert [item["candidate_id"] for item in value["candidates"]] == ["candidate-1"]
+    assert "duplicate_candidates" in value["warnings"]
+    assert "candidates_reduced" in value["warnings"]
+
+
+def test_two_genuinely_different_candidates_are_not_called_duplicates(gated):
+    # The counter-case: a warning that fired on every reply would be noise.
+    payload = reply(candidates=[
+        {"candidate_id": "candidate-1", "title_ko": "첫째", "difference_ko": "첫째",
+         "positive_prompt": "a woman in a red dress on a rainy street"},
+        {"candidate_id": "candidate-2", "title_ko": "둘째", "difference_ko": "둘째",
+         "positive_prompt": "a woman in a crimson dress on a wet street at night"},
+    ])
+    install(gated.app, lambda request: chat(payload))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert len(value["candidates"]) == 2
+    assert "duplicate_candidates" not in value["warnings"]
+    assert "candidates_reduced" not in value["warnings"]
+
+
+def test_weighting_syntax_is_reported_but_never_dropped(gated):
+    # A parenthesised weight is a formatting habit, not an unusable prompt. Dropping the
+    # candidate would delete a whole usable sentence; the engine's own LoRA tag is added at
+    # generation time regardless, so the client is told instead of corrected.
+    weighted = "a woman in a (red dress:1.2) on a rainy street"
+    install(gated.app, lambda request: chat(reply(candidates=[
+        {"candidate_id": "candidate-1", "title_ko": "가중", "difference_ko": "가중",
+         "positive_prompt": weighted}])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    assert value["candidates"][0]["positive_prompt"] == weighted
+    assert "profile_weighting_syntax" in value["warnings"]
+    # The text was neither rewritten nor cut, so nothing was "reduced".
+    assert "candidates_reduced" not in value["warnings"]
+
+
+def test_a_candidate_with_an_inline_lora_tag_is_reported(gated):
+    # The other spelling of the same problem, and the one `SdCpp.effective_prompt` would
+    # actually collide with: it appends `<lora:name:strength>` itself when it finds none.
+    tagged = "a woman, <lora:my-style:0.8>, rainy street"
+    install(gated.app, lambda request: chat(reply(candidates=[
+        {"candidate_id": "candidate-1", "title_ko": "로라", "difference_ko": "로라",
+         "positive_prompt": tagged}])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["candidates"][0]["positive_prompt"] == tagged
+    assert "profile_weighting_syntax" in value["warnings"]
+
+
+def test_a_parenthesised_phrase_that_is_not_a_weight_is_not_flagged(gated):
+    # `(smiling)` and a clock time have no numeric weight, so they are ordinary prompt
+    # text. A regex that flagged every parenthesis would warn on correct output.
+    plain = "a woman (smiling) at 5:30 in the afternoon"
+    install(gated.app, lambda request: chat(reply(candidates=[
+        {"candidate_id": "candidate-1", "title_ko": "괄호", "difference_ko": "괄호",
+         "positive_prompt": plain}])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert "profile_weighting_syntax" not in value["warnings"]
+
+
+
+
+def test_a_long_prompt_is_not_flagged_without_an_established_window(gated):
+    # `flux2` reads a Qwen3-class encoder whose context length is a property of checkpoint
+    # files this build cannot read. Its profile window is `None`, so no warning is raised:
+    # a blanket 77-token warning across families would be a fabricated limit (§5).
+    long_prompt = ", ".join(["red dress"] * 40)
+    install(gated.app, lambda request: chat(reply(candidates=[
+        {"candidate_id": "candidate-1", "title_ko": "김", "difference_ko": "김",
+         "positive_prompt": long_prompt}])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    # The candidate is returned whole: the check never refuses and never cuts.
+    assert value["candidates"][0]["positive_prompt"] == long_prompt
+    assert "profile_token_window" not in value["warnings"]
+
+
+def test_the_same_long_prompt_does_warn_for_sd15(gated):
+    # The mirror image, on the one family whose window is a known constant. The same prompt
+    # is used so the difference is the profile, not the text.
+    long_prompt = ", ".join(["red dress"] * 40)
+    install(gated.app, lambda request: chat(reply(candidates=[
+        {"candidate_id": "candidate-1", "title_ko": "김", "difference_ko": "김",
+         "positive_prompt": long_prompt}])))
+    value = gated.post("/api/v1/prompt/compose", json=body(
+        target_model_id="realistic-vision-v6", target_family="sd15")).json()
+    assert value["status"] == "ready"
+    assert value["candidates"][0]["positive_prompt"] == long_prompt
+    assert "profile_token_window" in value["warnings"]
+
+
+def test_a_short_sd15_prompt_does_not_warn(gated):
+    # The warning must track the window, not the family: a 34-character tag list is well
+    # inside 77 tokens and warning about it would teach the user to ignore the warning.
+    short = "a woman, red dress, rainy street"
+    install(gated.app, lambda request: chat(reply(candidates=[
+        {"candidate_id": "candidate-1", "title_ko": "짧음", "difference_ko": "짧음",
+         "positive_prompt": short}])))
+    value = gated.post("/api/v1/prompt/compose", json=body(
+        target_model_id="realistic-vision-v6", target_family="sd15")).json()
+    assert "profile_token_window" not in value["warnings"]
+
+
+def test_a_family_without_a_profile_is_refused_before_the_call(gated):
+    # A registry family this build has no profile for is a 422 about the target: there is
+    # nothing to tell the model about how that family reads a prompt, and a generic prompt
+    # would apply the wrong convention silently.
+    gated.app.state.registry.models["unprofiled-model"] = {
+        **gated.app.state.registry.models[MODEL_ID],
+        "model_id": "unprofiled-model", "family": "unprofiled",
+    }
+    calls = install(gated.app, lambda request: chat())
+    response = gated.post("/api/v1/prompt/compose", json=body(
+        target_model_id="unprofiled-model", target_family="unprofiled"))
+    assert response.status_code == 422
+    assert "no output profile" in response.json()["detail"]
+    assert calls == []
+
+
+def test_the_warning_cap_keeps_the_load_bearing_codes(gated):
+    # Four is the contract's cap. `candidates_reduced` and `profile_token_window` must
+    # survive it, otherwise a shortened list would look complete and an over-budget prompt
+    # would look fine. This reply asks for both plus two advisories at once.
+    long_prompt = ", ".join(["(red dress:1.2)"] * 30)  # weighted *and* over the window
+    install(gated.app, lambda request: chat(reply(candidates=[
+        {"candidate_id": "candidate-1", "title_ko": "가중", "difference_ko": "가중",
+         "positive_prompt": long_prompt, "negative_prompt": "blurry"},
+        {"candidate_id": "candidate-2", "title_ko": "중복", "difference_ko": "중복",
+         "positive_prompt": f"{long_prompt} "},
+    ])))
+    value = gated.post("/api/v1/prompt/compose", json=body(
+        target_model_id="realistic-vision-v6", target_family="sd15")).json()
+    assert len(value["warnings"]) <= 4
+    assert "candidates_reduced" in value["warnings"]
+    assert "profile_token_window" in value["warnings"]
+
+
+def test_the_profile_joiner_matches_the_compiler_convention():
+    # The profile restates the compiler's separator instead of importing it, so a silent
+    # divergence is possible. `frontend/src/prompt/compiler.ts` joins with `, ` for `sd15`
+    # and `; ` for the natural-language families; this pins the backend half to that rule.
+    assert {family: profile.joiner for family, profile in PROFILES.items()} == {
+        "sd15": ", ", "flux2": "; ", "z-image": "; ", "moss-image": "; ", "fake": "; ",
+    }
+    assert profile_for("sd15").prompt_style == "tags"
+    for family in ("flux2", "z-image", "moss-image"):
+        assert profile_for(family).prompt_style == "sentence"
+
+
+# ── negative prompt, CFG, and the MOSS/LoRA duplication (§5, UCP04 checklist) ─────────
+
+
+def moss_app(gated):
+    """Register the real MOSS model over the fake-test fixture's registry.
+
+    The compose route reads the live registry, and MOSS is the one family where the
+    engine also rewrites the prompt (`SdCppEngine.effective_prompt`). Using the shipped
+    `config/models.yaml` facts keeps the test aligned with the operator config instead of
+    a hand-copied `negative_prompt: unsupported`.
+    """
+    from app.services.registry import Registry
+
+    registry = Registry("config/models.yaml", "sdcpp")
+    gated.app.state.registry = registry
+    return registry
+
+
+def test_moss_negative_prompt_is_dropped_once_not_twice(gated):
+    """MOSS declares `negative_prompt: unsupported`, and the engine has no second rule.
+
+    §5's checklist item asks whether the compose layer and the MOSS engine path both act
+    on a negative prompt. They do not: `SdCppEngine.command` emits `-n` only when the spec
+    carries one, and `Registry.resolve` refuses a negative for an `unsupported` model
+    before a spec exists. So compose clearing the field is the *only* removal — one
+    warning, not two, and no silent second edit of the user's prompt.
+    """
+    moss_app(gated)
+    payload = reply(candidates=[{
+        "candidate_id": "candidate-1", "title_ko": "부정", "difference_ko": "부정",
+        "positive_prompt": "a woman in a rainy street",
+        "negative_prompt": "blurry, deformed hands"}])
+    install(gated.app, lambda request: chat(payload))
+    value = gated.post("/api/v1/prompt/compose", json=body(
+        target_model_id="moss-image-nsfw", target_family="moss-image")).json()
+    assert value["status"] == "ready"
+    assert value["candidates"][0]["negative_prompt"] is None
+    # Exactly one negative warning: the duplication the checklist asks about would show
+    # as the same code twice, or as an extra engine-side mutation the client cannot see.
+    assert value["warnings"].count("negative_unsupported") == 1
+    assert "negative_requires_cfg" not in value["warnings"]
+
+
+def test_the_moss_engine_adds_its_own_lora_tag_and_trigger_once(gated):
+    """The engine's rewrite is the source the compose warning describes, not a duplicate.
+
+    `SdCppEngine.effective_prompt` prepends the LoRA trigger and appends
+    `<lora:name:strength>`. That is why the profile tells the model not to emit its own
+    tag: a model-supplied tag for a *different* LoRA would leave two, and the engine's
+    dedup only matches the configured name. This pins the engine half so the compose
+    warning's reason stays true.
+    """
+    from app.engines.sdcpp import SdCppEngine
+
+    registry = moss_app(gated)
+    model = registry.get("moss-image-nsfw")
+    lora = model["lora"]
+    assert lora["enabled"] and lora["trigger"]
+
+    plain = "a woman in a rainy street"
+    effective = SdCppEngine.effective_prompt(plain, model)
+    # Trigger first, tag last, and the user's sentence untouched in between.
+    name = lora["path"].rsplit("/", 1)[-1].removesuffix(".gguf")
+    assert effective == f"{lora['trigger']} {plain} <lora:{name}:{lora['strength']:g}>"
+    # Applying it twice changes nothing: the trigger and tag are each recognised.
+    assert SdCppEngine.effective_prompt(effective, model) == effective
+
+
+def test_a_model_supplied_lora_tag_survives_alongside_the_engines(gated):
+    """The documented collision, made explicit rather than fixed silently.
+
+    A candidate carrying `<lora:some-other:0.8>` is not deduplicated by the engine — it
+    matches only the configured LoRA's name — so the final prompt has two tags. Compose
+    therefore warns (`profile_weighting_syntax`) instead of dropping the candidate: the
+    user can see and edit the text, which a silent rewrite would prevent.
+    """
+    from app.engines.sdcpp import SdCppEngine
+
+    registry = moss_app(gated)
+    model = registry.get("moss-image-nsfw")
+    supplied = "a woman, <lora:my-style:0.8>, rainy street"
+    effective = SdCppEngine.effective_prompt(supplied, model)
+    assert effective.count("<lora:") == 2
+    assert "<lora:my-style:0.8>" in effective
+
+    install(gated.app, lambda request: chat(reply(candidates=[{
+        "candidate_id": "candidate-1", "title_ko": "로라", "difference_ko": "로라",
+        "positive_prompt": supplied}])))
+    value = gated.post("/api/v1/prompt/compose", json=body(
+        target_model_id="moss-image-nsfw", target_family="moss-image")).json()
+    assert "profile_weighting_syntax" in value["warnings"]
+    # Not shortened, not rewritten: the warning is the whole intervention.
+    assert value["candidates"][0]["positive_prompt"] == supplied
+    assert "candidates_reduced" not in value["warnings"]
 

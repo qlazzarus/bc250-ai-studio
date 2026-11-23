@@ -159,11 +159,93 @@ export function setPinned(edit: ComposeEdit, id: string, pinned: boolean): Compo
 /**
  * Attribute a chip to an entity. Only `auto`/`manual` rows can be attributed; an
  * excluded row carries no meaning to attribute.
+ *
+ * `allowed` is the scene's entity IDs. When given, an attribution to anything else is
+ * refused instead of written: the server validates `entity_id` against its own scene and
+ * answers `422`, so letting a stale or invented ID through would turn a UI slip into a
+ * request the user cannot repair (UCP06, per-entity attribution).
  */
-export function attributeTo(edit: ComposeEdit, id: string, entityId: string | null): ComposeEdit {
+export function attributeTo(
+  edit: ComposeEdit,
+  id: string,
+  entityId: string | null,
+  allowed?: ReadonlySet<string>,
+): ComposeEdit {
   const existing = find(edit, id);
   if (existing === undefined || existing.source === "excluded") return edit;
+  if (entityId !== null && allowed !== undefined && !allowed.has(entityId)) return edit;
   return replace(edit, id, { ...existing, entityId });
+}
+
+/**
+ * Hand a chip back to the AI. UCP06 requirement: a manual pick stays manual until the user
+ * says otherwise, so this is the *only* way `manual` becomes `auto` — it is an explicit act,
+ * never a side effect of a reply. `pinned` is dropped with the source: keeping a pin would
+ * mean "the AI may choose this, but it must keep it", which `setPinned` reserves for a chip
+ * the user still owns.
+ */
+export function makeAuto(edit: ComposeEdit, id: string): ComposeEdit {
+  const existing = find(edit, id);
+  if (existing === undefined || existing.source === "excluded") return edit;
+  if (existing.source === "auto" && !existing.pinned) return edit;
+  return replace(edit, id, { id, source: "auto", pinned: false, entityId: existing.entityId });
+}
+
+/** The scene's entity IDs, for validating an attribution before it is written. */
+export const sceneEntityIds = (scene: StructuredScene): Set<string> =>
+  new Set(scene.entities.map((entity) => entity.entityId));
+
+/**
+ * Resolve one `ExclusionClash` by the option the user picked (UCP02 case 4).
+ *
+ * Neither answer is applied automatically: both discard something the user said, so the
+ * spec requires an explicit choice. This function performs the chosen half and nothing
+ * more.
+ *
+ * - `drop_exclusion` — the veto goes, and the user's current sentence stands.
+ * - `drop_mention` — the *affirmed* mentions of that phrase are cut out of the brief. Only
+ *   affirmed ones: a negated mention (`네온 없이`) is the veto restated, and removing it
+ *   would silently delete half of the same decision. The veto stays, because the brief no
+ *   longer contradicts it.
+ *
+ * Edits are right-to-left so earlier offsets stay valid, and `choices` is cleared because
+ * the brief (or the chip set) moved — the same rule as `withBrief`.
+ */
+export function resolveClash(
+  edit: ComposeEdit,
+  clash: ExclusionClash,
+  resolution: ClashResolution,
+  dictionary: readonly DictionaryEntry[],
+): ComposeEdit {
+  if (resolution === "drop_exclusion") {
+    return clearExclusion(edit, clash.id);
+  }
+  const entry = dictionary.find((item) => item.id === clash.id);
+  if (entry === undefined) return edit;
+  const text = edit.briefKo;
+  const lowered = text.toLocaleLowerCase("ko");
+  const spans: { start: number; end: number }[] = [];
+  for (const phrase of [entry.labelKo, ...entry.aliases]) {
+    if (!phrase) continue;
+    for (const occurrence of matchOccurrences(lowered, phrase, "label")) {
+      if (polarityAt(lowered, occurrence.end) === "affirmed") {
+        spans.push({ start: occurrence.start, end: occurrence.end });
+      }
+    }
+  }
+  if (spans.length === 0) return edit;
+  spans.sort((a, b) => b.start - a.start);
+  let next = text;
+  let cursor = Number.POSITIVE_INFINITY;
+  for (const span of spans) {
+    // Overlapping matches from two aliases of the same entry must not be cut twice.
+    if (span.end > cursor) continue;
+    next = next.slice(0, span.start) + next.slice(span.end);
+    cursor = span.start;
+  }
+  const briefKo = next.replace(/\s{2,}/g, " ").trim();
+  if (briefKo === edit.briefKo) return edit;
+  return { ...edit, briefKo, choices: [] };
 }
 
 /** Plain text and a chosen chip both count; `excluded` alone does not. */

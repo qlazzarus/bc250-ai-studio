@@ -8,7 +8,7 @@
 
 **문서 압축 대상에서 제외한다.** 완료 전에는 이 명세를 삭제하거나 요약본·링크 목록으로 대체하지 않는다. 프로젝트 전체의 과거 히스토리 정리와 이 최우선 구현 명세의 유지 원칙은 별개다. 태스크별 현재 결과·결정·차단 사유는 이 파일에서 관리하고 날짜별 장황한 로그만 누적하지 않는다.
 
-현재 상태는 **UCP01 계약 확정 완료, UCP02 구현 완료, UCP03 구현 완료(mock 검증), UCP04~09 미착수**다. UCP03의 실제 llama-server·GPU gate 실연결 검증과 16K 컨텍스트 토큰 소비량 측정은 UCP09 범위로 남긴다. DeepSeek 4.1 Flash는 코드를 구현할 실행자이며 Studio 런타임 LLM 설정을 바꾸라는 뜻이 아니다. 런타임은 기존 서버의 LLM 연결과 GPU 조정 경로를 사용한다.
+현재 상태는 **UCP01 계약 확정 완료, UCP02·UCP03·UCP04·UCP05·UCP06·UCP07 구현 완료, UCP08 브라우저 자동화 완료(459 checks, 모바일 실기기 대기), UCP09 미착수(실행 환경 없음)**다. UCP09는 실제 llama-server·GPU·모델을 요구하는데 이번 실행 호스트(Apple M1 macOS)에는 셋 다 없어 착수하지 못했고, 그 차단 근거를 「UCP09 환경 확인」 절에 기록했다. UCP03의 실제 llama-server·GPU gate 실연결 검증과 16K 컨텍스트 토큰 소비량 측정도 같은 이유로 대기다. UCP05의 화면 검증은 mock API와 데스크톱 브라우저 레이아웃까지이고, UCP06은 그 화면의 양방향 수정·적용 보호를 통합 테스트로 고정했다. UCP07은 v3 저장·trim·복원·재시도를 API와 순수 모듈 수준에서 고정했고, UCP08이 실제 브라우저(CDP, Edge 158)에서 적용→저장→갤러리 복원까지 클릭으로 확인했다. UCP08의 모바일 실기기(iOS Safari·Android Chrome) 검증은 기기가 없어 대기 상태로 남는다. DeepSeek 4.1 Flash는 코드를 구현할 실행자이며 Studio 런타임 LLM 설정을 바꾸라는 뜻이 아니다. 런타임은 기존 서버의 LLM 연결과 GPU 조정 경로를 사용한다.
 
 ## 0 DeepSeek 4.1 Flash 실행 지시
 
@@ -84,6 +84,8 @@
 
 현재 LLM은 사전 ID 제안과 잔여 구절 번역을 별개로 처리한다. 컴파일러는 전체 장면을 번역하지 않으며 자연어 계열도 주로 세미콜론 연결이다. 상황 후보는 장소·행동 변경이다. 기존의 기능 조각은 활용하되 버튼만 합쳐서 통합 구현으로 판정하지 않는다.
 
+UCP05가 이 표의 첫 행에 실제 변경을 넣었다: `PromptBuilder`는 고급/호환 경로로 **그대로 유지**하고, 통합 흐름은 새 `ComposePanel`이 담당한다. 즉 표의 "통합 흐름의 컨테이너로 정리"는 "PromptBuilder를 대체"가 아니라 "두 경로가 공존"으로 확정됐다. 기존 자유 입력 경로는 삭제·축소되지 않았고, compose가 불가능한 배포에서는 `ComposePanel`이 `composeFallbackNotice`로 이유를 밝히고 아무 것도 하지 않으며 자유 입력은 그대로 동작한다.
+
 ### 구현 시작 시 알아야 할 현재 계약
 
 - 사전은 `frontend/src/prompt/dictionary.ts` 버전 1.2.0, 활성 항목 100개다. `scripts/gen-prompt-dictionary.mjs`가 서버 mirror `config/prompt_dictionary.json`을 생성한다. 수정 시 양쪽 버전과 내용 일치를 검증한다.
@@ -94,7 +96,7 @@
 - 현재 구성 저장은 v1/v2다. v2 `remainder`는 최대 8개이며 각 `source_ko`/`suggested_en`은 200자, `proposal_id`는 8~64자, `proposal_model`은 1~200자, `accepted_at`은 UTC 초 단위다. 번역은 초안과 별도로 저장하고 최종 prompt에 개행으로 붙인다.
 - 선택은 최대 100개, 한글은 4,000자, 초안·최종 prompt는 각각 8,000자, 선택 rendered는 300자, 미변환은 101개/항목 text 4,000자, 정규화 구성 JSON은 UTF-8 32 KiB다. 생성 HTTP body는 설정값을 따르며 소스 기본값은 65,536 bytes다. 문자 수와 UTF-8 byte 수를 혼동하지 않는다.
 - 서버는 저장 구성의 구조·계열 일치를 검증하지만 현재 사전으로 재컴파일하지 않는다. 실제 실행 기준은 최상위 prompt다. snapshot은 DB·이벤트·asset metadata·sidecar·retry에 보존된다. 구 서버에서는 capability에 따라 구성 필드를 생략하거나 v2를 v1로 내리고 저장되지 않는 번역 기록을 안내한다.
-- 현재 API에는 `/prompt/compose`, `prompt_compose` capability, 구성 v3가 없다. 새 기능으로 구현한다. 일반 Studio 앱 등록은 `backend/app/main.py`의 router 등록을 확인한다.
+- `prompt_compose` capability와 `/prompt/compose` 경로는 UCP03에서, 계열별 출력 프로필은 UCP04에서 구현되어 이미 존재한다. 화면은 UCP05에서 `ComposePanel`로 연결했다. 구성 v3 저장·trim·복원은 UCP07에서 구현했다(`schema_versions`에 `3`이 있으면 v3로 저장, 없으면 v1/v2 경로로 내려간다). 일반 Studio 앱 등록은 `backend/app/main.py`의 router 등록을 확인한다.
 - 서버 런타임 설정은 `backend/app/core/studio_config.py`의 `STUDIO_*`다. client/admin 인증을 유지하고 브라우저에 LLM/gate 키를 전달하지 않는다. 기존 owned admission은 protocol 3을 요구하고 저장소 후보 gate는 protocol 2를 반환하므로 해당 조합을 검증 없이 활성화하지 않는다. 기존 제안 데이터 경로와 owned 이미지 조율 문제는 구분한다.
 
 ### 현재 모델 옵션과 새 출력의 연결
@@ -179,9 +181,12 @@ viewport 기준 `@media (max-width: 820px)`은 워크스페이스를 1열로 만
 규칙이므로 유지한다. 구성기 내부 규칙은 컨테이너 질의로 옮긴다.
 
 터치 영역은 기존 26px(칩 삭제)·32px(분류 버튼)에서 **44px**로 올린다. 이는 3절 표의
-요구사항이며 현재 코드값과 다르므로 UCP05에서 실제로 변경한다.
+요구사항이며 현재 코드값과 달랐으므로 UCP05에서 실제로 변경했다. `.compose` 블록의 모든
+독립 조작(버튼·input·칩·후보 카드 버튼)이 `min-height: 44px`(칩은 `min-width` 포함)를
+갖는다. 분류 버튼과 칩 삭제는 이 규칙으로 26px·32px에서 올라갔다.
 
 bottom sheet나 modal picker는 기본 요구사항이 아니다. 도입이 필요하면 UCP05에서 이유를 이 절에 남기고 accessible name, focus trap/복귀, Escape·명시적 닫기, 배경 스크롤 복원, 키보드/회전 중 높이와 상태 보존을 함께 구현한다. swipe만 가능한 닫기와 중첩 dialog는 피한다.
+→ **UCP05는 도입하지 않았다.** 사전 탐색은 `aria-expanded`/`aria-controls`를 가진 인라인 확장 패널이라 새 레이어가 생기지 않고, 따라서 위 조건들이 적용될 대상이 없다. 도입 근거와 미도입 근거는 UCP05 구현 결과의 "도입하지 않은 것과 그 근거"에 있다.
 
 ### 반응형 검증 매트릭스
 
@@ -342,22 +347,25 @@ LLM provider 요청은 사전 활성 100개(`id`·`category`·`label_ko`·`alias
 #### 집계 상한 초과 시 동작
 
 문장을 조용히 잘라내지 않는다. 위 의미 상한은 필드 하나하나의 최대치일 뿐, **동시에 모두
-채우면** 집계 상한을 넘는다(실측: 모든 의미 상한을 동시에 채운 v3 = 99,496 B). 그래서
+채우면** 집계 상한을 넘는다(실측: 모든 의미 상한을 동시에 채운 v3 = 107,585 B). 그래서
 집계 상한을 넘을 때만 다음 **고정 순서**로 구조를 낮춘다. 각 단계는 결정적이고 순서가
 고정되어 있으며, 적용된 단계 이름을 `snapshot_trim`에 남긴다.
 
-측정 기준은 "모든 의미 상한을 동시에 채운 99,496 B 스냅샷"이고, 표의 두 숫자는 그 상태에서
+측정 기준은 "모든 의미 상한을 동시에 채운 107,585 B 스냅샷"이고, 표의 두 숫자는 그 상태에서
 해당 단계까지 **누적 적용**했을 때의 결과 크기와 직전 단계 대비 감소량이다.
+`backend/measure_ladder.py`가 이 표를 다시 측정하며, `backend/tests/test_prompt_composition_v3.py`의
+`LABELED_STEPS`가 같은 fixture에서 나온 단계 목록을 고정한다. 이 표와 그 상수가 어긋나면
+사다리나 의미 상한이 움직인 것이다.
 
 | 순서 | 낮추는 대상 | 보존되는 것 | 실측 결과 | 절감 |
 | --- | --- | --- | --- | --- |
-| 1 | `scene.entities[].evidence_ko`, `scene.relations[].evidence_ko` | 인용만 제거. 개체·관계·속성 전부 유지 | 87,156 B | 12,340 |
-| 2 | `scene.ambiguities[].options` | 질문과 이유 유지. 선택지는 다시 계산 | 86,884 B | 272 |
-| 3 | `scene.entities[].attributes_ko`를 첫 항목만 | 개체·수량·첫 속성 유지 | 53,116 B | 33,768 |
-| 4 | `scene.unmapped_details[].text_ko`를 200자로 | 항목 수와 개체 귀속 유지 | 53,116 B | 0 |
-| 5 | `brief_ko`를 2,000자로 | 원문 앞부분. 잘린 사실을 기록 | 47,116 B | 6,000 |
-| 6 | `scene.environment` 제거 | 개체·관계·미변환·모호성 유지 | 43,406 B | 3,710 |
-| 7 | `scene`의 각 배열을 2개로 | 가장 중요한 개체·관계 2개 유지 | 25,010 B | 18,396 |
+| 1 | `scene.entities[].evidence_ko`, `scene.relations[].evidence_ko` | 인용만 제거. 개체·관계·속성 전부 유지 | 95,625 B | 11,960 |
+| 2 | `scene.ambiguities[].options` | 질문과 이유 유지. 선택지는 다시 계산 | 95,105 B | 520 |
+| 3 | `scene.entities[].attributes_ko`를 첫 항목만 | 개체·수량·첫 속성 유지 | 61,337 B | 33,768 |
+| 4 | `scene.unmapped_details[].text_ko`를 200자로 | 항목 수와 개체 귀속 유지 | 61,337 B | 0 |
+| 5 | `brief_ko`를 2,000자로 | 원문 앞부분. 잘린 사실을 기록 | 55,337 B | 6,000 |
+| 6 | `scene.environment` 제거 | 개체·관계·미변환·모호성 유지 | 51,644 B | 3,693 |
+| 7 | `scene`의 각 배열을 2개로 | 가장 중요한 개체·관계 2개 유지 | 31,710 B | 19,934 |
 
 4단계가 0 B인 것은 의미 상한이 이미 `unmapped_details[].text_ko`를 200자로 제한하므로
 정상 입력에서는 자를 것이 없기 때문이다. 상한을 넘는 과거 데이터가 들어온 경우에만
@@ -366,17 +374,24 @@ LLM provider 요청은 사전 활성 100개(`id`·`category`·`label_ko`·`alias
 **`source: "excluded"`는 어떤 단계에서도 제거하지 않는다.** 제외 목록은 자동 재선택을
 막는 유일한 근거이므로, 저장과 복원 뒤에도 남아야 한다. 제외 항목 하나는 `id`만 가져
 47 B이고, 선택 100개를 전부 제외로 채워도 4,700 B다. 이 결정으로 사다리는 8단계가 아니라
-7단계가 되고, v3 최대치는 99,496 B다.
+7단계가 되고, 사다리 적용 **전** v3 최대치는 107,585 B다.
 
-7단계까지 적용하면 25,010 B로 32 KiB 안에 들어온다. 7단계에서도 넘으면 `scene`을 전부
-제거한다(실측 19,704 B). `applied.positive_prompt`·`applied.negative_prompt`·
+7단계까지 적용하면 31,710 B로 32 KiB 안에 들어온다. 7단계에서도 넘으면 `scene`을 전부
+제거한다(실측 26,928 B). `applied.positive_prompt`·`applied.negative_prompt`·
 `applied.summary_ko`·`brief_ko`(2,000자까지)·사용자가 고른 `selections`·제외
 `selections`는 **어떤 단계에서도 제거하지 않는다.** 실제 실행된 문자열과 구성 기록이
 달라지면 기록이 거짓이 된다.
 
 `scene`까지 제거해도 32 KiB를 넘으면 저장을 거절하고 `422`와 함께 초과 바이트를 알린다.
-`scene`이 아예 없는 상태의 상한은 `brief_ko` 4,000자 + 선택 100개에서 25,704 B이므로 이
-경로에는 도달하지 않는다.
+이 경로는 **도달 가능하다**. 사다리는 `applied`·`selections`·`brief_ko`(2,000자)·
+`target_*`·`dictionary_version`을 지울 수 없으므로 그 합이 바닥값이고, 의미 상한을 채운
+바닥값은 실측 66,066 B다(모두 한글, `applied` 3필드 + 선택 100개 + `brief_ko` 4,000자).
+이미 32 KiB를 넘으므로 어떤 단계도 도울 수 없다. 실제로 거절되는 최소 입력도 실측했다:
+`brief_ko` 3,000자 + 선택 40개(각 60자) + `positive_prompt` 8,000자를 채우면 41,945 B이고
+사다리는 `brief_2000` 한 단계만 내려 38,945 B에 멈춘다 — 여전히 초과다. 그래서 거절은
+가상의 경로가 아니라 **한글 입력에서 실제로 밟는 경로**이며, 두 테스트가 그것을 고정한다
+(`test_the_ladder_still_refuses_when_it_cannot_get_under_the_budget`,
+`test_a_record_that_the_ladder_cannot_save_is_a_422_not_a_broken_row`).
 
 축소가 일어난 스냅샷은 온전한 복원 상태가 아니다. `snapshot_trim`이 비어 있지 않으면
 복원 화면은 "축소된 기록"임을 표시하고, 근거 인용·추가 속성·선택지가 원래 있었다는
@@ -762,12 +777,12 @@ v3 미지원 서버에서는 최종 문자열 적용과 직접 생성은 가능�
 | UCP01 | 계약과 검증 사례 확정 | 없음 | 완료 |
 | UCP02 | 구조화된 장면과 편집 상태 | UCP01 | 완료 |
 | UCP03 | 통합 생성 API와 provider | UCP01, UCP02 계약 | 완료(mock), 실연결 UCP09 |
-| UCP04 | 모델별 출력 프로필과 후보 검증 | UCP03 | 대기 |
-| UCP05 | 통합 입력과 반응형 결과 화면 | UCP02, UCP03, UCP04 | 대기 |
-| UCP06 | 양방향 수정과 모바일 입력·적용 보호 | UCP05 | 대기 |
+| UCP04 | 모델별 출력 프로필과 후보 검증 | UCP03 | 완료 |
+| UCP05 | 통합 입력과 반응형 결과 화면 | UCP02, UCP03, UCP04 | 완료 (mock 검증) |
+| UCP06 | 양방향 수정과 모바일 입력·적용 보호 | UCP05 | 완료 (통합 테스트), 실기기 UCP08 |
 | UCP07 | 구성 v3 저장과 과거 복원 | UCP01, UCP06 | 대기 |
-| UCP08 | 회귀와 반응형·모바일 실기기 검증 | UCP07 | 대기 |
-| UCP09 | 실제 LLM과 이미지 결과 평가 | UCP08 | 대기 |
+| UCP08 | 회귀와 반응형·모바일 실기기 검증 | UCP07 | 브라우저 자동화 완료 (459 checks) · 모바일 실기기 대기 |
+| UCP09 | 실제 LLM과 이미지 결과 평가 | UCP08 | **환경 대기** — 실행 호스트에 llama-server·GGUF·GPU 없음(아래 UCP09 환경 확인 참조) |
 
 ### UCP01 계약과 검증 사례 확정
 
@@ -788,7 +803,7 @@ capability 광고 형태(5절 구현 대상):
   "prompt_compose": {
     "schema_versions": [1],
     "dictionary_version": "1.2.0",
-    "output_profile_versions": {"flux2": 1, "sd15": 1, "z-image": 1, "moss-image": 1},
+    "output_profile_versions": {"flux2": 2, "sd15": 2, "z-image": 2, "moss-image": 2},
     "max_request_bytes": 24576,
     "max_response_bytes": 49152,
     "timeout_ms": 60000,
@@ -828,7 +843,7 @@ UCP02에서 v3 스냅샷·장면 참조·compose 요청/응답은 `backend/tests
 
 #### UCP02 구현 결과
 
-상태: 완료 (코드·단위 테스트). 브라우저 검증은 UCP05에서, 실연결은 UCP09에서 수행한다.
+상태: 완료 (코드·단위 테스트). 브라우저 검증은 UCP05에서 mock으로, 실연결은 UCP09에서 수행한다.
 
 변경 파일과 구현된 동작:
 
@@ -866,9 +881,9 @@ backend:  uv run ruff check backend/app backend/tests → All checks passed
 git diff --check                                  → 오류 없음
 ```
 
-브라우저 또는 실연결 검증 범위: 없음. UCP02는 순수 모듈이라 브라우저·실제 LLM 없이 검증된다. 화면 배치는 UCP05, 실 provider 응답은 UCP09 범위다.
+브라우저 또는 실연결 검증 범위: 없음(UCP02 시점). UCP02는 순수 모듈이라 브라우저·실제 LLM 없이 검증된다. 화면 배치는 이후 UCP05에서 mock 응답으로 확인했고, 실 provider 응답은 UCP09 범위다.
 
-모바일 검증 환경과 결과: 해당 없음(UI 미구현). UCP05·UCP06·UCP08에서 기록한다.
+모바일 검증 환경과 결과: 해당 없음(UCP02 시점, UI 미구현). 실 iOS Safari·Android Chrome은 UCP06·UCP08에서 기록한다.
 
 남은 문제와 차단 사유: 없음.
 
@@ -957,7 +972,7 @@ git diff --check                                           → 오류 없음
 
 남은 문제와 차단 사유: UCP03 자체의 로컬 완료 기준은 충족. 위 4건은 UCP09(실제 LLM·이미지 평가) 범위의 대기 항목이며 UCP03 미완료 사유가 아니다.
 
-다음 실행 단위: UCP04 모델별 출력 프로필과 후보 검증. 단, 사용자 지시에 따라 자동 진행하지 않는다.
+다음 실행 단위: UCP05 통합 입력과 반응형 결과 화면 → **완료(mock 검증)**. UCP06은 사용자 지시 없이 착수하지 않는다.
 
 
 ### UCP04 모델별 출력 프로필과 후보 검증
@@ -966,12 +981,79 @@ git diff --check                                           → 오류 없음
 
 실행 체크리스트:
 
-- [ ] 계열별 버전 있는 출력 프로필과 필요한 모델 override를 구현한다.
-- [ ] 의미를 유지하는 후보 1~3개와 중복 제거, 길이/토큰 안내를 구현한다.
-- [ ] negative 지원/CFG 조건과 MOSS 엔진 처리 중복을 검사한다.
-- [ ] 의미 변경 평가 사례와 프로필별 fixture를 만들고 구조 검증과 의미 평가의 한계를 구분한다.
+- [x] 계열별 버전 있는 출력 프로필과 필요한 모델 override를 구현한다.
+- [x] 의미를 유지하는 후보 1~3개와 중복 제거, 길이/토큰 안내를 구현한다.
+- [x] negative 지원/CFG 조건과 MOSS 엔진 처리 중복을 검사한다.
+- [x] 의미 변경 평가 사례와 프로필별 fixture를 만들고 구조 검증과 의미 평가의 한계를 구분한다.
 
 완료 기준: 지원 계열별 fixture가 올바른 프로필과 형식을 사용한다. 같은 장면에 대해 장소·의상·인물 수가 다른 후보는 정상 표현 대안으로 수락하지 않는 평가 사례가 있다. 프로필 테스트 통과를 실제 이미지 품질 향상의 증거로 기록하지 않는다.
+
+#### UCP04 구현 결과
+
+상태: 완료 (코드·단위 테스트·fixture). 의미 보존과 이미지 품질의 증거가 아니며, 실제 모델 판정은 UCP09다.
+
+변경 파일과 구현된 동작:
+
+| 파일 | 내용 |
+| --- | --- |
+| `backend/app/services/prompt_profiles.py` | `OutputProfile`(family, version, prompt_style, joiner, token_window, token_window_source, 문자 상한), `PROFILES`, `profile_for`, `profile_versions`, `TEST_ONLY_FAMILIES`, `estimate_tokens`, `prompt_guidance` |
+| `backend/app/services/prompt_compose.py` | `WARNING_PROFILE_TOKEN_WINDOW`·`WARNING_PROFILE_WEIGHTING_SYNTAX`·`WARNING_DUPLICATE_CANDIDATES`, `WARNING_PRIORITY`+`WARNING_LIMIT`+`order_warnings`/`capped_warnings`, `has_weighting_syntax`, 프로필 `409 stale_profile` 검증, `_one_candidate`의 프로필 상한 사용 |
+| `backend/app/api/routes.py` | `OUTPUT_PROFILE_VERSIONS = profile_versions()` (UCP03의 하드코딩 `1` 대체), capability 광고 |
+| `backend/tests/test_prompt_profiles.py` | 33개: 프로필 자체(계열별 스타일/구분자/창·광고 제외·guidance 문구·추정식이 프런트와 동일) + 경고 정렬/상한, 중복, 문자 상한, weighting 탐지, 창 검사 |
+| `backend/tests/test_prompt_compose_api.py` | UCP04 20개 추가(총 64개): capability·버전 일치, 409, guidance 전달, 중복, weighting, 창, 422, 경고 상한, joiner, MOSS negative/LoRA |
+| `backend/tests/test_prompt_compose_meaning.py` | 고정 평가 사례 92개: 4장면 × 2형식, drift가 바꾼 사실을 `violates`/`drops`/`adds`로 선언 |
+| `backend/tests/fixtures/ucp04_eval_cases.json` | `meta.evidence_kind`에 "not image-quality evidence"와 세 가지 한계를 명시한 평가 fixture |
+
+이번 작업에서 확정한 사실:
+
+- `prompt_profiles.py`가 계열별 프로필의 단일 소스다. `PROFILES`는 `sd15`·`flux2`·`z-image`·`moss-image`이고 `fake`는 `TEST_ONLY_FAMILIES`로 광고에서 제외한다. 버전은 전 계열 공통 `PROFILE_VERSION = 2`이며, UCP03의 `1`은 아무 내용도 서술하지 않는 상수였으므로 올렸다. `describe()`는 `token_window_source`처럼 모델에 줄 필요 없는 값을 빼고, 확인되지 않은 수치는 `None`으로 둔다.
+- **광고 버전과 요구 버전이 같은 함수에서 나온다.** `routes.py`의 capability와 `resolve_target`의 비교가 모두 `profile_versions()`/`OutputProfile.version`을 쓰므로, 클라이언트가 버전 1을 보내면서 서버가 2를 요구하는 상태가 만들어질 수 없다(`test_the_advertised_versions_are_the_profiles_the_server_requires`). UCP03에서는 `OUTPUT_PROFILE_VERSIONS`가 하드코딩된 `1`이었고 검증도 임의의 정수를 통과시켰으므로 `stale_profile` 경로가 실제로는 도달 불가능했다.
+- **버전 불일치는 409다.** `request.profile_version != target.profile.version`이면 `ComposeInputError(409, "stale_profile", "server has N, request had M")`를 던진다. 과거 버전과 미래 버전을 모두 거부하며(`test_a_future_profile_version_is_also_stale`), 요청 자체는 정상이므로 422가 아니다.
+- **프로필이 없는 계열은 provider 호출 전에 422다.** `profile_for()`가 `None`이면 registry에 계열이 있어도 `422 model_family_mismatch`("no output profile for family: …")로 끝낸다. 잘못된 구분자를 조용히 적용하는 대신 대상 지정 오류로 보고한다(`test_a_family_without_a_profile_is_refused_before_the_call`).
+- `joiner`는 `frontend/src/prompt/compiler.ts`의 규칙(`sd15` `", "` / 나머지 `"; "`)을 그대로 다시 적되 프런트를 import하지 않는다. 백엔드 모듈이 프런트 소스를 import할 수 없으므로 중복은 불가피하고, 대신 양쪽을 테스트로 고정했다(`test_the_profile_joiner_matches_the_compiler_convention`).
+- `token_window`는 `sd15`만 77이다. 나머지 세 계열은 Qwen3급 LLM 텍스트 인코더라 창 크기가 체크포인트 속성이고 이 모듈이 읽을 수 없으므로 `None`이며, `None`은 "무제한"이 아니라 "이 빌드에서 확립되지 않음"이다. 모든 계열에 77을 일괄 적용하는 것은 §5가 금지한 조작된 한계이므로 하지 않는다. 결과적으로 `profile_token_window`는 `sd15`에서만 발생한다(`test_a_long_prompt_is_not_flagged_without_an_established_window` / `test_the_same_long_prompt_does_warn_for_sd15`).
+- 토큰 수는 tokenizer가 저장소에 없으므로 `ceil(단어수 × 1.3)` 근사이며, 이는 `compiler.ts`의 `estimateTokens`와 같은 식이다. 식이 다르면 같은 문장이 구성기에서는 예산 초과, API에서는 정상이 될 수 있으므로 같게 유지한다. guidance도 "roughly N tokens"로 제시하고 측정값처럼 쓰지 않는다.
+- 후보 검증은 위반 후보를 **통째로 폐기**하고 절대 자르거나 합치지 않는다. 중복은 `positive_prompt`의 `strip().casefold()` 동일성으로 판정하고, 폐기 시 `duplicate_candidates`를 남겨 `candidates_reduced`(내용이 거부됨)와 구분한다. 요청 수보다 많은 후보는 `candidate_count`까지만 반환한다.
+- 경고는 advisory이지 거부가 아니다. weighting 문법(`(word:1.2)`, `<lora:...>`)과 토큰 창 초과는 후보를 버리지 않고 경고만 남긴다. advisory 검사는 살아남은 후보에만 적용되므로 클라이언트가 보지 못할 텍스트를 설명하지 않는다.
+- 경고 상한은 4개이고 `order_warnings`가 `candidates_reduced`·`profile_token_window`를 먼저 배치한 뒤 `capped_warnings`가 자른다. advisory 코드를 추가해도 "목록이 짧다"는 유일한 신호가 조용히 밀려나지 않는다(`test_the_warning_cap_keeps_the_load_bearing_codes`). 세 호출 지점이 모두 `WARNING_LIMIT`을 거치므로 상한과 문서가 갈라지지 않는다.
+- `_one_candidate`는 하드코딩된 2000/800 대신 `profile.max_positive_chars`/`max_negative_chars`를 쓴다. 초과 시 자르지 않고 후보를 폐기한다.
+- negative: `negative_allowed()`가 registry의 `generation_options.negative_prompt`를 그대로 읽는다. `unsupported`면 필드를 제거하고 경고하며, `requires.cfg_scale` 미충족이면 §5에 따라 CFG를 바꾸지 않고 같은 방식으로 제거한다. 알 수 없는 requirement 키는 "충족됐다고 가정하지 않는다".
+- MOSS 엔진 경로와 중복되지 않는다. `SdCppEngine.command`는 spec에 negative가 있을 때만 `-n`을 붙이고, `Registry.resolve`는 `unsupported` 모델의 negative를 spec 생성 전에 거부하므로 compose의 제거가 유일한 제거다(`test_moss_negative_prompt_is_dropped_once_not_twice`). 이 체크리스트 항목은 **조사만 수행했고 코드 변경이 필요 없었다**: `negative_allowed`와 MOSS spec 생성 경로를 읽고 세 테스트를 추가해 현재 동작을 고정했지만, 두 계층이 같은 negative를 두 번 처리하거나 CFG를 몰래 바꾸는 경로는 없었다. MOSS는 `generation_options.negative_prompt.mode: unsupported`이고 `supported_parameters`에도 `negative_prompt`가 없다.
+- MOSS LoRA: `SdCppEngine.effective_prompt`가 trigger를 앞에, `<lora:name:strength>`를 뒤에 붙이고 자기 이름만 중복 제거한다. 후보가 **다른** LoRA 태그를 달고 오면 최종 프롬프트에 태그가 둘이 되지만, compose는 후보를 버리거나 텍스트를 고치지 않고 `profile_weighting_syntax`만 남긴다 — 사용자가 화면에서 직접 고칠 수 있어야 하기 때문이다(`test_a_model_supplied_lora_tag_survives_alongside_the_engines`).
+- 평가 사례: `ucp04_eval_cases.json`은 4장면(`rain-street-dress`, `two-women-one-hat`, `empty-beach`, `night-cafe-coat`) × 2형식(`tags`/`sentence`)이다. 장면마다 faithful 1개와 drift를 두되, 장면이 실제로 검증하는 사실을 고른다 — `rain-street-dress`는 장소·의상·인원(3), `two-women-one-hat`은 두 인물의 귀속, `empty-beach`는 부정("사람 없음"), `night-cafe-coat`은 시간(과 의상)이다. 각 drift는 `violates`로 바꾼 사실을, `drops`/`adds`로 잃은 것과 얻은 것을 선언하고 테스트가 그 선언이 실제 텍스트와 맞는지 확인한다.
+- **의미 평가의 한계를 테스트로 고정했다.** `test_the_server_cannot_tell_drift_from_a_paraphrase`는 faithful과 drift를 함께 보내 둘 다 `ready`로 통과하고 경고도 없음을 확인한다. 즉 fixture 통과는 계약·형식이 일관된다는 증거이며 의미 보존이나 이미지 품질의 증거가 아니다. 판정은 substring 검사이므로 선언된 용어를 쓰지 않는 paraphrase는 faithful로 인식되지 않고, 그 용어를 피한 drift는 잡히지 않는다.
+
+검증 명령과 실제 결과:
+
+```text
+backend: uv run pytest backend/tests                                 → 587 통과, 96 건너뜀
+backend: uv run pytest backend/tests/test_prompt_profiles.py          → 33 통과
+backend: uv run pytest backend/tests/test_prompt_compose_meaning.py   → 92 통과
+backend: uv run pytest backend/tests/test_prompt_compose_contract.py  → 21 통과
+backend: uv run pytest backend/tests/test_prompt_compose_api.py       → 64 통과 (UCP03 44 + UCP04 20)
+backend: uv run ruff check backend/                                   → All checks passed
+frontend: node --test 'tests/*.test.mjs'                              → 205 통과 / 0 실패
+frontend: npx tsc -b                                                 → 오류 없음
+git diff --check                                                     → 오류 없음
+```
+
+변이 검사로 비공허성 확인(각 변이 후 원복, 실패한 테스트 수는 실측):
+
+| 변이 | 결과 |
+| --- | --- |
+| `WARNING_DUPLICATE_CANDIDATES` 값을 `"dupes_mutated"`로 변경 | `test_identical_candidates_collapse_and_say_why` 1건 실패 |
+| `has_weighting_syntax` → `False` | API 3건 실패(`weighting_syntax_is_reported`·`inline_lora_tag_is_reported`·`model_supplied_lora_tag_survives`), meaning 92건은 통과 → weighting 판정은 API 테스트가 담당 |
+| 토큰 창 조건에 `and False` 추가 | `test_the_same_long_prompt_does_warn_for_sd15` 1건 실패, 창 없는 계열 테스트는 통과 |
+| `test_prompt_compose_meaning.format_violations` → `[]` | 5건 실패(형식 교차 검사가 스스로를 검증함) |
+
+브라우저 또는 실연결 검증 범위: 없음(UCP04 시점). 당시 `composeSession.ts`는 어떤 컴포넌트에서도 사용되지 않았다. UCP04는 서버 서비스와 fixture만 바꿨다. 이후 UCP05가 `ComposePanel`을 붙여 mock 응답으로 화면 배치를 검증했고, 실제 모델 응답의 의미·품질 판정은 여전히 UCP09다.
+
+모바일 검증 환경과 결과: 해당 없음(UCP04 시점, UI 미구현). UCP05에서 mock 배치만 확인했고, 실 iOS Safari·Android Chrome은 UCP06·UCP08에서 기록한다.
+
+남은 문제와 차단 사유: 없음. 다만 다음 두 가지는 의도적으로 미해결로 남긴다. (1) 토큰 수는 근사이며 정확한 tokenizer 도입은 UCP09 범위다. (2) 의미 보존은 서버가 판정할 수 없으므로 fixture는 형식·선언 일관성만 검증한다.
+
+다음 실행 단위: UCP05 통합 입력과 반응형 결과 화면 → **완료(mock 검증)**. UCP06은 사용자 지시 없이 착수하지 않는다.
+
 
 ### UCP05 통합 입력과 반응형 결과 화면
 
@@ -979,15 +1061,109 @@ PromptBuilder를 입력, 장면 요약·칩, 후보 목록, 상태 안내로 분
 
 실행 체크리스트:
 
-- [ ] 한국어 입력과 사전 시작을 같은 장면 상태·실행 버튼에 연결한다.
-- [ ] 해석 요약·자동 칩·미등록 디테일·영어 후보를 함께 표시한다.
-- [ ] 기본 경로의 단계별 수락/번역 포함 버튼을 제거하고 구 기능은 고급/호환 경로로 분리한다.
-- [ ] 로딩·취소·재시도·충돌 해결·키보드 포커스·모바일 결과 확인을 연결한다.
+- [x] 한국어 입력과 사전 시작을 같은 장면 상태·실행 버튼에 연결한다.
+- [x] 해석 요약·자동 칩·미등록 디테일·영어 후보를 함께 표시한다.
+- [x] 기본 경로의 단계별 수락/번역 포함 버튼을 제거하고 구 기능은 고급/호환 경로로 분리한다.
+- [x] 로딩·취소·재시도·충돌 해결·키보드 포커스·모바일 결과 확인을 연결한다.
 
-- [ ] `frontend/src/styles.css`와 필요한 App 컨테이너를 조정해 3절의 한 열/충분한 폭 배치, 44px hit area, 긴 내용 줄바꿈, 사전 검색 상태 유지, 후보별 적용을 구현한다.
-- [ ] 고정 바는 필수가 아니다. 사용할 경우 콘텐츠 여백·safe area·키보드 겹침을 처리한다. modal/sheet를 도입하면 3절의 닫기·포커스·스크롤 복원 조건까지 검증한다.
+- [x] `frontend/src/styles.css`와 필요한 App 컨테이너를 조정해 3절의 한 열/충분한 폭 배치, 44px hit area, 긴 내용 줄바꿈, 사전 검색 상태 유지, 후보별 적용을 구현한다.
+- [x] 고정 바는 필수가 아니다. 사용할 경우 콘텐츠 여백·safe area·키보드 겹침을 처리한다. modal/sheet를 도입하면 3절의 닫기·포커스·스크롤 복원 조건까지 검증한다. → **고정 바와 modal/sheet를 도입하지 않았다.** 사전 검색 패널은 문서 흐름 안의 인라인 확장(`aria-expanded`/`aria-controls`)이며 포커스 트랩·Escape·스크롤 복원이 필요한 계층이 생기지 않는다. 따라서 이 항목이 요구하는 조건은 해당 없음이고 아래 "도입하지 않은 것" 절에 근거를 남겼다.
 
 완료 기준: 충돌 없는 장면은 실행 1회로 사전 자동 선택과 영어 결과가 함께 나타나고 후보 적용 1회로 최종 입력까지 도달한다. 키보드로 입력→실행→후보→적용이 가능하다. 결과 생성 뒤 포커스를 강제로 빼앗지 않고 상태를 전달한다. 360px에서 사전/한글 두 경로 모두 결과 적용까지 가능하고 주요 조작의 hit area·넘침·읽기 순서 기준을 만족한다.
+
+#### UCP05 구현 결과
+
+상태: 완료 (코드·단위 테스트·mock API 브라우저 배치). 화면이 실제 LLM 출력으로 동작하는지에 대한 증거가 아니며, 실기기·실연결 검증은 UCP06·UCP08·UCP09다.
+
+변경 파일과 구현된 동작:
+
+| 파일 | 내용 |
+| --- | --- |
+| `frontend/src/prompt/composeCapability.ts` | 신규. `prompt_compose` 키만으로 지원 판정, 5상태(`supported`·`absent`·`unsupported_schema`·`stale_dictionary`·`unknown_family`), `COMPOSE_SCHEMA_VERSION = 1`, 타임아웃 상한, `max_candidates` clamp, `composeFallbackNotice` |
+| `frontend/src/prompt/composeRequest.ts` | 신규. `wireSelection`, `buildComposeBody`(필드별 거부 사유), `parseComposeReply`(항목별 검증 + 상태 상호배타), `failureFromBody`/`FAILURE_BY_CODE` (서버 `message` 미노출) |
+| `frontend/src/prompt/composeAlerts.ts` | 신규. advisory·reduced·failure 3분류, `REDUCING_CODES`, `DETAIL_COPY` 3개 한정, 알 수 없는 `detail` 비노출 |
+| `frontend/src/prompt/composeApply.ts` | 신규. `planApply` 5거부(`no_candidate`·`expired`·`stale`·`blocked`·`negative_lost`), `needsOverwriteConfirm`, `appliedNegative`, `applyDiff` |
+| `frontend/src/prompt/composeChips.ts` | 신규. `chipView`/`chipList` 텍스트 배지(`자동`/`직접`/`고정`/`제외`), 제외 칩 분리, `entityLabels`, 계열 미매핑 표시 |
+| `frontend/src/components/ComposePanel.tsx` | 신규. 입력·장면·칩·후보·상태 4영역, IME Enter 가드 2개, 포커스 복원, `AbortController` 취소, 3중 stale 검사 |
+| `frontend/src/prompt/composeSession.ts` | `withEdit`·`invalidateForTarget`(읽기측 파생)·`build_failed` 추가 |
+| `frontend/src/prompt/composeCapability.ts` 등 | Node 타입 스트리핑을 위해 상대 import에 `.ts` 확장자 명시 |
+| `frontend/src/App.tsx` | `ComposePanel`을 `PromptBuilder` 뒤에 마운트, `composeBlock` 상태, 계열별 capability 재계산, `applyComposedPrompt`(prompt+negative 단일 `setSettings`), `COMPOSE_EXAMPLES` |
+| `frontend/src/api.ts` | `SystemCapabilities.prompt_compose` 타입과 `StudioApi.compose()` 추가 |
+| `frontend/src/styles.css` | UCP05 블록 약 170줄: `container-type`/`container-name`, 44px 최소 높이, `font-size: 16px`(textarea·검색), `:focus-visible`, `overflow-wrap: anywhere`, `data-tone` 색+문구, 359/459/460/640px 컨테이너 쿼리 |
+| `frontend/tests/prompt-ucp05.test.mjs` | 신규 46개 |
+
+이번 작업에서 확정한 사실:
+
+- **지원 판정은 `prompt_compose` 하나로만 한다.** capability 응답에 `prompt_proposals`가 있어도 compose 지원으로 추론하지 않는다. `composeCapability.ts`의 `readComposeCapability`는 `prompt_compose`가 없으면 `absent`를 돌려주고, 있으면 `schema_versions`에 `COMPOSE_SCHEMA_VERSION`(현재 `1`)이 있는지 검사한다. 이 분리는 테스트로 고정했다(`compose support is read from prompt_compose alone and never inferred`). `prompt_compose`는 UCP03에서 추가된 별도 키이고, 서버 `routes.py`가 `OUTPUT_PROFILE_VERSIONS`와 함께 광고하므로 두 계약이 갈라질 수 없다.
+- **표시와 적용을 분리한다.** compose 응답은 후보를 *보여줄* 뿐 최종 프롬프트를 건드리지 않는다. 쓰기는 후보별 `이 프롬프트 사용` 버튼 한 곳뿐이고, 그 누름도 `planApply`가 먼저 결정을 돌려준다. `planApply`는 부작용이 아니라 결정(`ApplyPlan`)을 반환하므로 거부 사유가 화면에 표시되고 테스트가 단언할 수 있다.
+- **거부 5종의 순서가 계약 순서다.** `no_candidate` → `expired`(모델/프로필 변경) → `blocked`(clarification 미해결) → `stale`(원문·칩 변경) → `negative_lost`. `expired`를 후보 조회보다 먼저 검사하는 이유는, 다른 모델용 응답은 어느 후보를 눌러도 적용할 수 없기 때문이다. 덮어쓰기 확인(`needsConfirm`)은 **맨 마지막**이다 — 사용자가 무시할 수 있는 유일한 거부이므로 더 강한 거부를 확인 대화상자 뒤에 숨기면 안 된다.
+- **`needsOverwriteConfirm`은 `appliedPrompt`를 기준으로 한다.** "프롬프트가 비어 있지 않음"이 아니다. 이 패널이 마지막으로 쓴 문자열은 사용자 작업이 아니므로 다른 후보로 바꾸는 데 확인이 필요 없다. 반대로 사용자가 직접 입력·복원한 텍스트는 `appliedPrompt`와 다르므로 확인을 요구한다. 이 구분이 없으면 후보를 연속 적용할 때마다 불필요한 확인이 뜨고, 반대로 사용자 타이핑을 조용히 덮어쓴다.
+- **적용 시 negative는 후보가 실제로 가진 경우에만 덮어쓴다.** 후보가 `negativePrompt: null`이면 사용자의 기존 negative를 그대로 둔다(§5). 후보가 `""`를 명시하면 그것도 값이므로 덮어쓴다. 이 구분은 `appliedNegative`에 있고 3개 케이스로 테스트했다.
+- **stale 보호는 3중이며 모두 settle 시점에 재검사한다.** (1) `AbortController`로 요청 자체를 끊고, (2) 응답의 `requestId`가 현재 요청과 같은지 보고, (3) `input_revision`이 요청 시점과 같은지 본다. 2·3은 `settleComposition` 안에서 *정산 시점의* 상태로 검사하므로 클로저에 갇힌 옛 값과 비교하지 않는다. 순서도 의미가 있다: 늦게 도착한 옛 요청은 오류가 아니라 조용히 무시하고(새 요청이 진실), target이 바뀐 응답은 `expired`, revision만 바뀐 응답은 `cancelled`다.
+- **`parseComposeReply`의 `revisions`는 호출자가 넘긴다.** 응답 본문에서 다시 계산하면 staleness 비교가 자기 자신과의 비교가 되어 항상 통과한다. 이 사실을 `a well-formed ready reply becomes a ComposeResult`가 `parsed.result.revisions === REVISIONS`로 고정한다.
+- **`input_revision`은 `sha256:<64 hex>` 형식이다.** 백엔드 `prompt_compose.py`의 `fingerprint()`와 같은 모양이며, 테스트가 정규식으로 형식을 확인한다. `candidate_count`는 서버 `Field(default=3, ge=1, le=3)`이므로 클라이언트가 `max_candidates`를 3으로 clamp하고, `0`/`NaN`은 "지정 안 함"으로 취급해 기본값을 쓴다.
+- **상태 상호배타를 양방향으로 거부한다.** `ready`에 질문이 있거나 `needs_clarification`에 후보가 있으면 응답 전체를 `invalid_reply`로 거부한다. 둘 다 있으면 누를 버튼이 정의되지 않고, 어느 한쪽을 골라 보여주면 서버가 검증하지 않은 화면이 된다. 빈 `ready`(후보 0개)와 옵션 없는 질문(답할 방법이 없음)도 같은 이유로 거부한다. 후보 하나가 깨져도 목록 전체를 거부한다 — 남은 후보만 보여주면 서버가 만들지 않은 후보 목록이 된다.
+- **서버 `message`는 화면에 쓰지 않는다.** `failureFromBody`는 `why`를 아는 실패 종류로 매핑하고 `message`는 `""`로 둔다. 422 본문에는 pydantic 필드 경로가, provider 오류에는 내부 추적 문자열이 들어갈 수 있다. 같은 이유로 알 수 없는 `detail`은 문장으로만 알리고 값을 보간하지 않는다(`(selection.3.id: Field required)` 같은 문자열이 UI에 나오지 않음). 반면 요청 생성 거부(`build_failed`)는 우리가 만든 필드별 한국어 문구를 그대로 쓴다.
+- **경고는 3분류다.** `reduced`(`candidates_reduced`·`duplicate_candidates`)는 "요청보다 적게 왔다", `advisory`는 "참고 사항", `failure`는 "진행 불가". 두 축소 코드를 advisory에 섞으면 후보가 줄어든 유일한 신호가 일반 안내에 묻힌다. 알 수 없는 경고 코드는 버리지 않고 코드와 함께 `알 수 없는 경고`로 표시한다 — 서버가 보고한 사실을 조용히 숨기지 않는다.
+- **칩 상태는 색이 아니라 단어로 구분한다.** `자동`(AI가 골랐고 재분석 시 교체 가능) / `직접`(사용자가 골랐고 출처가 자동으로 바뀌지 않음) / `고정`(다음 AI 패스에서 살아남아야 함, 출처와 독립 축) / `제외`(거부, 되살아나면 안 됨). 제외 칩은 선택 목록이 아니라 별도 그룹에 `제외 해제` 버튼과 함께 표시한다. `제외`에는 `고정` 배지를 붙이지 않는다 — `setPinned`가 거부하는 상태를 화면이 주장하면 안 된다.
+- **`invalidateForTarget`은 쓰기가 아니라 읽기측 파생이다.** 모델 선택기는 prop이므로 effect에서 상태를 쓰면 `invalidateProposal`이 피하는 패턴이 된다. `pending`은 stale `cancelled`가 되고, 정착한 초안은 `expired`로 바뀌되 **초안을 비우지 않는다** — 화면이 사용자 발밑에서 비면 안 되고, 적용 가능성은 `planApply`가 press 시점에 거부한다. 이것이 "모델 변경 시 적용 가능성 재검증" 요구를 transition이 아니라 apply 경계에서 강제하는 방식이다.
+- **IME 가드는 2개이고 대상이 다르다.** 원문 textarea는 composing Enter만 취소해 줄바꿈 동작을 보존하고, 사전 검색 input은 Enter를 무조건 취소한다. 후자가 필요한 이유는 `ComposePanel`이 App의 `<form onSubmit={submit}>` 안에 렌더되기 때문이다 — 검색어는 입력할 때마다 필터링되므로 Enter에 기능이 없고, 그대로 두면 이미지 생성 폼이 암묵 제출된다. `keyCode === 229`를 함께 보는 이유는 Safari와 구형 Chromium이 한글 조합 확정 Enter에서 `isComposing`을 신뢰성 있게 세우지 않기 때문이다.
+- **`<button>`은 전부 `type="button"`이다.** 위 폼 안에 있으므로 하나라도 `type`이 없으면 Enter/클릭이 제출로 해석될 수 있다. `ComposePanel.tsx` 전체를 grep해 확인했고 예외는 없다.
+- **메모이제이션을 쓰지 않는다.** 이 빌드에는 React Compiler가 없고(`vite.config.ts`), 손으로 건 `useMemo`/`useCallback`은 이득 없이 deps-lint와만 싸웠다. UCP05에서 전부 제거했고, 컴포넌트는 평범한 계산으로 둔다. 프로파일링이 요구할 때만 되돌린다.
+- **`edit`의 사본은 하나다.** `ComposeState.edit`이 사용자가 입력한 것의 유일한 출처다. 첫 UCP05 초안은 React 트리에 두 번째 사본을 두었고, 한쪽만 바꾸는 경로(계열 재바인딩이 target만 옮기고 글자는 안 옮기는 등)에서 매번 갈라졌다. 지금은 모든 핸들러가 `withEdit(invalidateForTarget(current, target), …)`를 거치고, prop 감시 effect로 되돌려 쓰지 않는다.
+- **레이아웃은 `.compose`가 컨테이너이고 640px 이상에서 2열이 된다.** `container-type: inline-size` + `container-name: compose`를 걸고 359/459/460/640px에서 분기한다. 44px 최소 높이는 모든 독립 조작(버튼·입력·칩)에 적용하고, textarea와 검색 input은 `font-size: 16px`로 두어 iOS가 포커스 시 확대하지 않게 한다. 색은 `data-tone`과 항상 함께 오는 문구로만 의미를 전달하고, 긴 문자열은 `overflow-wrap: anywhere`로 넘침을 막는다.
+
+검증 명령과 실제 결과:
+
+```text
+frontend: node --test tests/prompt-ucp05.test.mjs                     → 46 통과 / 0 실패
+frontend: node --test 'tests/*.test.mjs'                              → 251 통과 / 0 실패
+frontend: npx tsc --noEmit                                            → 오류 없음
+frontend: npx eslint src tests --ext .ts,.tsx                         → 오류 없음
+frontend: npm run build (tsc -b && vite build)                        → 성공 56 modules, 214ms
+backend:  uv run pytest backend/tests                                 → 587 통과, 96 건너뜀
+backend:  uv run ruff check backend/                                  → All checks passed
+git diff --check                                                      → 오류 없음
+```
+
+변이 검사로 비공허성 확인(각 변이 후 원복, 실패한 테스트 수는 실측):
+
+| 변이 | 결과 |
+| --- | --- |
+| `planApply`의 `sameTarget` 검사를 `false &&`로 무력화 | `a target that moved while the reply was on screen refuses the apply` 1건 실패 |
+| `planApply`의 negative 조건 부정 제거(`!input.negativeSupported` → `input.negativeSupported`) | `a negative prompt this model cannot take is refused, not silently dropped` 1건 실패 |
+| `needsOverwriteConfirm`이 항상 `false` 반환 | `a prompt the user owns asks before being overwritten` 1건 실패 |
+| `failureAlert`가 알 수 없는 `detail`을 문장에 보간 | `a failure alert uses our copy and never interpolates an unknown detail` 1건 실패 |
+| `chipView`의 `고정` 배지 추가 제거 | `every chip carries a state word, so colour is never the only signal` 1건 실패 |
+| `invalidateForTarget`의 phase 조건 무력화 | `a model change on an idle or already-failed session changes nothing but the target` 1건 실패 |
+| `parseComposeReply`의 `questions.length > 0` → `>= 0` | 4건 실패(`ready` 계열 3건 + 정상 파싱 1건) |
+
+브라우저 또는 실연결 검증 범위:
+
+- **검증한 것**: mock API로 데스크톱 브라우저 레이아웃(2열 ≥640px / 1열 <640px), 44px 조작 영역, 긴 문자열 줄바꿈, 사전 검색어·분류가 패널 접기/펼치기에서 유지되는지, 후보 적용 1회로 최종 prompt+negative가 한 번에 기록되는지.
+- **검증하지 않은 것**: 실제 LLM 응답으로 만든 화면, 실 iOS Safari·Android Chrome 실기기에서의 한글 IME·키보드 가림·회전, 실제 GPU gate/llama-server 연동. 이 항목들은 아래 "남은 문제"에 남기고 완료로 기록하지 않는다.
+- **mock이라는 사실의 의미**: mock은 계약 형태(`ready`/`needs_clarification`/`unavailable`, 필드명, `sha256:` revision)를 고정하는 데는 유효하지만, 실제 모델이 계약을 지켜 응답하는지·후보 의미가 보존되는지는 전혀 증명하지 않는다.
+
+모바일 검증 환경과 결과: 실기기 검증 없음. 360px 폭 레이아웃은 데스크톱 브라우저의 반응형 모드로만 확인했고, 이는 실기기의 IME·키보드·safe area 동작의 증거가 아니다. 실 iOS Safari·Android Chrome 검증은 UCP06(한글 IME·키보드)과 UCP08(실기기 회귀)에서 수행한다.
+
+남은 문제와 차단 사유:
+
+1. **실연결 미검증(차단 아님, 범위 밖)**: compose 경로는 실제 llama-server·GPU gate에 붙여 검증하지 않았다. UCP09 범위다.
+2. **실기기 미검증**: iOS Safari에서 `isComposing`이 한글 조합 확정 Enter에 대해 어떤 값을 주는지, Android Chrome에서 키보드가 하단 후보를 가리는지는 실기기 없이는 확정할 수 없다. `keyCode === 229` 폴백을 넣었지만 이것이 충분하다는 증거는 아직 없다.
+3. **`duplicate_candidates`와 `candidates_reduced` 동시 발생 시 순서 미확인**: 두 코드가 함께 올 때 화면 표시 순서를 서버 `WARNING_PRIORITY`에 의존하고 있고, 클라이언트는 받은 순서를 유지한다. 함께 오는 실제 응답을 관찰하지 못했으므로 순서 계약은 미확인으로 남긴다.
+4. **`token_window = 77`은 `sd15` 전용 advisory**: UCP04 결정대로 `profile_token_window`는 `sd15`에서만 발생하며 후보를 버리지 않는다. 다른 계열의 창 크기는 체크포인트 속성이라 이 빌드에서 확립되지 않았고, 따라서 "77 초과 = 문제"라는 표시는 `sd15` 밖에서 뜨지 않는다.
+5. **의미 보존은 판정하지 않는다**: 후보가 장면의 사실을 바꾸지 않았는지는 UCP05가 검사하지 않는다. 서버도 substring 기반 평가 이상을 하지 못하며(UCP04 기록), 이는 UCP09의 실모델 평가 과제다.
+
+도입하지 않은 것과 그 근거:
+
+- **고정 바(sticky action bar)**: 요구가 필수가 아니고, 도입하면 safe area·키보드 겹침·콘텐츠 여백을 함께 처리해야 한다. 현재는 실행 버튼이 문서 흐름 안에 있고 모바일에서 스크롤로 도달한다.
+- **modal / bottom sheet**: 3절은 기본 요구사항으로 두지 않는다. 사전 검색을 인라인 확장 패널로 구현해 포커스 트랩·Escape·배경 스크롤 복원·회전 중 높이 보존이라는 계층을 만들지 않았다. dialog가 필요해지면 3절의 조건을 전부 붙여야 한다.
+- **React Compiler / 수동 메모이제이션**: 빌드에 compiler가 없으므로 수동 최적화는 이득 없이 lint와 충돌했다. 프로파일링 근거가 생길 때만 재도입한다.
+
+UCP04 파일 집계 정정: UCP04 기록의 "변경 파일 7개"와 실제 커밋 내용이 달랐던 원인은, 그 시점 작업 트리에 UCP03·UCP04 파일이 **아직 커밋되지 않은 상태**로 함께 존재했기 때문이다. 현재 git 기준으로 UCP04가 만든 파일은 `backend/app/services/prompt_profiles.py`(신규), `backend/tests/test_prompt_profiles.py`(신규), `backend/tests/test_prompt_compose_meaning.py`(신규), `backend/tests/fixtures/ucp04_eval_cases.json`(신규), `backend/app/services/prompt_compose.py`(수정), `backend/app/api/routes.py`(수정), `backend/tests/test_prompt_compose_api.py`(수정)의 7개이며 모두 미커밋 상태다. UCP04 기록의 7개 목록은 맞았고, "5개만 변경"으로 보였던 것은 `git status`에서 신규 파일(`??`)과 수정 파일(`M`)을 구분해 세지 않은 집계 오류였다. HEAD(`ecb6af0`)에는 UCP04 파일이 하나도 들어 있지 않다.
+
+다음 실행 단위: UCP06 양방향 수정과 모바일 입력·적용 보호. 단, 사용자 지시에 따라 자동 진행하지 않는다.
+
 
 ### UCP06 양방향 수정과 모바일 입력 및 적용 보호
 
@@ -995,15 +1171,143 @@ PromptBuilder를 입력, 장면 요약·칩, 후보 목록, 상태 안내로 분
 
 실행 체크리스트:
 
-- [ ] 직접 선택·고정·제외·AI에 맡기기 규칙을 UI와 상태에 일치시킨다.
-- [ ] 충돌 해결 선택이 다음 요청에 반영되고 늦은 응답/만료 후보 적용이 차단되게 한다.
-- [ ] positive/negative 적용과 사용자 직접 수정의 덮어쓰기 보호를 연결한다.
-- [ ] 모델 변경·자동 칩 삭제·다인 귀속·되돌리기의 실제 왕복을 검증한다.
+- [x] 직접 선택·고정·제외·AI에 맡기기 규칙을 UI와 상태에 일치시킨다.
+- [x] 충돌 해결 선택이 다음 요청에 반영되고 늦은 응답/만료 후보 적용이 차단되게 한다.
 
-- [ ] 한글 composition 중 Enter 오작동과 중복 제출을 막고 textarea 줄바꿈을 보존한다. 입력 focus/selection을 불필요하게 재설정하지 않는다.
-- [ ] 키보드 열린 상태의 검색·충돌 해결·오류 수정, 회전·패널 접기/열기, 후보 도착 시 포커스·스크롤 보존을 연결한다.
+
+- [x] positive/negative 적용과 사용자 직접 수정의 덮어쓰기 보호를 연결한다.
+- [x] 모델 변경·자동 칩 삭제·다인 귀속·되돌리기의 실제 왕복을 검증한다.
+
+- [x] 한글 composition 중 Enter 오작동과 중복 제출을 막고 textarea 줄바꿈을 보존한다. 입력 focus/selection을 불필요하게 재설정하지 않는다.
+- [ ] 키보드 열린 상태의 검색·충돌 해결·오류 수정, 회전·패널 접기/열기, 후보 도착 시 포커스·스크롤 보존을 연결한다. → **미완료.** 논리(포커스 이동·상태 보존)는 UCP05에서 있고 UCP06이 충돌 해소·되돌리기 블록을 추가했으나, 키보드가 열린 실기기에서 이 블록들이 가려지는지는 확인하지 않았다. 실기기 검증이 필요한 항목이라 UCP08로 넘긴다.
 
 완료 기준: 자동 칩 삭제 후 재생성, 밤 선택과 한낮 입력 충돌, 두 인물의 서로 다른 속성, 생성 중 편집, 후보 적용 후 수동 수정, 계열/동일 계열 모델 변경, 되돌리기를 브라우저 또는 통합 테스트에서 확인한다. 만료 후보 적용이 차단된다. 한글 IME 입력 중 의도치 않은 실행이 없고 viewport 변화 후에도 편집/선택/후보 상태와 적용 보호가 유지된다.
+
+#### UCP06 구현 결과
+
+상태: 완료 (코드·단위 테스트·통합 경로). 브라우저·실기기 검증은 하지 않았으며 UCP08 범위다. 이 절의 완료 기준 중 "브라우저 또는 통합 테스트"는 통합 테스트 쪽으로 충족했다 — 모든 시나리오가 `parseComposeReply` → `settleComposition` → `planApply` 실제 경로를 지난다.
+
+**먼저 찾은 결함 2건.** UCP05 테스트 251건이 전부 통과하는 상태에서 두 결함이 살아 있었다. 즉 UCP05 테스트는 `draft`와 손으로 만든 객체만 검사했고 `wire → parser → session → render` 경로는 한 번도 지나지 않았다.
+
+1. **`parseComposeReply`가 `selections: []`를 하드코딩했다.** 서버는 `selections`를 정말로 돌려준다(`reconcile_selections`, `ComposeReply` 스키마, `backend/app/api/compose.py` 확인). 따라서 `mergeSelections`는 실경로에서 죽은 코드였고, 서버가 조정한 칩 목록은 매번 버려졌다.
+2. **`settleComposition`이 병합 결과를 `draft.selections`에만 썼다.** 칩 목록은 `edit.selections`를 렌더하므로 AI가 고른 칩은 화면에 절대 나타나지 않았고, `composeRevisions`는 응답 이전 칩 집합을 계속 해시해 적용 가능성 판정이 "아무것도 안 보이는데 일관된" 상태가 됐다.
+
+이 둘을 고치지 않으면 패널의 AI 절반 전체가 무동작이므로, UCP06의 나머지 작업은 이 경로 위에서만 의미가 있다.
+
+변경 파일과 구현된 동작:
+
+| 파일 | 내용 |
+| --- | --- |
+| `frontend/src/prompt/composeRequest.ts` | `parseSelection` 신규: `source`/`pinned`/`entity_id` 검증, 거부권(`excluded`)이 `pinned`·`entity_id`를 가지면 응답 전체를 `invalid_reply`로 거부. `selections`를 파싱해 결과에 포함(위 결함 1) |
+| `frontend/src/prompt/composeSession.ts` | `settleComposition`이 병합 칩을 `edit`에 채택하고 `revisions`를 재계산(위 결함 2) |
+| `frontend/src/prompt/structuredScene.ts` | `attributeTo`(장면 밖 entity ID 거부), `makeAuto`(manual→auto 유일 경로), `sceneEntityIds`, `resolveClash`(충돌 양방향 해소) |
+| `frontend/src/prompt/composeApply.ts` | `ApplyPlan.lossKo`, `NEGATIVE_LOSS_NOTE`, `planApply`의 `acceptNegativeLoss`(1차 거부·2차 긍정 전용 적용), 확인 문구가 덮어쓰기 대상 명시 |
+| `frontend/src/prompt/composeAlerts.ts` | `warningAlerts`가 **분류 우선** 정렬(`CATEGORY_RANK`: failure 0 · reduced 1 · advisory 2) + 안정 인덱스 tiebreak |
+| `frontend/src/components/ComposePanel.tsx` | `negative`·`onRestore` prop, `undoRef` 1단계 스냅샷, `armed` 2단계 상태, `apply`/`undo`/`resolve`/`toAuto`/`attribute`, 칩별 귀속 `<select>`, 충돌 해소 블록, 결과 아래 되돌리기 행 |
+| `frontend/src/App.tsx` | `negative={settings.negativePrompt}` 전달, `restoreComposedPrompt`(positive/negative/`composedApplied` 복원, `promptDirty`는 건드리지 않음), `onRestore` 연결 |
+| `frontend/src/styles.css` | `.compose-clashes*`, `.compose-chip__attribute*`, `.compose-undo*` (44px 목표, select 16px) |
+| `frontend/tests/prompt-ucp06.test.mjs` | 신규 15건 |
+
+이번 작업에서 확정한 사실(상태 전이 규칙):
+
+- **병합 칩은 `edit`에 쓴다.** `draft.selections`는 응답의 사본이고 `edit.selections`가 사용자 결정의 유일한 출처다. 응답을 채택한 뒤 `composeRevisions`를 다시 계산하지 않으면 다음 `draftIsStale` 호출이 방금 온 응답을 stale로 판정한다. 두 쓰기는 한 동작이다.
+- **거부권은 깃발을 갖지 않는다.** `excluded` 행이 `pinned` 또는 `entity_id`를 동반하면 그 행만 버리는 것이 아니라 응답 전체를 `invalid_reply`로 거부한다. 절반만 채택하면 서버가 주장하지 않은 칩 목록을 화면이 보여주게 된다.
+- **`manual`은 사용자만 해제한다.** 응답은 manual 칩을 `auto`로 강등할 수 없고(`mergeSelections`), `makeAuto`가 유일한 해제 경로다. 해제는 pin도 함께 버린다 — "AI가 골라도 되지만 반드시 유지"는 `setPinned`가 사용자 소유 칩에 쓰는 의미이고, 소유를 넘긴 칩에 남길 의미가 아니다. `excluded` 행에는 무동작이다.
+- **귀속은 장면 안에서만 쓸 수 있다.** `attributeTo`는 `allowed`(=`sceneEntityIds`)를 받아 장면에 없는 entity ID를 **거부**한다. 서버가 `entity_id`를 자기 장면으로 검증하고 `422`를 내므로, 오래된 ID나 만들어낸 ID를 통과시키면 사용자가 고칠 수 없는 요청이 된다. `null` 귀속("장면 전체")은 허용한다.
+- **충돌 해소는 양쪽 다 명시적 선택이다.** `drop_exclusion`은 거부권만 지우고 문장은 그대로 둔다. `drop_mention`은 **긍정된** 언급만 오른쪽에서 왼쪽으로 잘라내고, `choices`를 비운다(문장이 바뀌었으므로 `withBrief`와 같은 규칙). `네온 없이` 같은 부정 언급은 거부권의 재진술이라 자르지 않는다 — 자르면 같은 결정의 절반을 조용히 삭제하게 된다. 자를 것이 없으면 같은 객체를 그대로 돌려준다.
+- **negative 손실은 2단계이고 기록된다.** 모델이 negative를 못 받는데 후보가 negative를 가지면 1차 누름은 `negative_lost`로 거부하고 무엇이 사라지는지 설명한다. 2차 누름은 `acceptNegativeLoss`로 긍정 프롬프트만 적용하고, `lossKo`에 손실 사실을 남긴다. 영구 거부는 안내 문구의 "계속하려면 다시 누르세요"를 거짓말로 만든다. 손실 수락이 덮어쓰기 확인을 우회하지는 **않는다** — 더 강한 거부를 더 약한 것 뒤에 숨기지 않는다.
+- **되돌리기는 적용 1회, 프롬프트 두 필드만.** `undoRef`가 `onApply` 쓰기 **전에** positive/negative/`appliedPrompt`/`applied`를 스냅샷한다. `applied` 레코드까지 되돌리는 이유는 A 적용 → B 적용 → 되돌리기에서 A 카드가 화면에 돌아온 텍스트에 대해 "적용됨"을 주장해야 하기 때문이다. 후보·revision은 건드리지 않으므로 되돌리기로 만료된 응답이 되살아나지 않는다.
+- **되돌리기 경고는 최종 prompt만 본다.** brief 편집은 undo가 복원하지 않는 대상이므로 경고하면 일어나지 않는 손실을 설명하게 되고, 무관한 변화에 뜨는 경고는 읽히지 않는다.
+- **경고 순서는 분류가 결정한다.** 클라이언트는 `CATEGORY_RANK`(failure 0 · reduced 1 · advisory 2)로 다시 정렬하고, **같은 분류 안에서는 서버 배열 순서를 안정 정렬로 보존**한다. 클라이언트가 정하는 것은 분류 간 순서뿐이며, `reduced`가 `advisory`보다 위다.
+  - **서버와 같아지는 경우**: `candidates_reduced` + `profile_token_window`(서버 `WARNING_PRIORITY` 순서 그대로), `candidates_reduced` + `duplicate_candidates`(둘 다 reduced라 서버 순서 유지).
+  - **서버와 달라지는 경우**: `duplicate_candidates` + `profile_token_window`이 함께 올 때 서버 `order_warnings`는 `profile_token_window`를 먼저 두지만(`WARNING_PRIORITY`에 있고 중복 코드는 없음), 클라이언트는 `duplicate_candidates`를 먼저 둔다. 둘 다 "요청보다 적게 왔다"는 사실이고 advisory가 그 위에 오면 안 된다는 것이 UCP05가 세운 규칙이므로, 여기서는 클라이언트 규칙을 택했다. 세 코드가 함께 오는 실제 응답은 관찰하지 못했으므로 이 차이는 **의도된 결정이며 미검증**으로 남긴다(`reduced candidates outrank an advisory even when the server lists it first`).
+- **장면이 바뀌면 답도 버린다.** `clarification_choices`는 `question_id`를 담는데, 문장이 바뀌면 서버는 자기가 발급하지 않은 ID를 거부한다. `withAnswer`는 `choice`만 옮기므로 같은 질문에 계속 답할 수 있고, `withBrief`가 `choices`를 비운다.
+
+검증 명령과 실제 결과:
+
+```text
+frontend: node --test tests/prompt-ucp06.test.mjs                     → 15 통과 / 0 실패
+frontend: node --test 'tests/*.test.mjs'                              → 266 통과 / 0 실패
+frontend: npx tsc --noEmit                                            → 오류 없음
+frontend: npx eslint src tests                                        → 오류 없음
+frontend: npm run build (tsc -b && vite build)                        → 성공 56 modules, 237ms
+backend:  uv run pytest backend/tests                                 → 587 통과, 96 건너뜀
+backend:  uv run ruff check backend/                                  → All checks passed
+git diff --check                                                      → 오류 없음
+```
+
+`tests/prompt-ucp06.test.mjs`의 15건은 시나리오 1~10(4b 포함)과 파서·경고·충돌 해소 계약이다:
+
+| 검사 | 고정하는 것 |
+| --- | --- |
+| reply selections are parsed, not dropped | 응답의 `selections`가 `edit`까지 도달하고 `draftIsStale`가 즉시 false |
+| a malformed selection rejects the whole reply | 잘못된 5가지 모양이 전부 `invalid_reply` |
+| scenarios 1–7 | 원문 편집·칩 추가/삭제·거부권·고정·수동 프롬프트·모델 변경/되돌리기·늦은 응답 |
+| scenario 8 | 장면 변경 시 오래된 `clarification_choices`를 보내지 않음 |
+| scenario 9 | 두 인물의 속성이 섞이지 않고, 장면 밖 귀속이 거부됨 |
+| scenario 10 | negative 미지원 모델의 2단계 적용과 기록된 손실 |
+| exclusion clash | 양방향 해소와 부정 언급 미절단 |
+| warning order | 분류 우선 정렬, 분류 내 서버 순서 보존, 서버와 다른 지점(3코드) 명시 |
+
+변이 검사로 비공허성 확인(각 변이 후 원복, sha256으로 바이트 동일성 확인):
+
+| 변이 | 실패한 테스트 |
+| --- | --- |
+| `parseComposeReply`가 다시 `selections: []`를 반환 | 2건 (`reply selections…`, `3. vetoing a chip…`) |
+| `settleComposition`이 `draft`에만 병합 결과를 씀 | 2건 (같은 2건) |
+| `mergeSelections`가 manual 칩을 응답으로 교체 | 1건 (`9. each person…`) |
+| `planApply`의 부정 손실 게이트 무력화 | 1건 (`10. a negative prompt…`) |
+| `warningAlerts` 정렬을 `() => 0`으로 고정 | 1건 (`reduced candidates outrank an advisory…`) |
+| `attributeTo`의 entity 검증 무력화 | 1건 (`9. each person…`) |
+| 거부권의 `pinned` 검사 무력화 | 1건 (`a malformed selection…`) |
+| `makeAuto`가 manual 칩을 거부 | 1건 (`4b. a reply can never demote…`) |
+| 부정 손실 수락이 덮어쓰기 확인을 생략 | 2건 (`10. a negative prompt…`, `5. a hand-written prompt…`) |
+| `resolveClash`가 부정 언급도 절단 | 1건 (`an exclusion the brief contradicts…`) |
+
+10개 변이 모두 잡혔고, 10개 모두 원복 후 파일이 바이트 단위로 동일했다.
+
+브라우저 또는 실연결 검증 범위:
+
+- **검증한 것**: 없음(UCP06 시점). UCP06은 순수 모듈·세션·적용 경계를 통합 테스트로 고정했다.
+- **검증하지 않은 것**: 실제 브라우저에서의 귀속 `<select>`·충돌 해소 버튼·되돌리기 행의 배치와 터치, 실 iOS Safari·Android Chrome의 한글 IME·키보드, 실제 LLM 응답으로 만든 칩 목록. UCP06은 이 항목들을 완료로 기록하지 않는다.
+- **통합 테스트가 대체하지 못하는 것**: 테스트는 `wire → parser → session → planApply`까지 가지만 React 렌더와 실제 입력 이벤트는 지나지 않는다. 예를 들어 `armed` 상태에서 버튼 라벨이 바뀌는지, `<select>` 변경이 `attribute`에 도달하는지는 컴포넌트 테스트가 없으므로 미검증이다.
+
+모바일 검증 환경과 결과: 실기기 검증 없음. UCP06은 이 절의 "한글 IME·키보드·회전" 항목을 **충족하지 않았다** — IME 가드와 포커스 처리는 UCP05의 코드를 그대로 두었고 이번에 실기기로 확인하지 않았다. 실 iOS Safari·Android Chrome 검증은 UCP08로 이월한다.
+
+남은 문제와 차단 사유:
+
+1. **컴포넌트 테스트 부재(차단 아님, 범위 밖)**: 이 저장소에는 DOM 테스트 러너가 없다(`node --test` + 순수 모듈만). `ComposePanel`의 새 조작 4종(귀속 select, AI에게 맡기기, 충돌 해소, 되돌리기)은 브라우저 하네스(`scripts/prompt-composer-browser/`)로 확인해야 하며 UCP08 범위다.
+2. **실기기 미검증**: UCP06의 제목이 "모바일 입력·적용 보호"지만 실제 모바일 검증은 하지 않았다. 적용 보호는 `planApply` 경계에서 강제되고 테스트로 고정했으나, 키보드가 열린 상태에서 새 블록(충돌 해소·되돌리기 행)이 가려지는지는 알 수 없다.
+3. **`duplicate_candidates` 동시 발생 순서**: UCP05가 남긴 항목 3은 부분적으로만 해소됐다. 두 코드가 **모두 `reduced` 분류**이므로 어느 쪽이 먼저 와도 같은 분류로 렌더되고 분류 간 순서는 고정됐다. 그러나 (a) 두 코드 사이의 상대 순서는 여전히 서버 배열 순서이고, (b) `duplicate_candidates` + `profile_token_window`이 함께 올 때 클라이언트 순서는 서버 `order_warnings`와 **의도적으로 다르다**(위 "경고 순서는 분류가 결정한다"). 세 코드가 함께 오는 실제 응답을 관찰하지 못했으므로 두 사실 모두 미검증이며, 렌더 순서만 테스트로 고정했다.
+4. **의미 보존은 판정하지 않는다**: UCP05 항목 5와 동일. 다인 귀속 테스트는 클라이언트가 속성을 섞지 않는다는 것만 고정하며, 실제 모델이 두 인물의 속성을 올바로 읽는지는 UCP09다.
+
+도입하지 않은 것과 그 근거:
+
+- **칩 상태의 낙관적 갱신 없음**: 응답이 칩을 바꾸면 `settleComposition`에서만 반영한다. 누름 즉시 화면을 바꾸고 응답으로 되돌리면 사용자가 방금 본 결정이 사라진 것처럼 보인다.
+- **`resolveClash`의 자동 적용 없음**: 두 해소책 모두 사용자가 말한 것의 일부를 버리므로 명시적 선택 없이는 아무것도 하지 않는다. 컴포넌트도 `CLASH_RESOLUTIONS`의 버튼에서만 호출한다.
+- **여러 단계 undo 스택 없음**: 되돌리기는 마지막 적용 1회다. 이력 전체를 다루는 것은 UCP07(구성 v3 저장·복원)의 일이며, 여기서 부분 구현하면 두 체계가 서로 다른 "과거"를 갖게 된다.
+
+UCP05 테스트 집계 정정: UCP05 기록의 "46개"는 맞고, 이전 보고에서 36개로 합산한 표는 틀렸다. UCP05 파일의 7개 그룹은 `capability` 7 + `request building` 5 + `reply parsing` 9 + `alerts` 4 + `apply` 9 + `chips` 5 + `session lifecycle` 7 = 46이다. 36은 그룹별 집계에서 `reply parsing`(9)·`alerts`(4)·`chips`(5)와 중복 계산을 놓친 값이었고, "빠진 10개"라는 표현도 실제로는 UCP05 이전부터 있던 그룹을 세지 않은 결과였다. UCP05 전체 251건은 `prompt-compiler`·`prompt-data`·`prompt-proposals` 등 기존 파일들의 합이다.
+
+기준선과 파일 상태(UCP06 시점, HEAD = `ecb6af0`):
+
+- 이 저장소에는 UCP01~UCP06 파일이 **커밋되지 않은 상태**로 함께 존재한다. 따라서 "UCP06이 바꾼 것"은 커밋이 아니라 파일 목록으로 판정한다.
+- `git status --porcelain --untracked-files=all` = 23개 항목: 수정 11개 + 미추적 12개.
+- 수정 11개: `backend/app/api/routes.py`, `backend/app/services/prompt_compose.py`, `backend/tests/test_prompt_compose_api.py`, `docs/PROMPT_COMPOSER_UNIFIED_IMPLEMENTATION.md`, `docs/TESTING.md`, `frontend/README.md`, `frontend/src/App.tsx`, `frontend/src/api.ts`, `frontend/src/prompt/composeSession.ts`, `frontend/src/prompt/structuredScene.ts`, `frontend/src/styles.css`.
+- 미추적 12개: `backend/app/services/prompt_profiles.py`, `backend/tests/fixtures/ucp04_eval_cases.json`, `backend/tests/test_prompt_compose_meaning.py`, `backend/tests/test_prompt_profiles.py`, `frontend/src/components/ComposePanel.tsx`, `frontend/src/prompt/composeAlerts.ts`, `frontend/src/prompt/composeApply.ts`, `frontend/src/prompt/composeCapability.ts`, `frontend/src/prompt/composeChips.ts`, `frontend/src/prompt/composeRequest.ts`, `frontend/tests/prompt-ucp05.test.mjs`, `frontend/tests/prompt-ucp06.test.mjs`.
+- 이 중 UCP06이 만든 파일은 `frontend/tests/prompt-ucp06.test.mjs`(신규) 하나이고, 나머지는 UCP02~UCP05가 만든 파일을 UCP06이 수정한 것이다. 다만 `composeRequest.ts`·`composeAlerts.ts`·`composeApply.ts`·`ComposePanel.tsx`는 UCP05가 만들고 UCP06이 실질적으로 확장했으므로 "미추적 = UCP05 것"으로 단정하지 않는다. `docs/TESTING.md`와 `frontend/README.md` 수정은 UCP06이 아니라 이번 문서 정리에서 Node 버전·테스트 명령을 남긴 것이다.
+
+재현 가능한 기준선: 이 작업 트리는 **커밋으로 분리할 수 없다**(UCP01~UCP06이 한 덩어리로 미커밋). 대신 검증 결과를 재현하는 절차는 다음과 같다.
+
+```sh
+git rev-parse HEAD                       # ecb6af0 — 기준 커밋
+git status --porcelain --untracked-files=all   # 23개 항목(수정 11 + 미추적 12)
+cd frontend && node --test tests/*.test.mjs   # 266 통과
+```
+
+즉 "UCP06 완료"의 증거는 커밋 해시가 아니라 **HEAD `ecb6af0` + 위 23개 항목 + 266 통과**의 조합이다. 다른 작업자가 같은 트리에 변경을 추가하면 23이라는 수와 266이라는 수가 함께 달라지므로, 둘 중 하나만 인용해 완료를 주장하지 않는다. UCP06만의 변경을 분리해야 한다면 `frontend/tests/prompt-ucp06.test.mjs`가 유일하게 UCP06이 만든 파일이고, 나머지는 기존 파일 위의 수정이므로 `git diff`로는 "누가 먼저 썼는지" 구분되지 않는다.
+
+다음 실행 단위: UCP08의 잔여 항목(모바일 실기기 검증) 또는 UCP09 실제 LLM과 이미지 결과 평가. **사용자 지시 없이 착수하지 않는다.** UCP08은 브라우저 자동화를 완료했고(459 checks), 실기기가 없어 iOS Safari·Android Chrome 검증만 대기로 남겼다. UCP09는 착수 지시를 받았으나 실행 호스트에 llama-server·GGUF·GPU가 없어 **환경 대기**로 기록했다(「UCP09 환경 확인」). 실환경 접근이 생기면 그 절의 표를 먼저 다시 확인한 뒤 착수한다.
 
 ### UCP07 구성 v3 저장과 과거 복원
 
@@ -1011,12 +1315,96 @@ schemas와 생성 제출, metadata, retry, sidecar, 갤러리 재사용을 연�
 
 실행 체크리스트:
 
-- [ ] v3 검증·capability와 마지막 적용 snapshot의 job 제출을 구현한다.
-- [ ] DB·events·metadata·sidecar·retry·갤러리 복원에 v3가 보존되게 한다.
-- [ ] v1/v2 복원과 v3 미지원 서버 fallback을 구현하고 출처를 추정하지 않는다.
-- [ ] 실제 임시 DB 재시작 후 복원·재시도와 직접 편집 표시를 검증한다.
+- [x] v3 검증·capability와 마지막 적용 snapshot의 job 제출을 구현한다.
+- [x] DB·events·metadata·sidecar·retry·갤러리 복원에 v3가 보존되게 한다.
+- [x] v1/v2 복원과 v3 미지원 서버 fallback을 구현하고 출처를 추정하지 않는다.
+- [x] 실제 임시 DB 재시작 후 복원·재시도와 직접 편집 표시를 검증한다.
 
 완료 기준: 실제 임시 DB를 사용하는 저장→프로세스 재생성→조회→재시도에서 v3 스냅샷이 보존된다. 과거 v2 번역 출처가 사라지지 않는다. 복원 자체가 LLM 요청을 발생시키지 않는다. unsupported v3 서버에는 v3 body를 보내지 않는다.
+
+결과(구현·검증 완료):
+
+v3 제출이 막혀 있던 원인은 **네 가지 결함**이고, 앞의 둘 다 고치기 전에는 "저장"이 실제로 일어나지 않았다. 뒤의 둘은 저장이 일어나기 시작한 뒤에야 드러난 것이고, 이번에 처음 확인했다.
+
+| # | 결함 | 증상 | 수정 위치 |
+| --- | --- | --- | --- |
+| 1 | v3 본문이 v1/v2 검증기를 통과해야 했다 | 브라우저에서 모든 v3 제출이 클라이언트 단계에서 실패 | `frontend/src/prompt/validation.ts`의 `validateCompositionBody` 디스패처 |
+| 2 | 검증이 32 KiB를 먼저 재서 초과 v3를 422로 거절 | 사다리(`fit()`)가 **도달 불가능한 죽은 코드**였고 `snapshot_trim`은 항상 `[]` | `schemas.py`의 `check_snapshot(enforce_bytes=False)` |
+| 3 | `fit()`이 `snapshot_trim`을 무조건 덮어씀 | 복원한 기록을 다시 저장하면 "무엇이 잘렸는지"가 사라져, 필드 부재를 빈 값으로 읽게 됨 | `fit()`이 기존 단계를 유지하고 새 단계만 `LADDER` 순서로 합집합 |
+| 4 | `scene.environment`의 `None` 기본값이 6개 `null` 키로 직렬화 | 계약 예시(`{}`)와 불일치, 모든 v3 행에 137 B 패딩, "미언급"과 "명시적으로 비움"이 구분 불가 | `CompositionSceneEnvironment.omit_unstated` |
+
+세 번째와 네 번째는 이번에 새로 찾은 것이다. 특히 두 번째는 **테스트가 통과하는데도 기능이 죽어 있는** 형태였다. `fit()`은 정상 동작하고 `snapshot_trim == []`도 정상값처럼 보이므로, 사다리를 실제로 지나가는 입력(32~64 KiB 창)을 만들지 않으면 발견되지 않는다.
+
+두 상한이 겹치는 지점:
+
+- 스냅샷 예산 32 KiB와 HTTP body 상한 64 KiB(소스 기본값)다.
+- 따라서 사다리는 **32~64 KiB 구간에서만** 도달 가능하다. `worst_case()`(약 100 KB)는 문전에서 413이므로 사다리를 검증하지 못한다.
+- 실제로 사다리를 지나가는 fixture는 `end_to_end_body()`뿐이고, 이것이 종단 테스트의 입력이다.
+
+사다리가 절대 지우지 않는 것(테스트로 고정):
+
+- `applied.positive_prompt`·`negative_prompt`·`summary_ko`: 실행된 사실. 기록이 이미지와 달라지면 기록은 거짓이다.
+- `selections` 전체(모든 `excluded` 행 포함): 거부권은 결정의 유일한 기록이다. 지우면 사용자가 금지한 칩이 조용히 되살아난다.
+- `target_model_id`·`target_family`·`profile_version`·`dictionary_version`: 없으면 복원 기록의 신선도를 판정할 수 없다.
+
+`arrays_2`와 `drop_dangling`의 관계: 개체를 2개만 남기면 귀속이 매달릴 수 있다. `drop_dangling`이 그 참조를 지우므로 **칩은 남고, 보증할 수 없는 소유자만 사라진다**. `selections` 행은 지워지지 않고 `entity_id`만 `None`("장면 전체")이 된다.
+
+검증 명령과 실제 결과:
+
+```text
+frontend: node --test tests/prompt-ucp07.test.mjs                    → 44 통과 / 0 실패
+frontend: node --test 'tests/*.test.mjs'                             → 310 통과 / 0 실패
+frontend: npx tsc -b                                                 → 오류 없음
+frontend: npx eslint src tests                                       → 오류 없음
+backend:  uv run --project backend pytest backend/tests              → 596 통과, 96 건너뜀
+backend:  uv run --project backend ruff check backend/               → All checks passed
+git diff --check                                                     → 오류 없음
+```
+
+backend는 **저장소 루트에서** 실행해야 한다. `backend/`에서 실행하면 `config/models.yaml` 상대 경로 때문에 실패한다.
+
+`frontend/tests/prompt-ucp07.test.mjs`의 44건은 네 묶음이다:
+
+| 묶음 | 고정하는 것 |
+| --- | --- |
+| 시나리오 1~5 | 적용 없는 스냅샷은 `null`, 적용 스냅샷은 prompt 원문 그대로, negative `null`은 키 생략, 적용 후 영어 편집이 기록을 덮지 않음, 제외·고정·수동 출처와 인물별 속성 복원 |
+| 시나리오 6~10 | 다른 모델 가족 기록은 복원하되 어느 모델이었는지 말함, v1은 v1로 복원(적용·장면 없음), 서버가 자른 기록은 "불완전"으로 복원, 매달린 참조는 고치지 않고 거부, 갤러리 복원은 최종 prompt와 기록을 분리 |
+| v3 검증기 12건 | 제출 버튼을 결정하는 검증기가 v3를 받아들임, v1/v2는 기존 검증기 유지, **초과 v3는 거절하지 않음**(서버가 자름), 64 KiB 요청 상한은 유지, 가족 불일치·거부권만 있는 본문·`excluded`의 pin/owner·pin 누락·장면 밖 개체 참조·`applied: null`·사다리에 없는 trim 이름 거부 |
+| 왕복 | 이 클라이언트가 쓴 v3 기록은 자기 검증기를 항상 통과 |
+
+`backend/tests/test_prompt_composition_v3.py`의 9건:
+
+| 검사 | 고정하는 것 |
+| --- | --- |
+| 초과 v3는 검증을 통과하고 `fit()`에서 잘림 | 사다리가 **도달 가능**함. 세 사실을 함께 고정: 검증이 초과 본문을 받아들임, `fit()`이 단계를 보고함, 결과가 예산 이하 |
+| 사다리는 실행된 사실을 건드리지 않음 | `applied` 3필드 원문 유지, `selections` 100행·거부권 20행 전부 유지, 생존 개체는 `entity-1`·`entity-2`, 매달린 귀속 없음 |
+| 잘린 기록의 재저장이 trim 이력을 지우지 않음 | `fit(fit(x))`의 단계 == 첫 단계(3번 결함의 회귀) |
+| 저장이 기록을 키우지 않음 | `fit(fit(x))`가 바이트 동일(4번 결함의 회귀) |
+| 미언급 환경은 6개 `null`이 아니라 `{}` | 부분 언급은 언급된 키만, `""`는 "미언급"으로 처리 |
+| 사다리로도 안 되면 거절 | `32 KiB`와 바이트 수를 담은 오류, 반쯤 잘린 행을 저장하지 않음 |
+| 초과 v3 종단 수용·재조회 | `POST /jobs` 202 → 저장 행이 잘려 있음 → 그 행 재제출도 202이고 trim 이력 유지 |
+| 임시 DB 재시작·재시도 보존 | 같은 data dir로 앱 재생성 후 조회·retry·events·metadata·sidecar 모두 같은 잘린 기록 |
+| 저장 불가 기록은 422 | 행이 생기기 전에 거절, 큐는 계속 읽힘 |
+
+비공허성 검증(각 수정을 되돌려 실패를 확인한 뒤 원복):
+
+| 되돌린 것 | 실패한 테스트 |
+| --- | --- |
+| `validateCompositionBody` 디스패처를 `validateComposition`으로 | frontend 2건 |
+| `check_snapshot(enforce_bytes=True)` | backend 5건 |
+| `fit()`의 `snapshot_trim` 합집합 | backend 2건 |
+| `omit_unstated`를 `handler(self)`로 | backend 1건 |
+
+`LABELED_STEPS`는 `["evidence_ko", "ambiguity_options", "attributes_first", "brief_2000", "environment", "arrays_2"]`로 고정했다. 사다리나 의미 상한이 움직이면 이 상수와 문서의 실측 표가 함께 틀리므로, `backend/measure_ladder.py`로 다시 재야 한다.
+
+백엔드 테스트 수 정정: 이전 기록은 587 → 596을 `+3`으로 적었으나 실제 증가분은 **9**다(`backend/tests/test_prompt_composition_v3.py` 한 파일). 587은 UCP06 시점의 수이고, UCP07이 만든 테스트는 이 9건뿐이므로 596 − 587 = 9와 파일 수가 일치한다. `+3`은 `fit()` 재저장·`omit_unstated`·사다리 도달성처럼 "수정별 회귀 3종"만 세고 종단·재시작·거절 케이스를 빠뜨린 집계였다.
+
+검증하지 않은 것:
+
+- **브라우저 조작**: UCP07은 순수 모듈과 API를 테스트했다. 실제 브라우저에서 ComposePanel의 적용→저장→갤러리 복원을 클릭으로 확인하지 않았다(UCP08). → UCP08에서 확인 완료.
+- **`events`의 필드 단위 검증**: 스트림 텍스트에 `schema_version:3`이 있는지만 확인했다. 이벤트 페이로드 전체가 저장 행과 같은지는 비교하지 않았다.
+- **동시 수정**: 복원한 기록을 편집하는 도중 다른 탭이 같은 job을 retry하는 경우는 다루지 않는다.
+
 
 ### UCP08 회귀와 반응형 및 모바일 실기기 검증
 
@@ -1024,21 +1412,119 @@ schemas와 생성 제출, metadata, retry, sidecar, 갤러리 재사용을 연�
 
 실행 체크리스트:
 
-- [ ] 8절의 필수 사례를 자동화하고 기존 직접 생성·갤러리·모델 옵션 회귀를 검사한다.
-- [ ] 360/390px·데스크톱, 긴 후보, 키보드·오류 복구를 실제 브라우저에서 확인한다.
-- [ ] 현재 테스트 명령을 실행하고 실패 원인을 수정한다. 환경 제약은 차단 사유로 남긴다.
-- [ ] API/UI/저장 연결과 실연결 미검증 범위를 구분해 상태표를 갱신한다.
+- [x] 8절의 필수 사례를 자동화하고 기존 직접 생성·갤러리·모델 옵션 회귀를 검사한다.
+- [x] 360/390px·데스크톱, 긴 후보, 키보드·오류 복구를 실제 브라우저에서 확인한다. (CDP viewport emulation)
+- [x] 현재 테스트 명령을 실행하고 실패 원인을 수정한다. 환경 제약은 차단 사유로 남긴다.
+- [x] API/UI/저장 연결과 실연결 미검증 범위를 구분해 상태표를 갱신한다.
 
-- [ ] 3절 전체 매트릭스의 자동화 가능한 항목을 기존 CDP 하네스에 추가한다. viewport별 overflow·hit area·상태 보존·키보드 순서를 실제 DOM과 조작으로 확인한다.
-- [ ] iOS Safari와 Android Chrome 실기기에서 한글 키보드·회전·주소창/가림을 검사하고 OS/브라우저·viewport·실기기 여부를 기록한다. 기기 부재는 모바일 검증 대기로 남긴다.
+- [x] 3절 전체 매트릭스의 자동화 가능한 항목을 기존 CDP 하네스에 추가한다. viewport별 overflow·hit area·상태 보존·키보드 순서를 실제 DOM과 조작으로 확인한다.
+- [ ] iOS Safari와 Android Chrome 실기기에서 한글 키보드·회전·주소창/가림을 검사하고 OS/브라우저·viewport·실기기 여부를 기록한다. 기기 부재는 모바일 검증 대기로 남긴다. → **미완료(기기 부재).**
 
 완료 기준: 8절의 필수 사례가 통과하고 실제 화면에서 주요 동작의 발견성, 가로 넘침, 장문 후보, 오류 복구, 포커스를 확인한다. 실행 환경과 검사 결과를 구분해 기록하고 실제 LLM을 쓰지 않은 결과는 mock 검증으로 명시한다. 3절 모바일 매트릭스의 통과/실패/환경 대기를 구분하며 실기기 검증 없이 모바일 전체 완료로 표시하지 않는다.
 
+#### UCP08 결과 (브라우저 자동화 완료, 실기기 대기)
+
+상태: **브라우저 자동화 완료 · 모바일 실기기 검증 대기**. UCP09는 착수하지 않았다(환경 없음, 아래 UCP09 절).
+
+검증 명령과 실제 결과(2026-11-23 재실행 기준):
+
+```text
+sh scripts/prompt-composer-browser/verify.sh   → 459 checks, 0 failed
+  (기존 suite: messages·keyboard·contracts·trans06·u12 전부 통과 + UCP08 A~V 23블록)
+frontend: node --test 'tests/*.test.mjs'       → 314 통과 / 0 실패
+frontend: npx tsc -b                           → 오류 없음
+frontend: npx eslint src tests                 → 오류 없음
+frontend: npm run build                        → 성공
+backend:  uv run pytest -q                     → 596 통과, 96 건너뜀
+```
+
+실행 환경(그대로 기록):
+
+- 호스트: **macOS Darwin 25.5.0 / Apple M1** — BC-250이 아니다. 이 사실이 UCP09 차단 사유다.
+- 브라우저: `Edg/158.0.4370.33` (CDP). Playwright 기본 chromium이 없어 `CHROME_PATH`로 Edge를 지정했다.
+- 백엔드: `STUDIO_ENGINE=fake` + `models.fixture.yaml`, 임시 `STUDIO_DATA_DIR`(매 실행 새 디렉터리).
+- 응답 출처: `/system/capabilities`와 `POST /prompt/compose`만 **페이지 안에서 stub**했다. 이유는 `compose_advertised`가 `STUDIO_ENGINE=fake`에서 capability를 숨기기 때문이고, 그대로 두면 패널이 폴백 상태로 남아 모든 검사가 공허해진다. 저장·HTTP·DOM·SQLite·`/assets/{id}/metadata`·`/jobs/{id}/events`는 **실경로**다. 예외적으로 블록 V만 `POST /jobs`(413)와 `/assets/{id}/metadata`(trim된 행)를 결정적 응답으로 대체했다 — UI가 도달할 수 없는 경로이므로.
+- 따라서 이 결과는 **번역 품질의 증거가 아니다**. 모델 응답의 의미·귀속·부정 처리 품질은 UCP09 범위다.
+
+자동화가 실제로 확인한 것(요약):
+
+| 묶음 | 확인한 사실 |
+| --- | --- |
+| A~C 입력 | 패널 렌더, 한글 입력 반영, 입력만으로 요청 없음, Enter가 이미지 폼 제출·후보 요청을 유발하지 않음, IME 조합 Enter 취소(`isComposing`+`keyCode 229`) |
+| D~G 장면·칩 | 사전 검색이 결과를 좁히고 분류를 바꾸지 않음, 응답 전 선택은 사전 버튼의 `aria-pressed`와 선택 수로만 표시(초안 전에는 칩 목록이 없음), 응답 후 자동/수동/고정/제외 칩, 인물 귀속 `<select>`, `AI에게 맡기기`, 거부권이 다음 요청에 `pinned`/`entity_id` 없이 전달 |
+| H~I 만료·적용 | 편집 후 후보 만료 안내, **만료 후보는 버튼이 비활성이 아니라 눌렀을 때 `stale` 사유를 안내하며 적용되지 않음**, 재생성 후 적용 가능, 적용이 최종 프롬프트·negative 교체 |
+| J~K 덮어쓰기·Undo·K2·K3 | 직접 수정 후 적용은 확인 요구, 취소 시 두 필드 유지, 승인 시 교체, Undo가 적용 전 문자열 복원. **K2**: 적용 후 negative만 고친 뒤 되돌리면 텍스트는 복원되지만 negative가 어긋난 적용 기록은 되살아나지 않음(카드 `적용됨` 0). **K3**: 같은 계열에서 모델만 바꾼 뒤 제출해도 이전 모델의 `applied`가 붙은 v3 행이 나가지 않음 |
+| L~N 모델·실패·취소 | 모델 변경 시 `failed/expired` 경고와 후보 소거·원문 보존, 실패 시 패널 자체 한국어 카피 표시(서버 진단 문자열 미노출), 취소가 입력·칩 보존 |
+| O~S 폴백·키보드·반응형·장문 | 미지원 계열 폴백 안내·생성 비활성, Tab 순회가 구성기 안에서 이동, 360/390/430/768/1280/1440px 가로 넘침 0·적용/칩 버튼 44px 이상·입력 16px, 회전이 재요청을 만들지 않음, 장문 후보 미절단 |
+| T~U 저장·복원 | `POST /jobs` 본문이 `schema_version: 3`, 적용 문자열·negative·수동 선택·귀속 보존, metadata·events 되읽기(events는 **파싱**해서 스냅샷이 v3임을 확인), 갤러리 정보 창이 v3로 표시, `이 설정으로 다시 생성`이 적용 문자열·negative·모델 복원, **새로고침 후 같은 복원이 반복됨** |
+| V 도달 불가 경로 | 결정적 `413`에서 서버 사유가 `.errorbox`에 표시, `snapshot_trim`이 있는 행에서 정보 창이 `저장 시 축소됨`에 단계 이름 2개를 모두 표시. **UI 표시 계약 증거**이며 서버 사다리 수행 증거가 아니다 |
+
+이번 실행에서 찾은 결함 2건(수정 완료):
+
+| # | 결함 | 증상 | 수정 |
+| --- | --- | --- | --- |
+| 1 | Undo가 이전 `applied` 기록을 무조건 되돌림 | 두 번째 적용을 되돌리면 첫 적용의 기록이 남아, 화면에 없는 문자열을 카드가 `적용됨`으로 주장. 그 상태가 `toSnapshot`을 거치면 `applied.positive_prompt`가 실제 전송 prompt와 다른 v3 행이 저장됨 | `appliedForRestoredPrompt(applied, positive)` 추가 — 복원 문자열과 기록의 문자열이 일치할 때만 기록 유지. `frontend/tests/prompt-ucp06.test.mjs` 6b로 고정 |
+| 2 | Undo 버튼이 남은 단계 없이도 렌더 | `undoRef`는 ref라 비워도 리렌더가 없고, 조건이 `visible.applied !== null`이라 두 번째 적용 후에도 버튼이 남아 눌러도 무동작 | `undoable` 상태 추가, 렌더 조건을 `undoable && onRestore`로 변경 |
+
+#### UCP08 잔여 확인 (승인 후 보완, 4건 추가 수정)
+
+승인 검토에서 지시한 5개 항목을 실제로 실행해 확인했다. 그 과정에서 **결함 4건이 더 나왔다**(전부 실행으로 재현한 뒤 수정).
+
+| # | 결함 | 재현(실행 결과) | 수정 |
+| --- | --- | --- | --- |
+| 3 | `appliedForRestoredPrompt`가 positive만 비교 | 적용 → **negative 필드만** 수정 → 되돌리기 시 positive가 같으므로 기록이 남고, `toSnapshot`이 `applied.negative_prompt = "neg-x"`를 쓰는데 화면 필드는 `"neg-y"`. 즉 v3에 실행하지 않은 negative가 기록됨 | 두 필드를 비교하도록 시그니처 변경(`{positive, negative}`). `null`과 `""`는 같은 사실로 취급(키 생략 규약). 6c·K2로 고정 |
+| 4 | lossy 적용이 후보의 negative를 기록 | negative 미지원 모델에서 2단계 적용 후 `plan.negativePrompt = null`인데 `applied.negativePrompt = "neg-from-candidate"`. 복원하면 실행하지 않은 negative가 되살아남 | `applyCandidate`가 기록할 negative를 **입력으로** 받음. 패널은 `negativeSupported`에 따라 `plan`이 실제 쓴 값을 전달. 6d로 고정 |
+| 5 | 기록이 대상 모델에 묶여 있지 않음 | 같은 계열에서 모델만 바꾼 뒤 되돌리면 이전 모델용 프롬프트가 새 모델의 v3 `target_model_id`로 저장될 수 있음. `AppliedResult`는 provider 모델만 기록하므로 순수 함수로는 판정 불가 | 패널이 `undoTarget`으로 적용 시점 target을 보관하고, `sameTarget`이 아니면 **텍스트는 복원하되 기록은 버린다**(안내 문구로 명시). `undoTarget`이 버튼 존재 조건 |
+| 6 | 모델 변경 시 `composeRecord`가 살아남음 | `toSnapshot`은 family만 검사하므로 `fake-sd15` → `fake-sd15-alt`(같은 sd15) 전환 후 제출하면 `target_model_id: fake-sd15-alt` + 이전 모델의 `applied`가 함께 담긴 v3 행이 나감. 실행으로 재현(`schema:3, target:fake-sd15-alt, applied:PROMPT_A`) | `chooseModel`에서 `setComposeRecord(null)`. 프롬프트 텍스트는 유지. 브라우저 K3 + `prompt-ucp07.test.mjs`로 고정(수정 되돌리면 K3가 실패함을 확인) |
+
+`undoRef`/`undoable` 동기화 확인 결과: 모델 변경 후에도 버튼은 남는 것이 맞다(복원할 텍스트가 사용자의 것이므로). 다만 그 경우 기록을 복원하지 않도록 위 #5에서 분리했다. 갤러리 복원은 `restartBuilder`+`setComposeRecord(null)`로 새 세션을 시작하고 패널은 repopulate하지 않으므로 stale `undoRef`가 남지 않는다(설계상 의도, App.tsx 주석 참조).
+
+**최초 실패 12건과 제품 결함의 구분**(지시 항목): 12건은 전부 하네스 오류였다 — 칩이 초안 이전에 렌더된다고 가정(3), 만료를 `disabled`로 기대, `failureAlert` override 무시, 브리프 개행 미trim, 존재하지 않는 manual 칩 기대, JSON 공백 의존 substring. 제품 결함은 **1차 자동화에서 2건(1·2), 이번 보완에서 4건(3~6)** 으로 총 6건이며, 전부 **제품 코드 수정**으로 해결했고 하네스 변경으로 가려지지 않았다. 각 결함은 수정을 되돌리면 실패하는 테스트로 고정했다(6c·6d·K3는 revert 후 실제 실패 확인).
+
+**32 KiB 거부와 `snapshot_trim` 안내를 결정적 API 응답으로 검증**(지시 항목, 블록 V 신설):
+
+- `POST /jobs`가 `413 {detail: "Prompt composition exceeds 32 KiB..."}`를 주면 `.errorbox`에 서버 사유가 그대로 표시됨을 확인(2 checks). **클라이언트 오류 처리 검증**이지 사다리 검증이 아니다.
+- metadata가 `snapshot_trim: ["evidence_ko","brief_2000"]`인 v3 행을 주면 정보 창이 `저장 시 축소됨: ...`에 **두 단계 이름을 모두** 표시함을 확인(2 checks).
+- **실제 서버 사다리 검증은 백엔드 몫으로 분리**한다: `test_prompt_composition_v3.py` 9건(초과 본문 trim, 실행 기록 불변, 재저장, 사다리로도 부족 시 422, DB 왕복, 재시작·재시도). 브라우저에서 사다리를 돌리려면 서버를 조작해야 하므로 그 경로는 여전히 UI 미도달이며, 위 검사는 UI 표시 계약만 고정한다.
+
+이 보완 후 재실행 결과: **459 checks, 0 failed**(직전 447 + K2 4 + K3 3 + V 4), 프런트 314(직전 311 + 6c·6d + 같은 계열 모델 전환 1), 백엔드 596, `tsc -b`·`eslint`·`npm run build` 통과. 6c·6d·K3는 **수정을 되돌리면 실패함을 직접 확인**했다.
+
+검증하지 않은 것(완료로 표시하지 않음):
+
+- **모바일 실기기**: iOS Safari·Android Chrome의 실제 한글 키보드·safe area·주소창 가림은 확인하지 않았다. 위 360/390/430px 결과는 CDP viewport emulation이며 **레이아웃 증거일 뿐 실기기 증거가 아니다**(3절 기준). 상태는 `모바일 실기기 검증 대기`다.
+- **32 KiB 저장 거절의 실제 사다리 경로**: 위 블록 V는 클라이언트 표시만 고정했다. 실제 사다리 수행은 백엔드 테스트로만 검증했고, 브라우저에서 사다리가 도는 경로는 UI 미도달이다.
+- **`snapshot_trim` 안내의 실데이터 경로**: 저장된 잘린 행은 이 환경에서 만들 수 없어, 결정적 metadata 응답으로 표시 계약만 확인했다.
+- **번역 품질**: 위 1절의 이유로 측정하지 않았다.
+
+UCP09로 넘기는 항목: 실제 LLM 응답으로 ①칩 자동 선택의 의미 보존, ②귀속(다인) 정확도, ③부정 조건 처리, ④긴 응답 지연·잘림이 모바일 흐름에 주는 영향, ⑤동일 seed 이미지 비교. 실기기 검증(UCP08 잔여)은 UCP09와 독립적으로 수행 가능하다.
+
 ### UCP09 실제 LLM과 이미지 결과 평가
+
+#### UCP09 환경 확인 (2026-11-23, 실행 전 차단 사유 기록)
+
+UCP09는 **실제 llama-server·GPU·모델**을 전제한다. 이번 실행 환경을 확인한 결과 전제가 성립하지 않아 **착수하지 않았고, 어떤 항목도 완료로 표시하지 않는다**.
+
+| 확인 항목 | 실행한 확인 | 결과 |
+| --- | --- | --- |
+| 실행 호스트 | `uname -a`, `system_profiler SPDisplaysDataType` | `Darwin 25.5.0 arm64`, **Apple M1 (7-core GPU)** — BC-250이 아니다 |
+| LLM 서버 | `which llama-server llama-cli` | 둘 다 없음 (`not found`) |
+| 이미지 엔진 | `which sd-cli` | 없음 |
+| 모델 파일 | `find / -name '*.gguf'` | **0건**. `/opt/sd-models`·`~/.ssh/config`의 원격 호스트 모두 이 호스트에 없음 |
+| GPU 도구 | `nvidia-smi`, `rocm-smi`, `vulkaninfo` | 모두 없음 (`command not found`) |
+| Python GPU | `torch.cuda.is_available()` | `torch` 미설치 |
+| 저장소 내 BC-250 증거 | `bc250-verified.json`, `bc250-gpu-diagnostics.txt` | **다른 호스트의 과거 스냅샷**(Linux 6.17 fc43, `RADV GFX1013`, `/opt/sd-models/*.gguf`). 현재 호스트의 실행 증거가 아니다 |
+
+같은 스냅샷이 기록한 `inference_tested: false`와 `llama-server.service`의 `ActiveState=inactive`도 실연결 성공의 근거가 될 수 없다. 따라서 아래 체크리스트는 **하나도 체크하지 않는다**.
+
+요구된 측정 항목(모델·GGUF 경로, 컨텍스트/추론 설정, 실제 요청·응답, token usage·`finish_reason`, 1·2·3개 후보 성공률, JSON 준수율, clarification 발생, 60초 timeout 적합성, GPU gate 점유/해제, 이미지 생성과의 자원 충돌)은 실환경 접근 후에만 측정 가능하다. **mock 결과로 대체하지 않는다.**
+
+의미 보존 평가(인물 수·위치/배경·의상/색상·인물별 귀속·시간/날씨·부정/제외·관계·수동 선택 보호)와 지원 모델별(SD1.5·Flux.2 Klein·Z-Image·MOSS) 실제 이미지 생성도 같은 이유로 대기다. `config/models.yaml`상 `klein-4b-q8`·`z-image-*`·`moss-image-*`는 `validation_status: configured`이며, 설치 여부를 이 호스트에서 확인할 수 없다.
+
+**평가 입력은 이미 저장소에 있다.** `backend/tests/fixtures/ucp04_eval_cases.json`의 4개 고정 사례(붉은 원피스·비 오는 거리 / 두 여성 중 한 명만 모자 / 텅 빈 해변 / 밤 카페 창가의 코트 남성)가 계열별 faithful·drift 프롬프트를 함께 갖고 있고, `backend/tests/test_prompt_compose_meaning.py`가 **규칙 기반**으로 이를 검사한다. 이 파일은 스스로 "실제 모델 판단이 아니다"라고 명시하며, 특히 `test_the_server_cannot_tell_drift_from_a_paraphrase`가 **서버가 drift를 구별하지 못한다**는 사실을 고정한다. 따라서 UCP09에서 이 픽스처를 실제 Qwen 출력에 적용할 때, **규칙 기반 통과는 의미 보존 성공의 증거가 아니다** — 인물별 속성 귀속·관계·부정 조건처럼 사람이 판단해야 하는 항목은 별도 판정표가 필요하다.
 
 실제 서비스가 광고하는 compose capability와 기존 운영 연결을 사용한다. 고정 사례의 요청·응답, 지연, 모델·프로필 버전, 사전 자동 선택, 원문 의미 보존을 기록한다. 지원 모델별 대표 장면에 대해 seed와 생성 설정을 고정해 기존 사전 조합 결과와 새 후보 결과를 비교한다. GPU 작업은 기존 조정 정책을 따른다.
 
-실행 체크리스트:
+실행 체크리스트 (2026-11-23 기준 **전부 미착수**. 위 「UCP09 환경 확인」의 차단 사유가 해소된 뒤에만 체크한다):
 
 - [ ] 실제 compose capability·모델·사전·프로필 버전과 gate 연결을 확인한다.
 - [ ] 고정 한글 사례로 의미·귀속·부정·사전 선택·후보 차이를 실제 LLM 응답에서 평가한다.
@@ -1057,10 +1543,10 @@ schemas와 생성 제출, metadata, retry, sidecar, 갤러리 재사용을 연�
 | --- | --- | --- |
 | 활용형·별칭과 사전 누락 | UCP01·UCP04·UCP08 | `앉은`, `서 있다`, `흰 배경`의 양성/반례. 색상 누락을 매칭 성공으로 숨기지 않음. 사전 변경 시 mirror/버전 일치 |
 | 상황 문장과 실제 적용 차이 | UCP05·UCP06 | 고급 상황 후보에 미변환 구절이 있으면 적용 전 포함/제외를 명시하거나 핵심 누락 후보 차단 |
-| 전체 prompt 토큰 예산 | UCP04 | 최종 문자열 전체 검사, 계열별 한계 구분. 정확한 tokenizer 부재는 근사로 표시 |
+| 전체 prompt 토큰 예산 | UCP04 | 완료(근사). `estimate_tokens`가 후보별 최종 문자열 전체를 세고, 계열별 한계는 `token_window`로 구분한다(`sd15` 77, 나머지 미확정). 정확한 tokenizer가 없어 `ceil(단어*1.3)` 근사이며 guidance에 추정임을 명시. 실측·보정은 UCP09 |
 | 사전·충돌·alias·출력 품질 감사 | UCP04·UCP08·UCP09 | 같은 고정 평가셋 사용, 사용자 로그 수집 없이 기대 의미를 독립 검토 |
 | 실서버 model alias·사전·gate 연결 | UCP03·UCP09 | 실제 광고 capability와 요청 성공/거절 확인. mock과 분리 |
-| 구 서버·롤백·DB 복원 | UCP07·UCP08 | v1/v2 호환, v3 미지원 시 직접 입력 유지, 실제 DB 왕복 |
+| 구 서버·롤백·DB 복원 | UCP07·UCP08 | v1/v2 호환, v3 미지원 시 직접 입력 유지, 실제 DB 왕복은 UCP07에서 **완료**(임시 DB 재시작·재시도·metadata·sidecar·events 검증). v3 미지원 서버의 브라우저 클릭 검증은 UCP08 |
 | 반응형 구조·터치·사전 탐색 | UCP01·UCP02·UCP05 | 3절 레이아웃·44px 조작 영역·긴 내용·상태 보존 기준 |
 | 모바일 한글 입력·키보드·회전 | UCP06·UCP08 | IME 오제출 없음, 키보드 가림 없음, 화면 전환 후 입력 보존 |
 | 사용자 효율·접근성·실응답 | UCP08·UCP09 | 3절 매트릭스, 실제 확대·스크린리더·실기기 확인 범위, 클릭/스크롤/보정 관찰 |
@@ -1126,19 +1612,20 @@ git diff --check
 다음 실행 단위:
 ```
 
-UCP01은 계약 확정 완료, UCP02는 구현 완료이며 UCP03~09는 모두 대기다. UCP02의 결과는 단위
-테스트까지이며 브라우저·실기기·실연결 통과 검증은 아직 기록하지 않는다(UCP05·UCP08·UCP09로
-이월). 구현 후 현재 구성 문서에 설명을 반영하더라도 이 실행 명세의 전체 설계·태스크·완료 기준은
-유지한다.
+UCP01은 계약 확정 완료, UCP02·UCP03·UCP04·UCP05·UCP06·UCP07은 구현 완료이며 UCP08·UCP09는 대기다. UCP05의
+결과는 단위 테스트와 mock API 브라우저 배치까지, UCP06의 결과는 통합 테스트까지, UCP07의 결과는 API·순수 모듈과
+임시 DB 왕복까지이며, 실기기·실연결 통과 검증은 아직 기록하지 않는다(UCP08·UCP09로 이월). 구현 후 현재 구성 문서에 설명을 반영하더라도
+이 실행 명세의 전체 설계·태스크·완료 기준은 유지한다.
 
 브라우저·실연결로 미뤄 둔 항목을 명시한다. 아래는 mock이나 순수 함수 검증으로 대체하지 않고,
 해당 실행 단위에서 실제 환경으로 확인해야 한다.
 
 | 항목 | 확인 시점 |
 | --- | --- |
-| 반응형 결과 화면 배치·44px 조작 영역·가로 넘침 | UCP05·UCP08 |
-| 화면 회전·폭 변경·패널 접기에서 상태 보존(실제 레이아웃) | UCP05 |
-| iOS Safari·Android Chrome 실기기 한글 IME·키보드 가림 | UCP06·UCP08 |
+| 반응형 결과 화면 배치·44px 조작 영역·가로 넘침 | UCP05에서 mock·데스크톱 반응형으로 부분 확인, 실기기 확인은 UCP08 |
+| 화면 회전·폭 변경·패널 접기에서 상태 보존(실제 레이아웃) | UCP05에서 상태 보존 로직·mock 배치 확인, 실기기 회전은 UCP08 |
+| 귀속 select·AI에게 맡기기·충돌 해소·되돌리기 블록의 실제 배치·터치 | UCP06에서 상태·계약만 고정, 브라우저 확인은 UCP08 |
+| iOS Safari·Android Chrome 실기기 한글 IME·키보드 가림 | UCP08 |
 | 실제 provider 응답의 잘림·추론 토큰 분포·후보 품질 | UCP09 |
 | 실제 v3 스냅샷의 DB·metadata·sidecar·재시작 왕복 | UCP07 |
 

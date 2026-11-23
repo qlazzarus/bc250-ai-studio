@@ -23,6 +23,12 @@ npm --prefix frontend ci
 | 설치기 | `bash -n deploy/deploy-release.sh` 및 `.venv/bin/python -m pytest -q scripts/test_studio_static_deploy.py` |
 | diff | `git diff --check` |
 
+프런트 테스트는 `frontend/package.json`에 `test` 스크립트가 없다. `node:test`로 `.mjs`가
+`.ts` 소스를 직접 import하므로 번들러 없이 실행한다. `--experimental-strip-types`는 Node 22에서만
+필요하고 Node 23 이상은 타입을 기본으로 제거한다. 어느 쪽이든 **Node 22 이상**이 필요하다 —
+`structuredClone`·`node:test`·타입 제거를 쓰므로 그보다 오래된 런타임은 단언이 아니라 import
+단계에서 실패한다. `frontend/` 안에서는 `node --test tests/*.test.mjs`로 충분하다.
+
 Studio 릴리스 스크립트는 지정된 테스트 파일만 실행한다. 전체 backend, 프롬프트 추가 검사, 모델 제어 후보·Linux VM 스크립트의 전체 성공을 의미하지 않는다. CI가 실제 실행하는 목록은 `.github/workflows/deploy.yml`을 따른다.
 
 ## 브라우저
