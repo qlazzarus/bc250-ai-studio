@@ -559,6 +559,7 @@ def build_payload(
             "model": model,
             "max_tokens": COMPOSE_MAX_TOKENS,
             "stream": False,
+            "response_format": {"type": "json_object"},
             # Qwen reasoning would consume the budget without producing the object.
             "chat_template_kwargs": {"enable_thinking": False},
             "messages": [
