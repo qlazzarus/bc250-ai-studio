@@ -240,7 +240,70 @@ UCP09를 완료로 표시하려면 **아래가 모두 실제 출력으로** 남�
 
 **금지되는 완료 처리**: ① 광고만 켜지고 호출이 409로 실패하는 상태, ② Mock/스텁으로 4사례를 통과시킨 결과, ③ 자동 계약 테스트 통과를 의미 보존 증거로 대체, ④ 서버가 주지 않은 토큰 사용량·메모리·`finish_reason` 추정값.
 
+## `STUDIO_LLM_MODEL` 값 확정 (추정 없이)
+
+llama-server 기동 인자에 `--alias`가 **없다**(실측 cmdline). 따라서 API가 노출하는 모델 이름은 별칭이 아니라 **파일 경로 전체**다. `/model-snapshot`의 `data[].id`가 유일한 권위 값이다:
+
+```
+'/opt/models/qwen36-35b-a3b-uncensored/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-IQ2_M.gguf'
+```
+
+| 후보 | 근거 | 판정 |
+| --- | --- | --- |
+| 위 경로 전체 | `/model-snapshot` `data[].id`, `GET /v1/models` `id` | **사용** |
+| `qwen3.6-35b-a3b` 등 짧은 이름 | 어디에도 정의 없음 | 쓰지 않음(추정) |
+| `qwen2.5-7b-instruct` | `deploy/studio.env.example`의 **예시 placeholder** | 쓰지 않음 |
+
+주의사항:
+
+- `--alias`는 llama.cpp가 지원하지만 지금 인자에 없으므로, 별칭을 만들려면 llama-server 재시작이 필요하다. 그것은 **금지 범위(전역 LLM 설정)** 이므로 하지 않는다. 경로를 그대로 쓴다.
+- `STUDIO_` 접두사는 pydantic이 붙인다(`env_prefix="STUDIO_"`, `extra="forbid"`). 변수명이 `STUDIO_LLM_MODEL`이 아니면 기동이 실패한다.
+- Studio는 응답 `model` 필드를 설정값과 **비교하지 않는다**(`_envelope_model`은 기록용). 따라서 값이 틀려도 오류로 드러나지 않고 llama가 무시할 뿐이다. 조용한 실패를 피하려면 정확한 id를 넣는다.
+- 값에 `/opt/models/...` 경로가 들어가지만 **모델 파일을 바꾸는 것이 아니라** Studio가 요청에 실어 보내는 이름일 뿐이다.
+
+## `x-model-epoch` 최소 변경 설계 (조사 결과, 미구현)
+
+### 참조 구현: `/opt/bc250-llm-client/backend/app/main.py`
+
+| 요소 | 구현 |
+| --- | --- |
+| snapshot 조회 | `GET {gate}/model-snapshot`, `ready is True`, `epoch`가 `[0-9a-f]{32}`, `models.data` 비어있지 않음 |
+| 요청 헤더 | `X-Model-Epoch: <snapshot epoch>` (`gate_headers`) |
+| epoch 불일치 | `409` → `model_epoch_mismatch`로 사용자에게 반환. **자동 재시도 없음**(대화형). 백그라운드 준비 작업만 `sleep` 후 재확인 |
+| stale 방지 | 호출 직전 snapshot → 호출 → 필요 시 재확인. `after_epoch != epoch`면 실패 처리 |
+| 409 식별 | 게이트가 `X-BC250-Admission: rejected` 헤더를 붙임 |
+
+### 설계상 결정적 제약: epoch는 캐싱할 수 없다
+
+게이트 `mutate()` 135행:
+
+```python
+if hold not in holds and hold.startswith(('switch-', 'studio-')): epoch = secrets.token_hex(16)
+```
+
+**Studio의 이미지 생성 hold(`studio-*`)도 epoch을 올린다.** 즉 epoch은 "모델이 바뀌었다"가 아니라 **"GPU 소유권이 바뀌었다"**의 표식이다. Studio가 이미지 job을 시작/종료할 때마다 값이 바뀌므로, 프로세스 시작 시 한 번 받아 캐싱하면 곧 409가 된다. → **매 호출 직전에 `/model-snapshot`을 조회해야 한다.**
+
+### GPU Gate 점유와의 정합성
+
+- `/model-snapshot`은 **hold를 잡지 않는다.** 게이트가 `enter()` 없이 `status()`만 읽고 llama `/v1/models`를 프록시한다. 그래서 조회 자체가 GPU를 점유하지 않는다.
+- paused 상태에서는 `/model-snapshot`이 `409 {"ready": false, "epoch": ...}`를 준다. 현재 Studio는 이미 `_gate_state`로 paused를 먼저 확인해 `admission_paused`로 끝내므로, epoch 조회는 그 뒤에 두면 된다.
+- ⚠️ **알려진 경합**: 이미지 job 시작과 LLM compose가 겹치면 클라이언트가 받은 epoch이 hold 획득 직후 무효가 되어 409가 날 수 있다. 이것이 **정확히 의도된 동작**이다(모델/소유권 전환 중 호출 금지). 재시도로 덮지 말고 사용자에게 알린다.
+- Studio compose는 이미지 생성 중 `leased=True`면 애초에 `image_running`으로 거절하므로, 실제 경합 창은 좁다.
+
+### 변경 범위 (초안, 승인 전)
+
+| 파일 | 변경 |
+| --- | --- |
+| `backend/app/services/gate_epoch.py` (신규) | `snapshot_epoch(settings, transport)` — `/model-snapshot` 조회·검증, `ready`/`epoch` 형식 확인. `proposal_provider.py`의 `data_base_url` 재사용 |
+| `backend/app/services/proposal_provider.py` | `_headers()`에 epoch 인자 추가, `_call()`에서 paused 확인 **후** snapshot 조회 → 헤더 전송. 409는 기존 `upstream_status`/`http_409` 대신 `epoch_mismatch`로 구분 |
+| `backend/app/services/prompt_compose.py` | 동일(중복된 `_headers`/`_gate_state`를 공유 헬퍼로 통합) |
+| `backend/app/api/...` | 새 failure code `model_epoch_mismatch`를 409로 매핑 |
+| 테스트 | MockTransport로 ① 헤더 존재 ② 409 시 재시도 없음 ③ snapshot 409(ready=false) 처리 ④ epoch 형식 오류 처리 |
+
+**하지 않는 것**: epoch 하드코딩, 409 자동 재시도, `/model-snapshot` 결과 장기 캐싱, 게이트 코드 수정.
+
 ## 롤백
+
 
 
 1. 실패 시 출력된 backup 경로를 확인한다. **root 필요**(`0700`).
@@ -250,11 +313,15 @@ UCP09를 완료로 표시하려면 **아래가 모두 실제 출력으로** 남�
 
 ## 하지 않은 것
 
+- **`/etc/bc250-ai-studio.env` 변경·Studio 재시작**: 하지 않았다. `sudoedit`과 `systemctl restart`가 필요한 단계라 **사용자 승인 대기**다. 값만 확정해 두었다.
+- **운영 Compose 호출**: 하지 않았다. 실제 추론과 GPU 점유가 발생하므로 승인 후에 한다.
+- **epoch 코드 수정**: 하지 않았다. 설계만 기록했다. 요청 없이 구현하지 않는다.
+- **push·배포**: 하지 않았다. 로컬 커밋 `630db8a`, `bb9e6ea`만 있으며 `origin/main`보다 2커밋 앞선다.
+- **llama-server 설정 변경**: 하지 않았다. `--alias`도 추가하지 않았고(재시작 필요), 모델·컨텍스트·reasoning 인자를 건드리지 않았다.
+- **모델 파일·DB·이미지 자산 변경**: 하지 않았다. GPU job도 새로 만들지 않았다.
 - **모바일 실기기 검증**: 계속 미완료다. 이번 작업은 데스크톱 터널 경로만 확인했다.
-- **재배포·push·서비스 재시작**: 하지 않았다. 이번 세션은 읽기 전용 점검과 진단 스크립트 추가뿐이다. `llm_model` 설정은 `sudoedit` + Studio 재시작이 필요해 **사람 승인 사항**으로 남겼다.
-- **전역 LLM 설정 변경**: 하지 않았다. llama-server의 모델·컨텍스트·reasoning 설정을 건드리지 않았고 `bc250-llm-client.service` 재시작 권한도 쓰지 않았다.
-- **모델 파일·DB·이미지 자산 변경**: 하지 않았다. GPU 작업(job)도 새로 만들지 않았다 — 이번 조회는 기존 job·asset만 읽었고, `contract probe` 2건은 이전 세션 기록이다.
 - **UCP09 완료 처리**: 하지 않았다. compose 단계가 503이므로 완료가 아니다.
+
 
 
 
