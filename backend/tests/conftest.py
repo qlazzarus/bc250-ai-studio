@@ -1,5 +1,6 @@
 import time
 
+import httpx
 import pytest
 from app.core.studio_config import Settings
 from app.main import create_app
@@ -9,6 +10,28 @@ CLIENT_KEY = "client-key-for-tests-1234567890"
 ADMIN_KEY = "admin-key-for-tests-1234567890"
 HEADERS = {"Authorization": f"Bearer {CLIENT_KEY}"}
 ADMIN = {"Authorization": f"Bearer {ADMIN_KEY}"}
+
+# LLM-I03: any transport that fakes the gate must also answer /model-snapshot,
+# because every inference call now reads the epoch first. The value is a fixed
+# 32-hex string shaped like the gate's own `secrets.token_hex(16)`.
+SNAPSHOT_EPOCH = "0f1e2d3c4b5a69788796a5b4c3d2e1f0"
+
+
+def snapshot(model, *, epoch=SNAPSHOT_EPOCH, ready=True, status=200):
+    """The gate's /model-snapshot body, in the shape measured on the host.
+
+    ``models`` is the proxied llama ``/v1/models`` reply, so a test that changes the
+    served model changes the id here rather than inventing a second contract.
+    """
+    if status != 200:
+        return httpx.Response(status, json={"detail": "model_epoch_mismatch"})
+    return httpx.Response(status, json={
+        "ready": ready,
+        "epoch": epoch,
+        "models": {"object": "list", "data": [{"id": model, "object": "model"}]}
+            if model else {"object": "list", "data": []},
+    })
+
 
 
 @pytest.fixture

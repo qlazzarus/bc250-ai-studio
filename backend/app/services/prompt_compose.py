@@ -47,6 +47,7 @@ from app.models.schemas import (
     CompositionSceneUnmapped,
     CompositionSnapshotSelection,
 )
+from app.services.gate_epoch import SnapshotError, epoch_for, rejection_detail
 from app.services.prompt_profiles import (
     OutputProfile,
     estimate_tokens,
@@ -1296,11 +1297,15 @@ class ComposeProviderClient:
             self._sessions[session] = semaphore
         return semaphore
 
-    def _headers(self) -> dict[str, str]:
+    def _headers(self, epoch: str) -> dict[str, str]:
         # Only the LLM key, never the gate control key: the data path does not validate
         # credentials itself (C02-1).
-        return ({"Authorization": f"Bearer {self.s.llm_api_key}"}
-                if self.s.llm_api_key else {})
+        headers = ({"Authorization": f"Bearer {self.s.llm_api_key}"}
+                   if self.s.llm_api_key else {})
+        # LLM-I03: the gate refuses a data request that cannot name the epoch it was
+        # built for, so the value read just before this call is sent with it.
+        headers["X-Model-Epoch"] = epoch
+        return headers
 
     async def _gate_state(self, client) -> dict:
         headers = {"Authorization": f"Bearer {self.s.admission_key}"}
@@ -1325,8 +1330,18 @@ class ComposeProviderClient:
                 if gate["paused"]:
                     return _failed("admission_paused", "gate_paused",
                                    validated=validated)
+                # LLM-I03: the epoch is read after the paused check and immediately
+                # before the call. It is never cached — any studio- or switch- hold
+                # raises it — and a failure here means no inference was attempted.
+                try:
+                    epoch = await epoch_for(client, self.s.admission_url,
+                                            self.s.llm_model)
+                except SnapshotError as error:
+                    return _failed(error.failure, error.detail,
+                                   Observation(latency_ms=_elapsed(started)),
+                                   validated=validated)
                 response = await client.request("POST", url, json=payload.body,
-                                                headers=self._headers())
+                                                headers=self._headers(epoch))
         except httpx.HTTPError as error:
             return _failed("gate_unreachable", type(error).__name__,
                            Observation(latency_ms=_elapsed(started)),
@@ -1339,6 +1354,13 @@ class ComposeProviderClient:
                            validated=validated)
         latency = _elapsed(started)
         if response.status_code != 200:
+            # A 409 raised by the gate itself means the GPU owner moved between the
+            # snapshot and this call. Report it, never retry: the gate's refusal is
+            # the correct answer, and a retry would hide it.
+            rejected = rejection_detail(response)
+            if rejected is not None:
+                return _failed("upstream_status", rejected,
+                               Observation(latency_ms=latency), validated=validated)
             return _failed("upstream_status", f"http_{response.status_code}",
                            Observation(latency_ms=latency), validated=validated)
         try:

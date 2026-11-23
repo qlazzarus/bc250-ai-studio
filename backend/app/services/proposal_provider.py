@@ -15,6 +15,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
+from app.services.gate_epoch import SnapshotError, epoch_for, rejection_detail
 from app.services.prompt_proposals import (
     DISPLAY_GROUP,
     FINISH_REASONS,
@@ -412,11 +413,15 @@ class ProposalProviderClient:
             self._sessions[session] = semaphore
         return semaphore
 
-    def _headers(self) -> dict[str, str]:
+    def _headers(self, epoch: str) -> dict[str, str]:
         # Only the LLM key, never the gate control key: the data path does not
         # validate credentials itself (C02-1).
-        return ({"Authorization": f"Bearer {self.s.llm_api_key}"}
-                if self.s.llm_api_key else {})
+        headers = ({"Authorization": f"Bearer {self.s.llm_api_key}"}
+                   if self.s.llm_api_key else {})
+        # LLM-I03: the gate refuses a data request that cannot name the epoch it was
+        # built for, so the value read just before this call is sent with it.
+        headers["X-Model-Epoch"] = epoch
+        return headers
 
     async def _gate_state(self, client: httpx.AsyncClient) -> dict:
         headers = {"Authorization": f"Bearer {self.s.admission_key}"}
@@ -427,9 +432,11 @@ class ProposalProviderClient:
             raise ValueError("Admission gate returned an invalid state")
         return value
 
-    async def _post(self, client: httpx.AsyncClient, payload: dict) -> httpx.Response:
+    async def _post(self, client: httpx.AsyncClient, payload: dict,
+                    epoch: str) -> httpx.Response:
         url = data_base_url(self.s.admission_url).rstrip("/") + "/v1/chat/completions"
-        return await client.request("POST", url, json=payload, headers=self._headers())
+        return await client.request("POST", url, json=payload,
+                                    headers=self._headers(epoch))
 
     async def _call(self, request: ProposalRequest, model: str,
                     dictionary: Mapping[str, DictionaryEntryRef]) -> ProposalOutcome:
@@ -444,7 +451,16 @@ class ProposalProviderClient:
                 if gate["paused"]:
                     # C02-3: a hold means the LLM is paused for image work.
                     return _failure("admission_paused", "gate_paused")
-                response = await self._post(client, payload)
+                # LLM-I03: read the epoch *after* the paused check and immediately
+                # before the call. It is never cached: any studio- or switch- hold
+                # raises it, so a stale value would be rejected by the gate anyway.
+                try:
+                    epoch = await epoch_for(client, self.s.admission_url,
+                                            self.s.llm_model)
+                except SnapshotError as error:
+                    return _failure(error.failure, error.detail,
+                                    int((time.monotonic() - started) * 1000))
+                response = await self._post(client, payload, epoch)
         except httpx.HTTPError as error:
             return _failure("gate_unreachable", type(error).__name__,
                             int((time.monotonic() - started) * 1000))
@@ -455,6 +471,12 @@ class ProposalProviderClient:
                             int((time.monotonic() - started) * 1000))
         latency = int((time.monotonic() - started) * 1000)
         if response.status_code != 200:
+            # A 409 the gate raised itself is an admission decision (the GPU owner
+            # moved between the snapshot and this call). It is reported as such and
+            # never retried: the gate's answer is the correct answer.
+            rejected = rejection_detail(response)
+            if rejected is not None:
+                return _failure("upstream_status", rejected, latency)
             return _failure("upstream_status", f"http_{response.status_code}", latency)
         try:
             content, observed = reply_envelope(response.content)

@@ -21,6 +21,9 @@
 | proposals | `/api/v1/prompt/proposals` → **200 `not_configured`**, capability 미광고 | **함께 미광고** |
 | gate | `/health`·`/status` 409(설계), `/model-snapshot` 200 `ready: true` | 정상 |
 
+> **2026-11-23 추가**: `x-model-epoch` 처리 코드가 **로컬에서 구현·검증됐다**(아래 「`x-model-epoch` 구현」 절). 다만 **서버에는 아직 배포되지 않았고** `STUDIO_LLM_MODEL`도 여전히 미설정이므로, 위 표의 호스트 상태는 그대로다. 배포하려면 사용자 승인이 필요하다.
+
+
 ### 차단 사유와 원인 (사전이 아니라 `llm_model`)
 
 배포된 코드로 인프로세스 재현한 결과가 결정적이다(`/opt/bc250-ai-studio/.venv/bin/python`, 서비스 무변경):
@@ -48,7 +51,7 @@ return (proposals_enabled(settings) and dictionary is not None
 
 **왜 비어 있나**: `STUDIO_LLM_MODEL` 요구는 `03a2fa5`(2026-11-18)에서 들어왔고, `deploy/model-control/prepare-secrets.py`가 만드는 `studio-gate.env`에는 이 항목이 **없다**. 호스트 `/etc/bc250-ai-studio.env`의 mtime은 **2026-10-24 19:51**로 그 이후 한 번도 갱신되지 않았다. 즉 오늘 배포가 만든 문제가 아니라 **처음부터 설정된 적이 없는 항목**이며, 이 때문에 `prompt_proposals`도 함께 광고되지 않는다.
 
-두 번째 잠재 결함(별개, 미해결): gate 프록시는 `/v1/chat/completions`에 `x-model-epoch` 헤더를 **필수**로 요구한다(`gate.py:114`, `enter()`가 `not epoch → 409 model_epoch_mismatch`). 실측:
+두 번째 잠재 결함(별개 → **로컬에서 구현 완료, 운영 미배포**): gate 프록시는 `/v1/chat/completions`에 `x-model-epoch` 헤더를 **필수**로 요구한다(`gate.py:114`, `enter()`가 `not epoch → 409 model_epoch_mismatch`). 실측:
 
 ```
 ready = True epoch = dc75b481
@@ -56,7 +59,8 @@ no epoch : 409 {"detail":"model_epoch_mismatch"}
 with epoch: 200
 ```
 
-`X-Model-Epoch`를 보내는 주체는 **LLM 클라이언트**(`/opt/bc250-llm-client/backend/app/main.py:419`)뿐이고, **이 저장소의 Studio 코드에는 `model-snapshot`/`epoch` 처리가 전혀 없다**(전체 grep 0건). 따라서 `llm_model`을 채워 광고를 켜도, compose 호출은 `upstream_status / http_409`로 실패할 가능성이 높다. `llm_model` 수정만으로 UCP09가 통과한다고 가정하면 안 된다.
+`X-Model-Epoch`를 보내는 주체는 원래 **LLM 클라이언트**(`/opt/bc250-llm-client/backend/app/main.py:419`)뿐이었고, **이 저장소의 Studio 코드에는 `model-snapshot`/`epoch` 처리가 전혀 없었다**(구현 전 전체 grep 0건). 따라서 `llm_model`만 채워 광고를 켜면 compose 호출은 `upstream_status / http_409`로 실패했을 것이다. **이제 코드는 있으나 서버에는 아직 배포되지 않았다** — 아래 "`x-model-epoch` 구현" 절 참조.
+
 
 ### 이미 해소된 것 (다시 미완료로 취급하지 않는다)
 
@@ -198,7 +202,7 @@ curl -sS -H "Authorization: Bearer $CLIENT_KEY" \
 
 **주의 1 — 전역 LLM 설정 금지**: `STUDIO_LLM_MODEL`은 Studio 프로세스의 환경변수일 뿐 llama-server 설정을 바꾸지 않는다. 모델 파일·llama 유닛은 수정하지 않는다.
 
-**주의 2 — 광고만 켜지고 호출은 실패할 수 있다**: gate 프록시가 `x-model-epoch`를 요구하는데 Studio에는 이 헤더를 보내는 코드가 없다(실측: 헤더 없으면 409, 있으면 200). 따라서 3)에서 광고가 보이더라도 2단계 compose가 `upstream_status / http_409`로 실패할 것으로 예상된다. **이 경우 코드 수정이 필요하며, 재배포 여부는 별도 승인 사항이다.** 광고 여부만 보고 UCP09를 완료 처리하지 않는다.
+**주의 2 — 광고만 켜지고 호출은 실패할 수 있다**: gate 프록시가 `x-model-epoch`를 요구한다(실측: 헤더 없으면 409, 있으면 200). 이 헤더를 보내는 코드는 **로컬에는 구현됐지만 이 절차를 실행하는 서버에는 아직 배포되지 않았다.** 따라서 `STUDIO_LLM_MODEL`만 설정하고 재시작하면 광고는 켜지나 2단계 compose가 `upstream_status / http_409`로 실패한다. **epoch 코드 배포와 환경변수 설정은 함께 적용해야 하며, 둘 다 별도 승인 사항이다.** 광고 여부만 보고 UCP09를 완료 처리하지 않는다.
 
 **주의 3 — `models.yaml` 백업**: 이번 배포로 서버에만 있던 `models.yaml.bak.20261113104948`는 제거됐다. 필요하면 `/var/backups/bc250-ai-studio.bmW32Fj2`(root 0700)에서 꺼낸다.
 
@@ -261,7 +265,7 @@ llama-server 기동 인자에 `--alias`가 **없다**(실측 cmdline). 따라서
 - Studio는 응답 `model` 필드를 설정값과 **비교하지 않는다**(`_envelope_model`은 기록용). 따라서 값이 틀려도 오류로 드러나지 않고 llama가 무시할 뿐이다. 조용한 실패를 피하려면 정확한 id를 넣는다.
 - 값에 `/opt/models/...` 경로가 들어가지만 **모델 파일을 바꾸는 것이 아니라** Studio가 요청에 실어 보내는 이름일 뿐이다.
 
-## `x-model-epoch` 최소 변경 설계 (조사 결과, 미구현)
+## `x-model-epoch` 구현 (로컬 완료, 운영 미배포)
 
 ### 참조 구현: `/opt/bc250-llm-client/backend/app/main.py`
 
@@ -290,17 +294,69 @@ if hold not in holds and hold.startswith(('switch-', 'studio-')): epoch = secret
 - ⚠️ **알려진 경합**: 이미지 job 시작과 LLM compose가 겹치면 클라이언트가 받은 epoch이 hold 획득 직후 무효가 되어 409가 날 수 있다. 이것이 **정확히 의도된 동작**이다(모델/소유권 전환 중 호출 금지). 재시도로 덮지 말고 사용자에게 알린다.
 - Studio compose는 이미지 생성 중 `leased=True`면 애초에 `image_running`으로 거절하므로, 실제 경합 창은 좁다.
 
-### 변경 범위 (초안, 승인 전)
+### 변경 범위 (구현 완료, 로컬)
 
 | 파일 | 변경 |
 | --- | --- |
-| `backend/app/services/gate_epoch.py` (신규) | `snapshot_epoch(settings, transport)` — `/model-snapshot` 조회·검증, `ready`/`epoch` 형식 확인. `proposal_provider.py`의 `data_base_url` 재사용 |
-| `backend/app/services/proposal_provider.py` | `_headers()`에 epoch 인자 추가, `_call()`에서 paused 확인 **후** snapshot 조회 → 헤더 전송. 409는 기존 `upstream_status`/`http_409` 대신 `epoch_mismatch`로 구분 |
-| `backend/app/services/prompt_compose.py` | 동일(중복된 `_headers`/`_gate_state`를 공유 헬퍼로 통합) |
-| `backend/app/api/...` | 새 failure code `model_epoch_mismatch`를 409로 매핑 |
-| 테스트 | MockTransport로 ① 헤더 존재 ② 409 시 재시도 없음 ③ snapshot 409(ready=false) 처리 ④ epoch 형식 오류 처리 |
+| `backend/app/services/gate_epoch.py` (신규, 154줄) | `read_snapshot()` — `/model-snapshot` 조회·검증(`ready is True`, `epoch` = `[0-9a-f]{32}`, `models.data` 비어있지 않음). `epoch_for()` — 위 검증 + 설정 모델 ID가 `data[].id`에 있는지 대조. `snapshot_url()` — `proposal_provider.data_base_url` 재사용(중복 없음). `rejection_detail()` — 게이트 자신의 409만 식별 |
+| `backend/app/services/proposal_provider.py` | `_headers(epoch)`로 epoch 헤더 추가, `_post(..., epoch)`. `_call()`은 paused 확인 **후** snapshot 조회 → 실패 시 `SnapshotError.failure`로 즉시 반환 → 헤더 전송. 409는 `rejection_detail()`로 갈라 `upstream_status` + `detail=model_epoch_mismatch` |
+| `backend/app/services/prompt_compose.py` | 동일한 3줄 변경(중복 통합은 하지 않음 — 요청대로 최소 범위) |
+| `backend/app/api/*` | **변경 없음.** 기존 `Failure` 어휘를 그대로 쓰므로 매핑 테이블(`FAILURE_MESSAGES`/`PROVIDER_MESSAGES`)과 프론트의 `FAILURE_BY_CODE` 계약이 그대로 유지된다 |
+| `backend/tests/conftest.py` | 게이트를 흉내내는 모든 transport가 `/model-snapshot`을 답하도록 `snapshot()` 헬퍼 추가 |
+| `backend/tests/test_gate_epoch.py` (신규, 24 테스트) | 승인된 8개 시나리오 전부 |
 
-**하지 않는 것**: epoch 하드코딩, 409 자동 재시도, `/model-snapshot` 결과 장기 캐싱, 게이트 코드 수정.
+**API 오류 매핑** — 새 상태 코드를 만들지 않았다. 이유: `api/proposals.py:73`이 `FAILURE_MESSAGES[failure]`로 **직접 인덱싱**하므로 코드 추가는 두 dict + 프론트 매핑을 동시에 건드려야 하고, 프론트는 미지의 `why`를 이미 `provider_error`로 안전하게 떨어뜨린다. 따라서 `why`는 기존 값을 유지하고 `detail`로 원인을 구분한다:
+
+| 상황 | `why` | `detail` | HTTP |
+| --- | --- | --- | --- |
+| snapshot paused / 409 | `admission_paused` | `snapshot_not_ready` | 200 (compose는 503) |
+| snapshot 연결·타임아웃·형식 오류 | `gate_unreachable` | `snapshot_<예외명>` / `snapshot_not_json` / `snapshot_invalid_epoch` / `snapshot_invalid_models` / `snapshot_no_model` / `snapshot_http_<n>` | 200 |
+| 설정 모델 ≠ 서빙 모델 | `not_configured` | `configured_model_unavailable: served=<게이트가 실제로 서빙하는 id>` | 503 |
+| 호출 직후 게이트가 409 | `upstream_status` | `model_epoch_mismatch` | 200 (재시도 없음) |
+
+**하지 않는 것(구현에도 반영)**: epoch 하드코딩, 409 자동 재시도, `/model-snapshot` 결과 캐싱, 게이트 코드 수정, `--alias` 추가.
+
+### 실제 `/model-snapshot` 응답 계약 (운영 관측 기준)
+
+```json
+{
+  "ready": true,
+  "epoch": "<32 hex>",
+  "models": { "object": "list", "data": [ { "id": "<weights path>", "object": "model" } ] }
+}
+```
+
+구현이 **가정하지 않는** 것: `epoch`는 32자 소문자 hex만 인정(`secrets.token_hex(16)`), `models.data`는 배열이어야 하고 각 항목의 `id`가 비어있지 않은 문자열이어야 한다. 그 외 필드는 읽지 않는다. paused일 때는 `409`, 그 외 오류는 `ready: false` 또는 비정상 status로 관측됐고 두 경우 모두 "보내지 않음"으로 처리한다.
+
+### 검증 결과 (로컬)
+
+```
+ruff check backend                         → All checks passed!
+pytest backend                             → 620 passed, 96 skipped   (구현 전 596)
+pytest backend/tests/test_gate_epoch.py    → 24 passed
+```
+
+승인된 8개 필수 시나리오 대응: ①정상 snapshot→헤더 전송 ②paused/409→차단 ③epoch 누락·형식 오류 5종 ④모델 ID 불일치→차단 ⑤chat 409→재시도 없음 ⑥snapshot timeout/connect 실패 3종 ⑦snapshot 후 epoch 변경→409 ⑧기존 인증 헤더·요청 계약 유지. MockTransport 결과이며 **실제 추론 성공의 증거가 아니다**.
+
+### 운영 적용 시 필요한 환경변수
+
+`STUDIO_LLM_MODEL=/opt/models/qwen36-35b-a3b-uncensored/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-IQ2_M.gguf` — 한 줄 추가뿐이다. 이 값이 `/model-snapshot`의 `data[].id`와 **정확히** 같아야 한다(다르면 `not_configured / configured_model_unavailable`로 즉시 실패한다 — 조용한 통과는 이제 없다).
+
+### 배포·재시작 영향
+
+- 변경 파일: `backend/app/services/gate_epoch.py`(신규), `proposal_provider.py`, `prompt_compose.py` + 테스트 4개. **API 계약·프론트 변경 없음.**
+- 재시작: `bc250-ai-studio.service` 하나. gate·llama-server·모델 파일·전역 LLM 설정은 건드리지 않는다.
+- 순서: epoch 코드 배포 → `STUDIO_LLM_MODEL` 설정 → **한 번의** 재시작으로 둘 다 반영. 환경변수만 먼저 넣고 재시작하지 않으면 아무 효과가 없다.
+- 추가 지연: 호출당 `GET /model-snapshot` 1회(루프백, hold 미획득). 60초 예산에 영향 없음.
+
+### 롤백 절차
+
+1. 직전 릴리스 백업(`/var/backups/bc250-ai-studio.*`, root `0700`)에서 code를 복원한다.
+2. `STUDIO_LLM_MODEL`을 제거하면 광고가 다시 꺼져 기존 동작(503 `capability_not_advertised`)으로 돌아간다 — 코드를 되돌리지 않아도 기능은 안전하게 비활성된다.
+3. gate·모델 전환 journal을 삭제해 검사를 우회하지 않는다.
+4. 재시작은 Studio 하나만.
+
+
 
 ## 롤백
 
@@ -315,8 +371,8 @@ if hold not in holds and hold.startswith(('switch-', 'studio-')): epoch = secret
 
 - **`/etc/bc250-ai-studio.env` 변경·Studio 재시작**: 하지 않았다. `sudoedit`과 `systemctl restart`가 필요한 단계라 **사용자 승인 대기**다. 값만 확정해 두었다.
 - **운영 Compose 호출**: 하지 않았다. 실제 추론과 GPU 점유가 발생하므로 승인 후에 한다.
-- **epoch 코드 수정**: 하지 않았다. 설계만 기록했다. 요청 없이 구현하지 않는다.
-- **push·배포**: 하지 않았다. 로컬 커밋 `630db8a`, `bb9e6ea`만 있으며 `origin/main`보다 2커밋 앞선다.
+- **epoch 코드 수정**: **로컬에서 구현·검증 완료**(`gate_epoch.py` + 두 provider + 24 테스트). 운영 배포는 하지 않았다.
+- **push·배포**: 하지 않았다. 로컬 커밋 `630db8a`, `bb9e6ea`, `aecf4d9`만 있으며 `origin/main`보다 3커밋 앞선다.
 - **llama-server 설정 변경**: 하지 않았다. `--alias`도 추가하지 않았고(재시작 필요), 모델·컨텍스트·reasoning 인자를 건드리지 않았다.
 - **모델 파일·DB·이미지 자산 변경**: 하지 않았다. GPU job도 새로 만들지 않았다.
 - **모바일 실기기 검증**: 계속 미완료다. 이번 작업은 데스크톱 터널 경로만 확인했다.

@@ -20,6 +20,7 @@ from app.services.proposal_provider import (
     proposals_enabled,
     reply_bytes,
 )
+from conftest import SNAPSHOT_EPOCH, snapshot
 
 REQUEST_ID = "req-0123456789"
 DICTIONARY = {
@@ -29,6 +30,9 @@ DICTIONARY = {
     "style.retired": DictionaryEntryRef("style", active=False),
 }
 ADMISSION = "http://127.0.0.1:8081/control"
+# The model the fake gate is serving; `make_client` configures the provider with it,
+# so a snapshot naming any other id is a real mismatch rather than a silent pass.
+CONFIGURED_MODEL = "qwen-test"
 
 
 def request(**changes):
@@ -88,6 +92,7 @@ def make_client(handler, **kwargs):
         "admission_key": "gate-control-key-for-tests-1234",
         "llm_api_key": "llama-key-for-tests-1234567890",
         "engine": "sdcpp",
+        "llm_model": CONFIGURED_MODEL,
     }
     settings_kwargs.update(kwargs.pop("settings", {}))
 
@@ -113,6 +118,8 @@ def install(monkeypatch, handler, **kwargs):
         calls.append(request)
         if request.url.path.endswith("/control"):
             return gate_ok()
+        if request.url.path.endswith("/model-snapshot"):
+            return snapshot(CONFIGURED_MODEL)
         return handler(request)
 
     client = make_client(transport, **kwargs)
@@ -506,6 +513,14 @@ async def test_provider_goes_through_the_real_gate_app():
 
     async def llama(request):
         seen.append(request)
+        if request.url.path == "/model-snapshot":
+            # The deployed gate serves the snapshot itself; the repo's copy proxies
+            # every path, so the fake upstream answers it here to keep the round trip
+            # real rather than bypassing the proxy.
+            return httpx.Response(200, json={
+                "ready": True, "epoch": SNAPSHOT_EPOCH,
+                "models": {"object": "list",
+                           "data": [{"id": CONFIGURED_MODEL, "object": "model"}]}})
         return httpx.Response(200, json={"choices": [{"message": {
             "content": json.dumps(reply())}, "finish_reason": "stop"}]})
 
@@ -517,8 +532,12 @@ async def test_provider_goes_through_the_real_gate_app():
     async with gate_app.router.lifespan_context(gate_app):
         outcome = await ok_call(provider)
     assert outcome.ok is True
-    assert len(seen) == 1
-    forwarded = seen[0]
+    # The snapshot read is part of the path now; what must stay exactly one is the
+    # inference call — a retry would show up here as a second POST.
+    chats = [request for request in seen
+             if request.url.path == "/v1/chat/completions"]
+    assert len(chats) == 1
+    forwarded = chats[0]
     assert forwarded.url.path == "/v1/chat/completions"
     # The Studio boundary keeps the gate control key out of the data path.
     assert forwarded.headers["authorization"] == "Bearer llama-key-for-tests-1234567890"

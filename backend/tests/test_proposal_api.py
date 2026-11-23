@@ -15,7 +15,7 @@ from app.main import create_app
 from app.services.llm import FakeLLM
 from app.services.prompt_dictionary import load_dictionary
 from app.services.proposal_provider import ProposalProviderClient
-from conftest import HEADERS
+from conftest import HEADERS, snapshot
 from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -94,6 +94,8 @@ def install(app, handler):
         if request.url.path.endswith("/control"):
             return httpx.Response(200, json={"paused": False, "waiting_requests": 0,
                                              "active_requests": 0})
+        if request.url.path.endswith("/model-snapshot"):
+            return snapshot(MODEL)
         return handler(request)
 
     app.state.proposal_client = ProposalProviderClient(
@@ -175,8 +177,10 @@ def test_ready_reply_is_returned_with_the_contract_fields(gated):
     assert value["revisions"] == body()["revisions"]
     assert value["provider"]["model"] == MODEL
     assert [item["id"] for item in value["suggestions"]] == ["appearance.short_hair"]
-    # Exactly one chat call and one control read: no retry, no extra probe.
-    assert [call.method for call in calls] == ["GET", "POST"]
+    # One control read, one snapshot read, one chat call: no retry, no extra probe.
+    # The snapshot is read per call because any studio-/switch- hold raises the epoch.
+    assert [(call.method, call.url.path) for call in calls] == [
+        ("GET", "/control"), ("GET", "/model-snapshot"), ("POST", "/v1/chat/completions")]
 
 
 def test_the_reply_does_not_leak_credentials(gated):

@@ -22,7 +22,7 @@ from app.services.prompt_compose import (
 )
 from app.services.prompt_dictionary import load_dictionary
 from app.services.prompt_profiles import PROFILE_VERSION, PROFILES, profile_for, profile_versions
-from conftest import HEADERS
+from conftest import HEADERS, snapshot
 from fastapi.testclient import TestClient
 
 REQUEST_ID = "cmp-0123456789ab"
@@ -184,6 +184,8 @@ def install(app, handler, *, timeout=None):
         if request.url.path.endswith("/control"):
             return httpx.Response(200, json={"paused": False, "waiting_requests": 0,
                                              "active_requests": 0})
+        if request.url.path.endswith("/model-snapshot"):
+            return snapshot(MODEL)
         return handler(request)
 
     app.state.compose_client = ComposeProviderClient(
@@ -377,8 +379,11 @@ def test_ready_reply_returns_the_full_contract_shape(gated):
     assert value["provider"]["model"] == MODEL
     assert value["provider"]["finish_reason"] == "stop"
     assert value["cut_short"] is False
-    # Exactly one control read and one chat call: no retry, no second verification call.
-    assert [call.method for call in calls] == ["GET", "POST"]
+    # One control read, one snapshot read, one chat call: no retry, no second
+    # verification call. The snapshot is read per call because any studio-/switch-
+    # hold raises the epoch, so a cached value would be rejected.
+    assert [(call.method, call.url.path) for call in calls] == [
+        ("GET", "/control"), ("GET", "/model-snapshot"), ("POST", "/v1/chat/completions")]
 
 
 def test_a_manual_chip_survives_even_when_the_reply_calls_it_automatic(gated):
@@ -650,6 +655,8 @@ async def test_a_second_concurrent_call_is_busy_rather_than_queued(gated):
         if request.url.path.endswith("/control"):
             return httpx.Response(200, json={"paused": False, "waiting_requests": 0,
                                              "active_requests": 0})
+        if request.url.path.endswith("/model-snapshot"):
+            return snapshot(MODEL)
         await release.wait()
         return chat()
 
@@ -708,6 +715,8 @@ def test_a_timeout_releases_the_lease_it_was_holding(gated):
             if request.url.path.endswith("/control"):
                 return httpx.Response(200, json={"paused": False, "waiting_requests": 0,
                                                  "active_requests": 0})
+            if request.url.path.endswith("/model-snapshot"):
+                return snapshot(MODEL)
             await asyncio.sleep(0.3)
             return chat()
 
@@ -776,6 +785,8 @@ def test_a_timeout_discards_the_late_reply(gated):
             if request.url.path.endswith("/control"):
                 return httpx.Response(200, json={"paused": False, "waiting_requests": 0,
                                                  "active_requests": 0})
+            if request.url.path.endswith("/model-snapshot"):
+                return snapshot(MODEL)
             await asyncio.sleep(0.3)
             return chat()
 
