@@ -61,8 +61,13 @@ def release_tree(tmp_path, backend="changed", frontend="built"):
         for item in ("pyproject.toml", "uv.lock"):
             (root).mkdir(parents=True, exist_ok=True)
             (root / item).write_text("same")
+        # `config` is a directory the deployer replaces wholesale, so its files
+        # must be nested: a flat `config` file would make `rm -rf config/*` fail.
         (root / "config").mkdir(parents=True, exist_ok=True)
         (root / "config/models.yaml").write_text("same")
+        # The dictionary is required by the release precondition and by
+        # `prompt_proposals`/`prompt_compose`; without it the server degrades.
+        (root / "config/prompt_dictionary.json").write_text('{"entries": []}')
         (root / "backend").mkdir(parents=True, exist_ok=True)
         (root / "backend/main.py").write_text(backend_body)
         (root / "frontend/dist").mkdir(parents=True, exist_ok=True)
@@ -70,18 +75,50 @@ def release_tree(tmp_path, backend="changed", frontend="built"):
     return app, stage
 
 
+def deploy_items():
+    """The items the deployer copies, read from the script itself.
+
+    Parsing avoids a second copy of the list in this test: when the list gained
+    `config/prompt_dictionary.json` the hard-coded string silently stopped
+    matching and the test failed with IndexError instead of checking anything.
+    """
+    line = next(row for row in SCRIPT.splitlines() if row.startswith("for item in "))
+    return line.removeprefix("for item in ").removesuffix("; do").split()
+
+
 def test_backend_and_frontend_are_replaced_together(tmp_path):
     """A backend change is deployed instead of being refused or dropped."""
     app, stage = release_tree(tmp_path)
-    body = SCRIPT.split("for item in backend config/models.yaml frontend/dist", 1)[1].split(
-        "done", 1)[0]
+    body = SCRIPT.split("for item in backend", 1)[1].split("done", 1)[0]
     result = bash(
         f"app={app}\nstage={stage}\n"
-        "for item in backend config/models.yaml frontend/dist" + body + "done"
+        "for item in " + " ".join(deploy_items()) + body + "done"
     )
     assert result.returncode == 0, result.stderr
     assert (app / "backend/main.py").read_text() == "changed"
     assert (app / "frontend/dist/index.html").read_text() == "built"
+
+
+def test_config_directory_is_shipped_with_the_dictionary(tmp_path):
+    """The prompt dictionary must reach the host, or compose is never advertised.
+
+    Copying only `config/models.yaml` left `config/prompt_dictionary.json`
+    behind, and a missing mirror is reported as "not configured" rather than as
+    an error, so `prompt_proposals`/`prompt_compose` disappeared silently.
+    """
+    app, stage = release_tree(tmp_path)
+    items = deploy_items()
+    assert "config" in items or "config/prompt_dictionary.json" in items, (
+        f"the deployer copies {items}, which cannot carry the prompt dictionary"
+    )
+    body = SCRIPT.split("for item in backend", 1)[1].split("done", 1)[0]
+    result = bash(
+        f"app={app}\nstage={stage}\n"
+        "for item in " + " ".join(items) + body + "done"
+    )
+    assert result.returncode == 0, result.stderr
+    assert (app / "config/prompt_dictionary.json").is_file()
+    assert (app / "config/models.yaml").read_text() == "same"
 
 
 @pytest.mark.parametrize("payload,allowed", [(r'{"id": "abc"}', False), ("{}", True)])
