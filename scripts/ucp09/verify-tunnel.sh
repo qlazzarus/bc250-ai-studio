@@ -99,6 +99,12 @@ if [ -n "$KEY" ]; then
             *'"prompt_composition"'*) ok "prompt_composition(v1~3) 광고됨" ;;
             *) bad "prompt_composition 미광고" ;;
         esac
+        # `prompt_proposals` shares the dictionary/llm_model gate with `prompt_compose`,
+        # so reporting it separately says whether one conflict or two exist.
+        case "$caps" in
+            *'"prompt_proposals"'*) ok "prompt_proposals 광고됨" ;;
+            *) info "prompt_proposals 미광고 — llm_model·사전 조건 확인" ;;
+        esac
     else
         bad "인증 capabilities 실패"
     fi
@@ -111,19 +117,33 @@ else
 fi
 
 # --- 5. SSE over the tunnel ------------------------------------------------
-# A job stream must flush through Caddy (flush_interval -1). A 404 means a path
-# problem, not a tunnel problem, so the two are reported differently.
+# A real job stream must flush through Caddy (flush_interval -1). A made-up id
+# would answer 404 and prove nothing about streaming, so the id comes from the
+# job list; only when there is no job at all does this fall back to a path check.
 if [ -n "$KEY" ]; then
-    sse=$(curl -sS -o /dev/null -w '%{http_code} %{content_type}' --max-time 6 \
-        -H "Authorization: Bearer $KEY" -H 'Accept: text/event-stream' \
-        "$BASE/api/v1/jobs/no-such-job/events" 2>/dev/null || echo '000 -')
+    ids=$(curl -sS --max-time 10 -H "Authorization: Bearer $KEY" \
+        "$BASE/api/v1/jobs?limit=1" 2>/dev/null || echo '[]')
+    job=$(printf '%s' "$ids" | grep -oE '"job_id":"[^"]+' | head -1 | cut -d'"' -f4)
+    [ -n "$job" ] || job="no-such-job"
+    sse=$(curl -sS -o /dev/null -w '%{http_code} %{content_type} %{size_download}' \
+        --max-time 6 -H "Authorization: Bearer $KEY" -H 'Accept: text/event-stream' \
+        "$BASE/api/v1/jobs/$job/events" 2>/dev/null || echo '000 - 0')
     sse_code=${sse%% *}
-    sse_type=${sse#* }
-    case "$sse_code" in
-        200|404|422) ok "SSE 경로 응답 $sse_code (터널 통과)" ;;
-        *) bad "SSE 경로 응답 $sse_code" ;;
-    esac
-    info "SSE content-type: $sse_type"
+    rest=${sse#* }
+    sse_type=${rest% *}
+    sse_bytes=${rest##* }
+    if [ "$job" = "no-such-job" ]; then
+        # Nothing to stream: 404/422 still proves the request reached FastAPI.
+        case "$sse_code" in
+            200|404|422) ok "SSE 경로 응답 $sse_code (작업 없음, 경로만 확인)" ;;
+            *) bad "SSE 경로 응답 $sse_code" ;;
+        esac
+    else
+        case "$sse_code:$sse_type" in
+            200:text/event-stream*) ok "SSE 실작업 스트림 200 ($sse_bytes bytes)" ;;
+            *) bad "SSE 실작업 스트림 $sse_code ($sse_type)" ;;
+        esac
+    fi
 fi
 
 # --- 6. image download through the same origin -----------------------------
