@@ -6,6 +6,10 @@
 
 [사전 프롬프트 통합 구성 단일 실행 명세](PROMPT_COMPOSER_UNIFIED_IMPLEMENTATION.md)에서 전체 구현·구성·UCP01~09·관련 보완·검증·현재 상태를 관리한다. 실행자는 DeepSeek 4.1 Flash다. 이 항목의 세부 TODO는 분산하지 않으며 해당 명세를 문서 압축 대상으로 취급하지 않는다.
 
+## Art Studio UI/UX
+
+[화면 개선 실행 계획과 태스크 상태표](ART_STUDIO_UI_UX_IMPLEMENTATION.md)에서 관리한다.
+
 ## 모델과 생성 기능
 
 - [ ] MOSS Q4 fast/quality, Q8 LoRA 0.7 및 미검증 프리셋의 실제 GPU·메모리·품질 검증. 다른 모델의 검증 범위를 확대하지 않기.

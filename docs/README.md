@@ -23,6 +23,7 @@
 
 - [프로젝트 TODO](TODO.md): 미구현 기능과 남은 검증의 단일 목록.
 - [통합 프롬프트 구현 계획](PROMPT_COMPOSER_UNIFIED_IMPLEMENTATION.md): 최우선 작업의 전체 설계·구현·태스크·검증·상태를 담은 단일 실행 명세. DeepSeek 4.1 Flash에 이 파일 하나를 전달한다. 압축·삭제 대상에서 제외한다.
+- [Art Studio UI/UX 실행 계획](ART_STUDIO_UI_UX_IMPLEMENTATION.md)에서 화면별 개선 범위와 다음 구현 태스크를 확인한다.
 - [외부 LLM 프로젝트 경계](LLM_MODEL_SWITCH.md): Client 소유 기능과 이 저장소에 남아 있는 후보 코드의 구분.
 
 ## 문서 관리 기준
