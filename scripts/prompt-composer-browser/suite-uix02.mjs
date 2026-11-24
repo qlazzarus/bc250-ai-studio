@@ -332,11 +332,58 @@ export async function runUix02({ page, check, record, sleep, shots }) {
     noResults.searchCount.includes("검색 결과 0개") && noResults.searchCount.includes("선택"));
   check("UIX02 · 검색만으로 요청이 나가지 않음", beforeView.requests, noResults.requests);
 
-  // The existing reset actions must still be the way out of an empty result.
+  // The existing reset action must still be the way out of an empty result.
   const resetButtons = await evaluate(`[...document.querySelectorAll('.compose-empty-actions button')]
     .map((node) => node.textContent.trim())`);
   check("UIX02 · 빈 결과에 검색어 지우기 제공", true,
     resetButtons.includes("검색어 지우기"));
+  // Only the query is narrowing the list, so the category reset must *not* be offered yet:
+  // a "전체 분류 보기" button here would do nothing and read as a broken control.
+  check("UIX02 · 검색만 좁혔을 때 분류 초기화는 없음", false,
+    resetButtons.includes("전체 분류 보기"));
+
+  // A category plus a query produces the same empty result, so the second reset action has
+  // to exist and work on its own: clearing the query must not be the only way out.
+  // Order matters — the category buttons are derived from the *filtered* entries, so the
+  // category has to be chosen while it still has results, then narrowed by the query.
+  // "네온" is a lighting word, so inside 의상 it matches nothing.
+  await clickByText(".compose-empty-actions button", "검색어 지우기");
+  await sleep(300);
+  const categorySetup = await evaluate(`(() => {
+    const labels = [...document.querySelectorAll('.compose-groups button')]
+      .map((node) => node.textContent.trim());
+    const button = [...document.querySelectorAll('.compose-groups button')]
+      .find((node) => node.textContent.trim().startsWith('의상'));
+    if (!button) return { clicked: false, labels };
+    button.click();
+    return { clicked: true, labels };
+  })()`);
+  await sleep(300);
+  await evaluate(setValue('.compose-dictionary input[type="search"]', "네온"));
+  await sleep(350);
+  const categoryOnly = await evaluate(VIEW);
+  check("UIX02 · 분류를 고를 수 있음", true, categorySetup.clicked === true);
+  check("UIX02 · 분류와 검색이 함께 결과를 좁힘", true,
+    categoryOnly.searchCount.includes("검색 결과 0개"));
+  check("UIX02 · 분류 선택이 요약에 표시됨", true,
+    categoryOnly.searchCount.includes("의상 분류"));
+  const categoryReset = await evaluate(`[...document.querySelectorAll('.compose-empty-actions button')]
+    .map((node) => node.textContent.trim())`);
+  check("UIX02 · 분류만 좁힌 빈 결과에 전체 분류 보기", true,
+    categoryReset.includes("전체 분류 보기"));
+  await clickByText(".compose-empty-actions button", "전체 분류 보기");
+  await sleep(350);
+  const categoryCleared = await evaluate(VIEW);
+  check("UIX02 · 전체 분류 보기가 분류를 해제", false,
+    categoryCleared.searchCount.includes("분류"));
+  check("UIX02 · 분류 초기화도 선택을 바꾸지 않음", beforeView.counts.chosen,
+    categoryCleared.counts.chosen);
+  check("UIX02 · 분류 초기화도 요청을 보내지 않음", beforeView.requests,
+    categoryCleared.requests);
+
+  // Now the query reset, from a query-only empty result.
+  await evaluate(setValue('.compose-dictionary input[type="search"]', "없는검색어zzz"));
+  await sleep(350);
   await clickByText(".compose-empty-actions button", "검색어 지우기");
   await sleep(350);
   const cleared = await evaluate(VIEW);

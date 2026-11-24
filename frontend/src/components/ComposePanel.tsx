@@ -47,6 +47,10 @@ import { failureAlert, warningAlerts, type ComposeAlert } from "../prompt/compos
 import { chipList, entityLabels as entityLabelMap, groupChips } from "../prompt/composeChips";
 import { applyDiff, needsOverwriteConfirm, planApply } from "../prompt/composeApply";
 import { composeFallbackNotice, type ComposeCapability } from "../prompt/composeCapability";
+import {
+  candidateBodyOpen, expansionFor, toggledView, EMPTY_VIEW,
+  type CandidateView, type ComposeStatusView,
+} from "../prompt/composeView";
 
 export type ComposePanelProps = {
   /** Live capability. `supported: false` keeps the rules-only path and says why. */
@@ -115,18 +119,15 @@ export type ComposePanelProps = {
   onStatusChange?: (status: ComposeStatusView) => void;
 };
 
-/** The four facts the folded strip needs. Deliberately flat and serializable. */
-export type ComposeStatusView = {
-  phase: "idle" | "pending" | "ready" | "needs_clarification" | "failed" | "cancelled";
-  /** Usable candidates in the current draft; 0 unless the phase carries a reply. */
-  candidateCount: number;
-  /** The displayed reply no longer matches the edit (brief/chips/model moved). */
-  stale: boolean;
-  /** The headline of the failure alert, when the phase is `failed`. */
-  failureKo: string | null;
-};
+/**
+ * UIX03: which candidate bodies are open, and the strip's own projection.
+ *
+ * Both live in `composeView.ts` beside the rest of the panel's display state, so they can be
+ * tested as plain functions. They are re-exported here because this component is where the
+ * rest of the codebase looks for the compose view's vocabulary.
+ */
+export type { CandidateView, ComposeStatusView, StripPhase } from "../prompt/composeView";
 
-type CandidateView = { key: string; expanded: string[]; collapsed: string[] };
 
 const GROUP_LABEL: Record<string, string> = {
   subject: "대상", appearance: "외형", clothing: "의상", expression: "표정",
@@ -217,7 +218,7 @@ export default function ComposePanel({
    * View state only: toggling a body never touches `edit`, so no revision moves, nothing is
    * sent, and the final prompt cannot change.
    */
-  const [candidateView, setCandidateView] = useState<CandidateView>({ key: "", expanded: [], collapsed: [] });
+  const [candidateView, setCandidateView] = useState<CandidateView>(EMPTY_VIEW());
 
   const pending = isPending(visible);
   const edit = visible.edit;
@@ -603,20 +604,12 @@ export default function ComposePanel({
    * pairs the new candidate ids with the previous reply's open set.
    */
   const viewKey = visible.draft?.resultId ?? "";
-  const bodyView = candidateView.key === viewKey
-    ? candidateView : { key: viewKey, expanded: [], collapsed: [] };
+  const bodyView = expansionFor(candidateView, viewKey);
   /** The first body is open unless the user closed it; the rest only on request. */
-  const bodyOpen = (candidateId: string, index: number): boolean => index === 0
-    ? !bodyView.collapsed.includes(candidateId) : bodyView.expanded.includes(candidateId);
+  const bodyOpen = (candidateId: string, index: number): boolean =>
+    candidateBodyOpen(bodyView, candidateId, index);
   const toggleBody = (candidateId: string, index: number) => {
-    setCandidateView((current) => {
-      const base = current.key === viewKey
-        ? current : { key: viewKey, expanded: [], collapsed: [] };
-      const list = index === 0 ? base.collapsed : base.expanded;
-      const next = list.includes(candidateId)
-        ? list.filter((id) => id !== candidateId) : [...list, candidateId];
-      return index === 0 ? { ...base, collapsed: next } : { ...base, expanded: next };
-    });
+    setCandidateView((current) => toggledView(expansionFor(current, viewKey), candidateId, index));
   };
 
   /**
@@ -906,7 +899,12 @@ export default function ComposePanel({
       {candidates.map((candidate, index) => {
         const diff = applyDiff(candidate, { currentPrompt: prompt,
           currentNegative: negative, negativeSupported });
-        const isApplied = visible.applied?.candidateId === candidate.candidateId;
+        // UIX03: an applied record belongs to the *reply* it came from. Two replies may reuse a
+        // candidate id, so matching the id alone would stamp "적용됨" on a candidate of the new
+        // reply that was never applied. The reply id is the missing half of the identity.
+        const isApplied = visible.applied !== null && visible.draft !== null
+          && visible.applied.candidateId === candidate.candidateId
+          && visible.applied.resultId === visible.draft.resultId;
         const open = bodyOpen(candidate.candidateId, index);
         const bodyId = `compose-candidate-body-${candidate.candidateId}`;
         // UIX03: the headline answers "which candidate is this and does it change my text"

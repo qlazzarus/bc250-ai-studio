@@ -8,6 +8,7 @@ import { runTrans06 } from "./suite-trans06.mjs";
 import { runU12 } from "./suite-u12.mjs";
 import { runUcp08 } from "./suite-ucp08.mjs";
 import { runUix02 } from "./suite-uix02.mjs";
+import { runUix03 } from "./suite-uix03.mjs";
 import { adjustOpen, closeAdjust, openAdjust, pickEntry, stageOrder, waitAdjustOpen, waitSearchFocus } from "./ui.mjs";
 
 export async function runSuite({ page, browser, sessionId, check, record, sleep, shots }) {
@@ -358,4 +359,8 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
   // UIX02 registers its own compose stub and reloads, so it starts from a clean document
   // and does not depend on what UCP08 left applied.
   await runUix02({ page, check, record, sleep, shots });
+  // UIX03 does the same, and owns its document from a fresh reload: it toggles candidate
+  // bodies, changes model mid-request and stubs a negative-less model through `/models`,
+  // all of which would leave the shared document in a state the blocks above did not assert.
+  await runUix03({ page, check, record, sleep, shots });
 }

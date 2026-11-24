@@ -12,7 +12,8 @@ import editable from "./lib/editable";
 import fixedValue from "./lib/fixedValue";
 import optionStatus from "./lib/optionStatus";
 import PromptBuilder from "./components/PromptBuilder";
-import ComposePanel, { type ComposeStatusView } from "./components/ComposePanel";
+import ComposePanel from "./components/ComposePanel";
+import { composeStripView, type ComposeStatusView } from "./prompt/composeView";
 import { initialBuilderState, appliedForFamily, restartBuilder, restoreComposition, v1OnlyWhenUnsupported, withReboundFamily } from "./prompt/builderState";
 import { changeSceneFamily } from "./prompt/scene";
 import { DICTIONARY, DICTIONARY_VERSION } from "./prompt/dictionary";
@@ -457,39 +458,10 @@ function App() {
   /**
    * UIX01/UIX03: the one line the folded strip shows.
    *
-   * Derived from the panel's own report (`composeStatus`), so this is a rendering of the
-   * session, not a second guess at it. Each state names what the user can do next; an
-   * idle session shows nothing at all rather than a strip that says "nothing yet".
-   *
-   * Staleness outranks the phase because it is what makes a ready draft *not usable*: a
-   * strip that said "후보 3개 준비됨" over an invalidated reply would promise something the
-   * apply button will refuse.
+   * The derivation lives in `composeStripView` so the precedence rules (staleness outranks
+   * the phase) are testable directly. This call site only decides *where* to render it.
    */
-  const composeStrip = (() => {
-    if (!composeStatus) return null;
-    const count = composeStatus.candidateCount;
-    if (composeStatus.stale && count > 0) {
-      return { phase: "stale" as const,
-        text: `한글 장면이 바뀌었습니다. 후보 ${count}개는 다시 만들어야 적용할 수 있습니다.` };
-    }
-    switch (composeStatus.phase) {
-      case "pending":
-        return { phase: "pending" as const, text: "한글 장면으로 후보를 만드는 중입니다." };
-      case "ready":
-        return count > 0
-          ? { phase: "ready" as const, text: `후보 ${count}개가 준비되었습니다. 적용은 한글 장면에서 고르세요.` }
-          : { phase: "ready" as const, text: "후보가 비어 있습니다. 다시 만들어 보세요." };
-      case "needs_clarification":
-        return { phase: "clarify" as const, text: "확인이 필요한 질문이 있습니다. 답하면 후보를 만듭니다." };
-      case "failed":
-        return { phase: "failed" as const,
-          text: `구성에 실패했습니다${composeStatus.failureKo ? `: ${composeStatus.failureKo}` : ""}.` };
-      case "cancelled":
-        return { phase: "cancelled" as const, text: "구성을 취소했습니다. 입력과 선택은 그대로 남아 있습니다." };
-      default:
-        return null;
-    }
-  })();
+  const composeStrip = composeStripView(composeStatus);
 
   async function submit(event: FormEvent) {
     event.preventDefault();

@@ -20,7 +20,7 @@ deepseek-v4.1-flash는 구현 담당이다. Studio 런타임 모델, API, 배포
 | --- | --- | --- | --- |
 | UIX01 | 장면 구성과 영어 직접 입력의 진입점 식별 | 없음 | 완료 |
 | UIX02 | 사전 선택을 요약에서 확인하고 수정 | UIX01 | 완료 |
-| UIX03 | 긴 영어 후보를 비교하고 적용 결과 확인 | UIX01 | 대기 |
+| UIX03 | 긴 영어 후보를 비교하고 적용 결과 확인 | UIX01 | 완료 |
 | UIX04 | 기본 설정으로 생성하고 막힌 입력으로 이동 | UIX01 | 대기 |
 | UIX05 | 접수한 작업 추적과 실패한 작업 재시도 | UIX04 | 대기 |
 | UIX06 | 갤러리에서 결과 확인 후 원래 위치로 복귀 | UIX01 | 대기 |
@@ -74,6 +74,27 @@ deepseek-v4.1-flash는 구현 담당이다. Studio 런타임 모델, API, 배포
 - [x] **UIX07 인계 항목** — 경로 전환 중 요청, 접힌 상태 응답 도착, 직접 입력 수정 중 응답 도착, 모델 변경·실패 후 재시도는 UIX07 통합 회귀에서 확인할 항목으로 남긴다. UIX03 스트립은 “응답이 도착해도 사용자의 입력·커서를 건드리지 않는다”는 전제로 작성되어 있다.
 - [x] **gap04 증거 복구 가능 여부** — 가능하다. UIX01 커밋(`782ee4d`)에서 `docs/evidence/prompt-composer-gap04/results.json`이 334→581 항목으로 덮였으나, 그 이전 원본은 `b672935`에 그대로 있다. `git show b672935:docs/evidence/prompt-composer-gap04/results.json`으로 334항목이 온전히 복구되고 추적 스크린샷 79개도 남아 있다. **이후 증거는 태스크별 디렉터리(`docs/evidence/art-studio-uix02/`)에만 기록했고 gap04는 건드리지 않았다.**
 
+### UIX01/UIX02 기존 검증 위치 확인 (2026-11-24, UIX03 실행 중)
+
+지시받은 6개 항목에 대해 **기존 테스트의 이름·위치·실제 단언**을 확인했다. 재작업은 하지 않았고, 누락 2건만 보강했다.
+
+| 요청 항목 | 기존 검증 위치 | 실제 단언 | 상태 |
+|---|---|---|---|
+| 검색·분류 변경 시 revision 불변 | `scripts/prompt-composer-browser/suite-uix02.mjs` §D `UIX02 · 검색만으로 요청이 나가지 않음` / `UIX02 · 분류 초기화도 요청을 보내지 않음` | `beforeView.requests === noResults.requests` (`window.__composeCalls.length` 비교). 단위: `frontend/tests/prompt-uix02.test.mjs` `panel, search and detail state stay local and never enter the edit` — `update()` 미호출과 `composeRevisions` 불변을 소스 구조로 단언 | 기존 확인 |
+| 사전 접기·펼치기 시 revision 불변 | `suite-uix02.mjs` §D 접기/재열기 절 | 접은 뒤 `counts.chosen`·`requests`·`lastSelections`가 접기 전과 동일 | 기존 확인 |
+| 검색 초기화가 선택을 바꾸지 않음 | `suite-uix02.mjs` `UIX02 · 검색 초기화도 선택을 바꾸지 않음` | `beforeView.counts.chosen === cleared.counts.chosen` | 기존 확인 |
+| 검색 결과 0건에서 검색어 **및 분류** 초기화 | 검색어: `UIX02 · 빈 결과에 검색어 지우기 제공` + `검색어 지우기가 결과를 되돌림`. 분류: **미검증이었다** | — | **보강함** (아래) |
+| 충돌 발생·해소에 따른 요약 개수 갱신 | `suite-uix02.mjs` §E `UIX02 · 충돌이 요약에 나타남` / `UIX02 · 해소가 요약을 되돌림` | `counts.clashes`가 `1`→`0`으로 변하고 `data-alert`가 함께 사라짐. 단위: `prompt-uix02.test.mjs`의 `clashes` 파생 단언 | 기존 확인 |
+| 충돌 당사 항목 표시 + ‘AI에게 맡기기’ 유지 | `suite-uix02.mjs` §E `UIX02 · 충돌 행에 당사 항목 표시`(`.compose-clashes__label`·`__phrase`), `UIX02 · 충돌 해소 버튼이 행 안에 있음`(`buttonsInside`) | 충돌 행에 칩 ID와 원문 구절이 함께 있고, 해소 버튼이 `.compose-clashes__actions` 안에 있음. `AI에게 맡기기`(`makeAuto`)는 `prompt-uix02.test.mjs`의 수동→자동 전이 단언으로 유지 확인 | 기존 확인 |
+| React key 및 조작 대상이 기존 칩 ID 사용 | **미검증이었다** | — | **보강함** (아래) |
+| 귀속 변경 후 키보드 포커스 유지 | 미검증 → **UIX07 인계** | `pendingFocusRef`(ComposePanel)로 다음 칩을 잡도록 구현돼 있으나, 실제 Tab 순회 뒤 포커스 유지를 브라우저로 확인하지 않았다. UIX07 통합 회귀 항목으로 넘긴다 | **UIX07 인계** |
+
+**보강 1 — 분류 초기화 (브라우저).** `suite-uix02.mjs` §D에 7건을 추가했다. 검색만 좁혔을 때는 `전체 분류 보기`가 **없어야** 하고(누르면 아무 일도 없는 버튼이 되므로), 검색어를 지운 뒤 `의상` 분류 + `네온` 검색으로 결과를 0건으로 만들어 `전체 분류 보기`가 나타나 분류를 해제하는지, 그 과정에서 선택·요청이 변하지 않는지 확인한다.
+
+**보강 2 — 칩 ID key (단위).** `prompt-uix02.test.mjs`에 `a chip card is keyed and addressed by its chip id, not by position`을 추가했다. `className="compose-chip" key={chip.id}`, `data-chip-id={chip.id}`, `aria-label={`${chip.labelKo} 조작`}`을 단언한다. 위치 key였다면 귀속 이동 때 React가 카드 DOM을 다른 칩에 재사용해 펼침·고정 스타일이 새 칩으로 새어 나간다.
+
+**558 judged와 results.json 665항목의 차이.** `run.mjs`의 `check()`는 판정 항목(`pass: true|false`)을, `record()`는 판정 없는 정보 항목(`pass: null`)을 같은 배열에 넣는다. `docs/evidence/art-studio-uix02/results.json`은 **665개 항목 = 판정 558 + 정보 107**이다(재확인: `entries 665 judged 558 records 107`). 로그의 `checks: 558, failed: 0`은 판정 항목만 센 값이고, 665는 정보 기록까지 포함한 파일 크기다. 두 수치는 같은 실행의 다른 집계이며 서로 모순이 아니다.
+
 ### UIX02 · 사전 선택과 충돌
 
 `frontend/src/components/ComposePanel.tsx`에 검색·분류, 칩별 귀속·고정·삭제, 제외 복구와 충돌 해소가 이미 있다. 많은 칩을 편집할 때 어느 선택에 조작이 적용되는지 알아보기 쉽게 한다.
@@ -110,19 +131,68 @@ deepseek-v4.1-flash는 구현 담당이다. Studio 런타임 모델, API, 배포
   - `git diff --check` → 경고 없음.
   - UCP 계약 회귀: 취소·revision/stale·적용/되돌리기·v3 저장/복원·413·`snapshot_trim` 검사가 모두 통과했다. 칩 ID·`wireSelection`·`composeRevisions`·스냅샷 직렬화는 수정하지 않았다.
 - **남은 문제**
-  - **작업 트리에 UIX03 선행 코드가 일부 들어와 있다.** 이번 실행 지시는 “UIX02만 수행”이지만, UIX01 후속 항목 1(“접힌 Compose 영역의 상태를 UIX03에서 읽기 전용으로 표시”)을 확인하려고 `onStatusChange`/`ComposeStatusView`(ComposePanel), `composeStatus`·`composeStrip`(App), `.compose-strip`(styles)을 작성했다. `suite-uix03.mjs`(494줄)는 어디에서도 import되지 않는 미연결 상태이며 UIX03 절은 아직 `[ ]`다. 즉 UIX03은 **완료가 아니라 착수 전 상태**이고, UIX02의 검증·기록은 이 코드와 무관하게 558검사 0실패로 통과했다. 다음 실행에서 UIX03을 진행할 때 이 코드를 이어 쓰거나, 지시대로 UIX02만 남기려면 해당 부분을 되돌리면 된다. 어느 쪽이든 UIX02 계약(칩 ID·revision·직렬화)은 건드리지 않았다.
+  - **UIX03 선행 코드는 UIX03 절에서 정리했다.** UIX02 실행 중 UIX01 후속 항목 1을 확인하려고 작성했던 `onStatusChange`/`ComposeStatusView`(ComposePanel), `composeStatus`·`composeStrip`(App), `.compose-strip`(styles), `suite-uix03.mjs`는 이후 UIX03 실행에서 계약에 맞는 부분은 재사용하고 문제가 있던 부분(`suite-uix03.mjs`의 중복 선언·시그니처 불일치)만 고쳐 정식 하네스에 연결했다. UIX02 시점의 558검사 0실패는 그 코드와 무관하게 성립했고, UIX02 계약(칩 ID·revision·직렬화)도 그때와 지금 모두 변경하지 않았다.
   - `docs/evidence/prompt-composer-gap04/results.json`은 UIX01 커밋(`782ee4d`)에서 재생성되며 334→581 항목으로 덮였다. UIX01 이전 원본은 `b672935`에서 그대로 복구 가능하다(`git show b672935:docs/evidence/prompt-composer-gap04/results.json`, 334항목 확인). 스크린샷 79개도 전부 추적 상태로 남아 있다.
   - `:has()` 기반 다인 그룹 세로 배치는 Chromium/Safari/Firefox 최신에서 동작하지만, 구형 브라우저에서는 그룹이 가로로 흐를 뿐 판독에는 지장이 없다.
   - 실기기 IME·소프트 키보드는 이 환경에 없어 확인하지 못했다(UIX07 인계).
-- **다음 ID** — **UIX03** (긴 영어 후보를 비교하고 적용 결과 확인). 선행 UIX01이 완료되어 대기 조건이 충족됐다.
+- **다음 ID** — **UIX03** (긴 영어 후보를 비교하고 적용 결과 확인). 선행 UIX01이 완료되어 대기 조건이 충족됐다. **→ 이번 실행에서 완료했다(아래 UIX03 절).**
 
 ### UIX03 · 후보 비교와 적용
 
 ComposePanel은 각 후보의 영문 전체, 차이, negative, 보존 내용, 적용 영향과 버튼을 세로로 반복한다. 긴 후보 세 개에서도 다음 대안과 적용할 후보를 쉽게 찾게 한다.
 
-- [ ] 후보 제목·한국어 차이·적용 상태를 먼저 보여 준다. 첫 후보 본문은 펼치고 대안 본문은 개별적으로 펼쳐 동시에 비교할 수 있게 한다. 본문과 적용 동작을 같은 카드에 둔다.
-- [ ] 최종 입력 교체 여부, negative 유지·교체·빠짐 안내는 적용 직전에 보이게 한다. 기존 stale 처리, 덮어쓰기 확인, 되돌리기 및 명시적 ‘결과로 이동’을 재사용한다.
+- [x] 후보 제목·한국어 차이·적용 상태를 먼저 보여 준다. 첫 후보 본문은 펼치고 대안 본문은 개별적으로 펼쳐 동시에 비교할 수 있게 한다. 본문과 적용 동작을 같은 카드에 둔다.
+- [x] 최종 입력 교체 여부, negative 유지·교체·빠짐 안내는 적용 직전에 보이게 한다. 기존 stale 처리, 덮어쓰기 확인, 되돌리기 및 명시적 ‘결과로 이동’을 재사용한다.
 - **완료 기준** — 긴 후보 세 개 중 두 번째를 펼쳐 적용하면 그 후보의 문자열과 상태가 일치한다. 직접 수정 후 적용 취소·되돌리기, negative 미지원 확인, 원문 수정 뒤 이전 후보 적용 방지를 검증한다. 응답 도착이나 카드 펼침만으로 최종 입력이 바뀌지 않는다.
+
+**결과 (2026-11-24 완료)**
+
+- **변경 파일**
+  - `frontend/src/prompt/composeView.ts` — UIX03의 두 표시 전용 투영을 추가했다. `CandidateView`(`key`·`expanded`·`collapsed`)와 `expansionFor`/`candidateBodyOpen`/`toggledView`, 그리고 `ComposeStatusView`+`composeStripView`. 이 파일은 이미 UCP02의 표시 상태(패널 접힘·폭·회전)가 사는 곳이라 성격이 같다. 두 타입 모두 `ComposeEdit`이 아니므로 `composeRevisions`에 들어갈 수 없다 — “카드 펼침이 revision을 올리지 않는다”가 리뷰 약속이 아니라 타입으로 성립한다.
+  - `frontend/src/components/ComposePanel.tsx` — 후보 카드를 `<article>` + 헤더 토글(`.compose-candidate__toggle`, `aria-expanded`/`aria-controls`) + 본문(`.compose-candidate__body`, `hidden={!open}`) + 같은 카드 안의 `.compose-apply`로 재구성했다. 헤더는 `제목 · 한국어 차이 → 적용 영향(최종 프롬프트 교체/같음 · negative 교체/유지/빠짐) → 적용됨 배지 → 펼치기/접기` 순이다. 펼침 상태는 `useState<CandidateView>` 하나로만 관리하고 `expansionFor(candidateView, visible.draft?.resultId)`로 렌더 중 파생한다(이펙트로 초기화하지 않음). **적용됨 판정을 `applied.candidateId` 단독에서 `applied.resultId`까지 비교로 고쳤다**(아래 실제 동작 3). 기존 `planApply`/`applyDiff`/`window.confirm`/`undo`/`resultRef.focus()` 경로는 그대로 호출한다.
+  - `frontend/src/App.tsx` — `composeStrip` 계산을 `composeStripView(composeStatus)` 호출로 바꿨다(동작 동일, 순수 함수로 분리해 단위 테스트 가능하게). `composeStatus`는 여전히 `onStatusChange`가 주는 스냅샷만 담는다.
+  - `frontend/src/styles.css` — `.compose-candidate__toggle`(44px 하한, wrap, 헤더 전체가 클릭 영역), `.compose-candidate__impact`, `.compose-candidate__body[hidden]{display:none}`(아래 grid 규칙이 UA `[hidden]`을 덮지 않도록 명시), `.compose-candidate__applied`, `.compose-candidate__chevron` 추가. 1280px에서는 `.compose-candidate`가 2열 grid가 되어 적용 버튼이 본문 오른쪽에 붙는다.
+  - `frontend/tests/prompt-uix03.test.mjs` — 신규 단위 테스트 **19건**. 펼침 규칙(첫 후보 기본 펼침·개별·동시·접은 첫 카드 유지·새 응답 미상속·렌더 중 파생), 스트립 투영(단계별 문구·stale 우선·`planApply` 미호출), 카드 구조(헤더 순서·`hidden`·44px·`key`), 그리고 실제 `planApply`/`applyDiff`로 두 번째 후보 적용·stale 거부·모델 만료·negative 2단계·negative 유지·영향 문구 일치를 검증한다.
+  - `frontend/tests/prompt-uix02.test.mjs` — 칩 ID key 단언 1건 추가(총 13건).
+  - `scripts/prompt-composer-browser/suite-uix03.mjs` — **미연결 상태였던 494줄을 정식 하네스에 연결하고 다시 작성**했다(현재 약 700줄, `check()` 84회). §A 헤더 우선·기본 펼침, §B 동시 비교·카드별 독립, §C 두 번째 후보 적용, §D 덮어쓰기 확인·취소, §E 되돌리기, §F stale, §G 새 응답 미상속, §H 접힌 띠·응답 도착 경쟁, §I 실패·취소·재시도, §J 모델 변경 경쟁, §K negative 미지원 2단계, §L 키보드·360/1280 레이아웃.
+  - `scripts/prompt-composer-browser/suite-uix02.mjs` — 분류 초기화 검사 7건 추가(§D).
+  - `scripts/prompt-composer-browser/suite.mjs` — `runUix03`을 UIX02 뒤에 연결(이전에는 import조차 없었다).
+  - `docs/evidence/art-studio-uix03/` — 신규 태스크별 증거 디렉터리. `gap04`·`art-studio-uix02`는 건드리지 않았다.
+- **실제 동작**
+  - 후보 세 개가 오면 첫 카드 본문만 열려 있고 나머지는 접혀 있다. 헤더만 읽어도 `원문 충실 · 원문 충실` / `대안 1 · 분위기 강조` 처럼 어느 후보인지, `최종 프롬프트 교체 · negative 교체` 처럼 누르면 무엇이 바뀌는지 알 수 있다.
+  - 접힌 본문은 DOM에 남아 있고 `hidden`+`display:none`으로만 가려진다(측정 높이 0). 펼치면 즉시 보인다.
+  - **적용됨 판정을 reply 단위로 고쳤다.** `settleComposition`은 새 응답에서도 `applied`를 보존하므로(적용은 과거의 사실이므로 의도된 동작), 이전에는 `candidateId`만 비교해 새 응답이 같은 ID를 재사용하면 적용한 적 없는 카드에 `적용됨`이 붙었다. `applied.resultId === draft.resultId`를 함께 요구해 새 응답에서는 배지가 초기화된다.
+  - 두 번째 후보를 펼쳐 적용하면 그 후보의 긴 문자열이 최종 입력에 그대로 들어가고 negative도 `blurry, text`로 바뀐다. 빈 입력 교체는 확인을 묻지 않고(`__confirmCalls === 0`), 적용된 카드에만 배지가 붙으며, 펼침 상태는 그대로 유지된다.
+  - 직접 수정 뒤 적용은 확인을 요구하고, 취소하면 입력·negative가 그대로다. 승인하면 적용되고 `적용 되돌리기`가 적용 전 문자열을 정확히 복원한다.
+  - 원문을 고치면 후보는 남되 `적용할 수 없습니다 … 다시 생성하세요`가 뜨고 적용 버튼이 거부한다(문자열·negative 불변, 요청 0건).
+  - 새 응답은 이전 응답의 펼침을 물려받지 않는다(첫 후보만 열림). 후보 ID가 같아도 마찬가지다.
+  - 요청 대기 중 영어 경로로 접으면 띠에 `후보를 만드는 중입니다`가 뜨고, 응답이 도착하면 `후보 3개가 준비되었습니다`로 바뀐다. 그 사이 사용자가 최종 필드에 입력한 값·포커스는 그대로다.
+  - 실패는 `구성에 실패했습니다: …`, 취소는 `구성을 취소했습니다. 입력과 선택은 그대로 남아 있습니다`로 띠에 반영되고, 다시 시도로 후보가 복구된다.
+  - 모델을 바꾸면 이전 요청의 응답은 적용 불가로 만료된다. negative 미지원 모델에서는 헤더가 `negative 빠짐`을 알리고, 첫 누름은 손실을 설명하며 멈추고(`지원되지 않습니다`), 두 번째 누름(`negative 없이 적용`)이 긍정 프롬프트만 적용한다.
+  - 헤더 토글은 실제 `<button>`이라 Enter·Space가 네이티브로 동작하고 포커스가 헤더에 남는다. 360px·1280px 모두 가로 넘침 0, 헤더·적용 버튼 44px 이상, 본문 가로 잘림 0, 세 본문 동시 펼침 가능.
+- **검증 명령과 결과**
+  - `npm --prefix frontend run lint` → 통과.
+  - `npm --prefix frontend run build` → `tsc -b && vite build` 성공.
+  - `node --experimental-strip-types --test frontend/tests/*.test.mjs` → **354 tests, 354 pass, 0 fail**(신규 `prompt-uix03` 19건, `prompt-uix02` 13건 포함). 저장소 `.venv`의 `python3`를 PATH 앞에 두고 실행했다.
+  - `scripts/prompt-composer-browser/verify.sh`(fake 엔진·임시 DB·`STUDIO_FAKE_DELAY=2`, Chromium CDP) → **669 checks, 0 failed**(`results.json` 788항목 = 판정 669 + 정보 119, 실패 0). 이 중 **UIX03 판정 105건**, UIX02 판정 74건이 전부 통과했다. 스크린샷 90개, UIX03 전용 18개.
+  - 필수 스크린샷 8장(4상태 × 2폭)이 `docs/evidence/art-studio-uix03/`에 있다: `uix03-10-default-{360,1280}.png`(후보 기본 접힘), `uix03-11-compare-{360,1280}.png`(복수 후보 비교), `uix03-12-confirm-{360,1280}.png`(적용 확인), `uix03-13-folded-{360,1280}.png`(접힌 Compose 진행). **단, `uix03-12-confirm-*`는 네이티브 `window.confirm` 대화상자를 담지 못한다** — CDP 스크린샷은 페이지 뷰포트만 찍고 브라우저 크롬은 포함하지 않는다. 그 상태에서 확인이 실제로 떴고 취소가 입력을 보존했다는 사실은 같은 절의 단언(`덮어쓰기 확인이 뜨고 취소됨` = `__confirmCalls` 1, `확인 취소 뒤 입력 유지`)이 증명하며, 스크린샷은 그 직전의 카드·입력 상태를 보여 준다.
+  - `git diff --check` → 경고 없음.
+- **선행 코드 처리 결과** — 삭제하지 않고 재사용했다. `onStatusChange`/`ComposeStatusView`/`composeStatus`/`.compose-strip`은 계약에 부합해 그대로 두고, 표시 전용 투영만 `composeView.ts`로 옮겨 테스트 가능하게 했다. `suite-uix03.mjs`는 중복 `applyCard` 선언으로 로드 자체가 실패하는 상태였고(그래서 미연결이어도 문제가 드러나지 않았다), 시그니처 불일치(`page` 구조분해 누락)도 있어 전면 재작성 후 `suite.mjs`에 연결했다. **UIX03 전용 검사는 이번 실행에서 처음 실제로 돌았다.**
+- **Compose 상태 표시 계약 확인 (지시 §3)** — `ComposePanel`이 UCP 세션의 소유자로 남아 있고, `App`의 `composeStatus`는 `onStatusChange`가 주는 스냅샷만 담는다. `App`은 후보 유효성·stale·revision·적용 가능 여부를 계산하지 않는다(그 판단은 `planApply`와 `draftIsStale`이 패널 안에서 한다). 다음 항목을 실제로 확인했다:
+  - **불필요한 API 요청 없음** — 펼침·접힘·검색·분류·경로 전환 각각에서 `window.__composeCalls.length`가 변하지 않음을 단언(§B·§F·UIX02 §D).
+  - **revision 증가 없음** — `CandidateView`/`ComposeStatusView`는 `ComposeEdit`이 아니므로 `composeRevisions`에 들어갈 수 없다(타입으로 보장). 브라우저에서는 stale 배지가 펼침 때문에 뜨지 않는 것으로 확인.
+  - **반복 렌더링·effect 루프 없음** — `onStatusChange` effect의 의존성은 `phase`·`candidateCount`·`stale`·`failureKo`·`onStatusChange` 다섯 스칼라뿐이다. 객체를 의존성으로 두면 매 렌더마다 발화하고, `App`이 무조건 저장하면 루프가 된다.
+  - **이전 요청·이전 모델 상태 잔존 없음** — 모델 변경 경쟁(§J)에서 이전 응답이 적용 불가로 만료됨을 확인. 새 응답이 이전 펼침을 물려받지 않음(§G)도 확인.
+  - **최종 입력 자동 변경 없음** — 펼침·응답 도착·stale·실패·취소 어느 경우에도 `#prompt-final`과 negative가 변하지 않음을 단언.
+  - **응답 도착에 따른 포커스 이동 없음** — 요청 대기 중 영어 필드로 접고 입력한 뒤, 느린 응답이 도착해도 `document.activeElement`가 `#prompt-final`에 그대로 있음을 단언(§H).
+  - **접힌 상태의 4상태 표시** — 구성 중(`pending`)/후보 준비·개수(`ready` + `후보 3개`)/실패(`failed` + 사유)/재구성 필요(`stale`)를 모두 `data-phase`와 문구로 확인(§H·§I·§F).
+- **남은 문제**
+  - 실기기 IME·소프트 키보드·회전은 이 환경에 없어 확인하지 못했다(UIX07 인계).
+  - `pendingFocusRef`로 구현된 “귀속 변경 후 포커스 유지”는 브라우저로 확인하지 않았다(UIX07 인계).
+  - `:has()` 기반 다인 그룹 세로 배치는 구형 브라우저에서 그룹이 가로로 흐를 뿐 판독에는 지장이 없다.
+  - negative 미지원 검사는 `/models` 응답을 페이지에서 stub해 `generation_options.negative_prompt.mode`를 `unsupported`로 바꾸는 방식이다. 실제 백엔드가 그런 프로필을 내려줄 때의 서버측 검증은 UCP 계약 테스트가 담당한다.
+- **다음 ID** — **UIX04** (생성 설정과 제출 오류).
+
 
 ### UIX04 · 생성 설정과 제출 오류
 

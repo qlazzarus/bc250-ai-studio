@@ -302,6 +302,17 @@ test('panel, search and detail state stay local and never enter the edit', () =>
   }
 });
 
+test('a chip card is keyed and addressed by its chip id, not by position', () => {
+  // React `key` must be the stable chip id: a position key would make React reuse a card's
+  // DOM for a *different* chip when attribution moves one between groups, which silently
+  // carries the old expand/pin styling onto the new chip.
+  assert.match(panelSource, /className="compose-chip" key=\{chip\.id\}/);
+  // The same id is on the DOM so a harness (and a bug report) can name the card it means.
+  assert.match(panelSource, /data-chip-id=\{chip\.id\}/);
+  // Controls are scoped inside the card and labelled with that chip's own name.
+  assert.match(panelSource, /aria-label=\{`\$\{chip\.labelKo\} 조작`\}/);
+});
+
 test('the styles keep the 44px floor reachable inside the new chip card', () => {
   // The controls moved one level down; a `>` selector would silently stop applying and the
   // UCP08 responsive checks would fail at every width.
