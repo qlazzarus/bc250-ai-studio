@@ -9,6 +9,7 @@ evaluation, and real-model behaviour is UCP09's.
 
 import asyncio
 import json
+import logging
 
 import httpx
 import pytest
@@ -1306,4 +1307,473 @@ def test_a_model_supplied_lora_tag_survives_alongside_the_engines(gated):
     # Not shortened, not rewritten: the warning is the whole intervention.
     assert value["candidates"][0]["positive_prompt"] == supplied
     assert "candidates_reduced" not in value["warnings"]
+
+
+# ── UCP09: `no_valid_candidates` diagnosis and the limits that produced it ────────────
+#
+# The production report was `unavailable/invalid_reply/no_valid_candidates` with a complete
+# scene and `finish_reason=stop`. Nothing distinguished "the model sent no candidates" from
+# "every candidate was rejected", and the schema shown to the model omitted a limit that was
+# enforced anyway. These tests pin those cases apart.
+
+
+def _candidate(index, **changes):
+    """One model-shaped candidate. `index` keeps the defaults distinct."""
+    payload = {
+        "candidate_id": f"candidate-{index}", "title_ko": f"후보 {index}",
+        "difference_ko": f"차이 {index}",
+        "positive_prompt": f"a woman in a red dress, version {index}",
+        "preserved_ko": ["붉은 원피스"],
+    }
+    payload.update(changes)
+    return payload
+
+
+def _diagnostics(record):
+    """The `no_valid_candidates` record as key/value pairs plus parsed reasons."""
+    message = record.getMessage()
+    values = {}
+    for part in message.split(" reasons=")[0].split()[2:]:
+        key, _, value = part.partition("=")
+        values[key] = value
+    values["reasons"] = json.loads(message.split(" reasons=")[1])
+    return values
+
+
+def _no_valid_candidates_record(caplog):
+    return [r for r in caplog.records
+            if r.name == "app.prompt_compose"
+            and "no_valid_candidates" in r.getMessage()][0]
+
+
+def test_three_valid_candidates_all_survive(gated):
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1), _candidate(2), _candidate(3)])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    assert [item["candidate_id"] for item in value["candidates"]] == [
+        "candidate-1", "candidate-2", "candidate-3"]
+    # Nothing was dropped, so nothing claims it was.
+    assert "candidates_reduced" not in value["warnings"]
+    assert value["cut_short"] is False
+
+
+def test_one_valid_candidate_is_ready_and_not_a_reduction(gated):
+    # The model may legitimately offer fewer than requested (§5). One is a complete answer.
+    install(gated.app, lambda request: chat(reply(candidates=[_candidate(1)])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    assert len(value["candidates"]) == 1
+    assert "candidates_reduced" not in value["warnings"]
+    assert value["cut_short"] is False
+
+
+def test_an_absent_candidates_field_is_diagnosed_as_absent(gated, caplog):
+    # Case A: the model returned no `candidates` key at all. `dropped` stays 0 because no
+    # candidate was offered, which is exactly why the offered count must be logged too.
+    payload = reply()
+    payload.pop("candidates")
+    install(gated.app, lambda request: chat(payload))
+    with caplog.at_level(logging.WARNING, logger="app.prompt_compose"):
+        value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "unavailable"
+    assert value["detail"] == "no_valid_candidates"
+    diagnosed = _diagnostics(_no_valid_candidates_record(caplog))
+    assert diagnosed["offered"] == "absent"
+    assert diagnosed["kept"] == "0"
+    assert diagnosed["dropped"] == "0"
+    assert diagnosed["reasons"] == [{"index": 0, "reason": "candidates field is absent"}]
+
+
+def test_an_empty_candidates_array_is_diagnosed_as_zero_offered(gated, caplog):
+    # Case A, the other spelling: the field exists and is empty.
+    install(gated.app, lambda request: chat(reply(candidates=[])))
+    with caplog.at_level(logging.WARNING, logger="app.prompt_compose"):
+        value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["detail"] == "no_valid_candidates"
+    diagnosed = _diagnostics(_no_valid_candidates_record(caplog))
+    assert diagnosed["offered"] == "0"
+    assert diagnosed["dropped"] == "0"
+    assert diagnosed["reasons"] == []
+
+
+def test_a_missing_required_field_is_diagnosed_per_candidate(gated, caplog):
+    # Case B: the model did produce candidates, but each one failed validation. The wire
+    # says only `no_valid_candidates`; the log must name the field.
+    install(gated.app, lambda request: chat(reply(candidates=[
+        {"candidate_id": "candidate-1", "title_ko": "제목", "difference_ko": "차이"},
+        _candidate(2, title_ko=""),
+    ])))
+    with caplog.at_level(logging.WARNING, logger="app.prompt_compose"):
+        value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "unavailable"
+    assert value["detail"] == "no_valid_candidates"
+    diagnosed = _diagnostics(_no_valid_candidates_record(caplog))
+    assert diagnosed["offered"] == "2"
+    assert diagnosed["kept"] == "0"
+    assert diagnosed["dropped"] == "2"
+    assert diagnosed["reasons"] == [
+        {"index": 0, "reason": "missing positive_prompt"},
+        {"index": 1, "reason": "blank title_ko"},
+    ]
+
+
+def test_a_type_mismatch_is_diagnosed_and_does_not_escape(gated, caplog):
+    # Case B: `positive_prompt` is a number and `preserved_ko` is not a list. Before UCP09 a
+    # pydantic error from `ComposeCandidate` could escape `validate_candidates` (which
+    # catches ReplyRejected only) and become a 500 instead of a dropped candidate.
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, positive_prompt=1234), _candidate(2, preserved_ko="not a list")])))
+    with caplog.at_level(logging.WARNING, logger="app.prompt_compose"):
+        response = gated.post("/api/v1/prompt/compose", json=body())
+    assert response.status_code == 200, response.text
+    assert response.json()["detail"] == "no_valid_candidates"
+    diagnosed = _diagnostics(_no_valid_candidates_record(caplog))
+    assert diagnosed["reasons"] == [
+        {"index": 0, "reason": "positive_prompt is not a string"},
+        {"index": 1, "reason": "preserved_ko is not a list"},
+    ]
+def test_a_partially_valid_list_keeps_the_good_candidates_and_names_the_drop(gated, caplog):
+    # Case B/C boundary: one good, one rejected, one duplicate. The reply is `ready`, so no
+    # `no_valid_candidates` record is written — the reduction is reported by warnings.
+    payload = reply(candidates=[
+        _candidate(1), _candidate(2, title_ko="x" * 41),
+        _candidate(3, positive_prompt="a woman in a red dress, version 1")])
+    install(gated.app, lambda request: chat(payload))
+    with caplog.at_level(logging.WARNING, logger="app.prompt_compose"):
+        value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    assert [item["candidate_id"] for item in value["candidates"]] == ["candidate-1"]
+    assert "candidates_reduced" in value["warnings"]
+    assert "duplicate_candidates" in value["warnings"]
+    assert value["cut_short"] is True
+    assert not [r for r in caplog.records
+                if r.name == "app.prompt_compose"
+                and "no_valid_candidates" in r.getMessage()]
+
+
+def test_every_candidate_rejected_still_reports_the_scene(gated):
+    # The reported production body: a complete scene, no usable candidate. The scene and
+    # selections must survive so the user does not lose their work.
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, title_ko="x" * 41), _candidate(2, positive_prompt=""),
+        _candidate(3, difference_ko="y" * 241)])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "unavailable"
+    assert value["candidates"] == []
+    assert value["scene"]["entities"][0]["entity_id"] == "e1"
+    assert value["summary_ko"]
+    assert "candidates_reduced" in value["warnings"]
+    assert value["cut_short"] is True
+
+
+def test_finish_reason_stop_with_no_candidates_is_not_a_truncation(gated, caplog):
+    # Case D ruled out by evidence, not by the word `stop`: nothing was dropped and the
+    # provider did not cut, so `cut_short` must be False.
+    install(gated.app, lambda request: chat(reply(candidates=[]), finish_reason="stop"))
+    with caplog.at_level(logging.WARNING, logger="app.prompt_compose"):
+        value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "unavailable"
+    assert value["detail"] == "no_valid_candidates"
+    assert value["cut_short"] is False
+    diagnosed = _diagnostics(_no_valid_candidates_record(caplog))
+    assert diagnosed["finish_reason"] == "stop"
+    assert diagnosed["cut_short"] == "False"
+    assert diagnosed["dropped"] == "0"
+
+
+def test_cut_short_is_true_when_the_provider_stopped_early_even_with_a_valid_candidate(gated):
+    # `cut_short` is about lost output, not about the candidate list. `length` with usable
+    # candidates is still an incomplete call.
+    install(gated.app, lambda request: chat(reply(candidates=[_candidate(1)]),
+                                            finish_reason="length"))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    assert value["cut_short"] is True
+    assert value["provider"]["finish_reason"] == "length"
+
+
+def test_cut_short_is_false_for_a_clean_stop_with_a_full_list(gated):
+    install(gated.app, lambda request: chat(
+        reply(candidates=[_candidate(1), _candidate(2)]), finish_reason="stop"))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    assert value["cut_short"] is False
+
+
+def test_a_candidate_over_an_unstated_preserved_ko_limit_is_kept(gated):
+    # The limit that produced the production failure, made explicit. `preserved_ko` is
+    # display metadata and never reaches the engine, so exceeding it must not delete an
+    # otherwise usable prompt.
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, preserved_ko=["가"] * 7)])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    assert value["candidates"][0]["positive_prompt"] == (
+        "a woman in a red dress, version 1")
+    # Bounded to the contract's maximum, not passed through over-long.
+    assert len(value["candidates"][0]["preserved_ko"]) == 6
+
+
+def test_an_overlong_preserved_item_is_dropped_not_the_candidate(gated):
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, preserved_ko=["짧음", "가" * 121, 42, "  "])])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    # Over-long, non-string and blank entries are removed; the rest is untouched.
+    assert value["candidates"][0]["preserved_ko"] == ["짧음"]
+
+
+def test_the_schema_states_every_candidate_limit_that_is_enforced(gated):
+    # The mismatch that made a good reply fail: limits enforced but never stated. The
+    # system prompt must carry each one.
+    captured = {}
+
+    def handler(request):
+        captured.update(json.loads(request.content))
+        return chat()
+
+    install(gated.app, handler)
+    gated.post("/api/v1/prompt/compose", json=body())
+    system = captured["messages"][0]["content"]
+    assert "at most 6 items" in system
+    assert "<= 120 chars" in system
+    assert "<= 64 chars" in system
+    # The profile's own limits were already stated and must stay stated.
+    assert "<= 2000 chars" in system
+    # `preserved_ko` is still shown as a one-item array, not as a bare string: the shape
+    # the model is asked for must match `ComposeCandidate`. The schema is serialised with
+    # compact separators (`canonical_json`), hence the missing space after the colon.
+    assert '"preserved_ko":[' in system
+
+
+def test_an_overlong_candidate_id_is_reported_not_crashing(gated, caplog):
+    # A pydantic error escaping here used to be a 500. It is now one dropped candidate with
+    # a reason, and the rule (an id the contract cannot carry is unusable) is kept rather
+    # than "repaired" into a different id.
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, candidate_id="c" * 65)])))
+    with caplog.at_level(logging.WARNING, logger="app.prompt_compose"):
+        response = gated.post("/api/v1/prompt/compose", json=body())
+    assert response.status_code == 200, response.text
+    assert response.json()["detail"] == "no_valid_candidates"
+    diagnosed = _diagnostics(_no_valid_candidates_record(caplog))
+    # Field path plus error type only — never pydantic's rendered message (§2).
+    assert diagnosed["reasons"][0]["reason"] == "validation candidate_id:string_too_long"
+
+
+def test_the_diagnostic_never_logs_the_brief_or_the_candidate_sentence(gated, caplog):
+    # The privacy half of §6: counts and reason codes only. A rejected candidate's text and
+    # the user's brief must not appear in the journal.
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, title_ko="x" * 41)])))
+    with caplog.at_level(logging.WARNING, logger="app.prompt_compose"):
+        gated.post("/api/v1/prompt/compose", json=body())
+    message = _no_valid_candidates_record(caplog).getMessage()
+    assert BRIEF not in message
+    assert "a woman in a red dress" not in message
+    assert "x" * 41 not in message
+    # It does carry the identifying request id, so a report can be traced to one call.
+    assert REQUEST_ID in message
+
+
+def test_json_parse_failure_keeps_its_own_detail(gated):
+    # The pre-existing failure this must stay distinct from: a body that is not JSON at all
+    # reports the parse error, never `no_valid_candidates`.
+    install(gated.app, lambda request: chat("<html>not json</html>"))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["why"] == "invalid_reply"
+    assert value["detail"] != "no_valid_candidates"
+    assert "not a complete JSON object" in value["detail"] or "valid JSON" in value["detail"]
+    assert value["candidates"] == []
+
+
+# ── UCP09 follow-up: log hygiene, partial-success diagnosis, metadata ordering ─────────
+
+
+def test_a_pydantic_error_never_copies_the_rejected_value_into_the_log(gated, caplog):
+    """§2: `str(ValidationError)` embeds `input_value='...'`, so it must never be logged.
+
+    This is the concrete leak: pydantic renders the offending value inside its own message.
+    A candidate over the `candidate_id` limit would have put its full text — and, for a
+    `positive_prompt` failure, the whole English prompt — into the journal.
+    """
+    secret_prompt = "SENSITIVE-PROMPT-MARKER-a-woman-in-a-red-dress"
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, candidate_id="SENSITIVE-ID-MARKER-" + "c" * 80,
+                   positive_prompt=secret_prompt)])))
+    with caplog.at_level(logging.WARNING, logger="app.prompt_compose"):
+        gated.post("/api/v1/prompt/compose", json=body())
+    message = _no_valid_candidates_record(caplog).getMessage()
+    # The value is nowhere in the record, in either pydantic spelling.
+    assert "SENSITIVE-ID-MARKER" not in message
+    assert "SENSITIVE-PROMPT-MARKER" not in message
+    assert "input_value" not in message
+    assert "input_type" not in message
+    # What survives is a structured reason: field path + error type.
+    assert "candidate_id:string_too_long" in message
+
+
+def test_a_clean_reply_writes_no_diagnostic_line(gated, caplog):
+    """§3: the normal path must stay silent.
+
+    A diagnostic that fired on every request would bury the ones that matter, and the
+    journal is the only place these records exist.
+    """
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1), _candidate(2), _candidate(3)])))
+    with caplog.at_level(logging.DEBUG, logger="app.prompt_compose"):
+        value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    assert len(value["candidates"]) == 3
+    assert [r.getMessage() for r in caplog.records
+            if r.name == "app.prompt_compose"] == []
+
+
+
+
+def test_a_partial_success_is_diagnosed_at_info_when_something_is_dropped(gated, caplog):
+    """§3: partial success is the shape that silently shrinks a list.
+
+    The reply is `ready`, so no WARNING is raised — but a field limit that rejected a good
+    candidate is visible here and nowhere else on the wire.
+    """
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1), _candidate(2, title_ko="x" * 41)])))
+    with caplog.at_level(logging.INFO, logger="app.prompt_compose"):
+        value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    assert len(value["candidates"]) == 1
+    records = [r for r in caplog.records
+               if r.name == "app.prompt_compose"
+               and "candidates_dropped" in r.getMessage()]
+    assert len(records) == 1
+    assert records[0].levelno == logging.INFO
+    diagnosed = _diagnostics(records[0])
+    assert diagnosed["offered"] == "2"
+    assert diagnosed["kept"] == "1"
+    assert diagnosed["dropped"] == "1"
+    assert diagnosed["reasons"] == [{"index": 1, "reason": "title_ko exceeds 40 characters"}]
+    # The partial case warns about the reduction on the wire, not in the log.
+    assert "candidates_reduced" in value["warnings"]
+
+
+def test_a_duplicate_only_drop_is_also_diagnosed_at_info(gated, caplog):
+    # Duplicates are a different cause and get their own reason code, so an operator can
+    # tell "the model repeated itself" from "a rule rejected the text".
+    same = "a woman in a red dress, version 1"
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, positive_prompt=same), _candidate(2, positive_prompt=same)])))
+    with caplog.at_level(logging.INFO, logger="app.prompt_compose"):
+        value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    records = [r for r in caplog.records
+               if r.name == "app.prompt_compose"
+               and "candidates_dropped" in r.getMessage()]
+    assert _diagnostics(records[0])["reasons"] == [
+        {"index": 1, "reason": "duplicate_positive_prompt"}]
+
+
+
+def test_preserved_ko_filters_before_capping(gated):
+    """§4: invalid entries are removed first, then the remaining valid ones are capped.
+
+    The order matters: capping first would let junk consume the six slots and discard real
+    facts that came after it.
+    """
+    # Six junk entries of different kinds, then the only real one. Filter-then-cap keeps
+    # it; cap-then-filter would lose it.
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, preserved_ko=[42, "", "   ", None, {"a": 1}, "가" * 121, "진짜 사실"])])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    assert value["candidates"][0]["preserved_ko"] == ["진짜 사실"]
+
+
+def test_preserved_ko_capped_at_six_after_filtering(gated):
+    # Nine valid entries: the cap is applied to the survivors, in order.
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, preserved_ko=[f"사실 {index}" for index in range(9)])])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["candidates"][0]["preserved_ko"] == [f"사실 {index}" for index in range(6)]
+
+
+def test_preserved_ko_empty_after_filtering_is_accepted(gated):
+    """§4: an empty list after cleaning must still satisfy both ends of the contract.
+
+    `ComposeCandidate.preserved_ko` is `default_factory=list`, and the browser parser
+    filters with `nonEmpty`, so `[]` is valid on the wire and in the client.
+    """
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, preserved_ko=[42, "", "   "])])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "ready"
+    # Present and empty — not absent, not dropped, not a candidate rejection.
+    assert value["candidates"][0]["preserved_ko"] == []
+    assert value["candidates"][0]["positive_prompt"] == (
+        "a woman in a red dress, version 1")
+
+
+def test_preserved_ko_wrong_type_still_rejects_the_candidate(gated):
+    # A *list* is the contract; a bare string is a shape error, not something to filter.
+    # The cleaning above applies to the entries, never to the container.
+    install(gated.app, lambda request: chat(reply(candidates=[
+        _candidate(1, preserved_ko="붉은 원피스")])))
+    value = gated.post("/api/v1/prompt/compose", json=body()).json()
+    assert value["status"] == "unavailable"
+    assert value["detail"] == "no_valid_candidates"
+
+
+def test_the_app_logger_reaches_the_journal_under_uvicorns_default_config():
+    """§3/§6: uvicorn's default config gives `app.*` no handler, so INFO is discarded.
+
+    The unit runs `uvicorn app.main:create_app --factory` with no logging flags. uvicorn
+    attaches handlers to `uvicorn*` loggers only, leaving root bare, so an `app.*` INFO
+    record falls to `logging.lastResort` — WARNING and above, stderr, nothing below. The
+    partial-success diagnostic would never appear in the journal without this.
+    """
+    from logging.config import dictConfig
+
+    from app.main import _ensure_app_logging
+    from app.services.prompt_compose import logger as compose_logger
+
+    package = logging.getLogger("app")
+    saved_package, saved_root = package.handlers[:], logging.getLogger().handlers[:]
+    saved_level = package.level
+    try:
+        package.handlers[:] = []
+        logging.getLogger().handlers[:] = []
+        # uvicorn's shape: its own logger has a handler, root has none.
+        dictConfig({"version": 1, "disable_existing_loggers": False, "loggers": {
+            "uvicorn": {"handlers": [], "level": "INFO", "propagate": False}}})
+        assert logging.getLogger().handlers == []
+        assert not compose_logger.isEnabledFor(logging.INFO)
+        _ensure_app_logging()
+        assert compose_logger.isEnabledFor(logging.INFO)
+        # Root is left alone: reconfiguring it would change every other logger.
+        assert logging.getLogger().handlers == []
+        # Idempotent, or a factory called twice would duplicate every line.
+        _ensure_app_logging()
+        assert len(package.handlers) == 1
+    finally:
+        package.handlers[:] = saved_package
+        logging.getLogger().handlers[:] = saved_root
+        package.setLevel(saved_level)
+
+
+def test_the_app_logger_is_not_duplicated_when_logging_is_already_configured():
+    # `caplog` and a deployment's own dictConfig both install a root handler. Adding a
+    # second handler here would print every diagnostic twice.
+    from app.main import _ensure_app_logging
+
+    package = logging.getLogger("app")
+    saved_package, saved_root = package.handlers[:], logging.getLogger().handlers[:]
+    try:
+        package.handlers[:] = []
+        logging.getLogger().handlers[:] = [logging.NullHandler()]
+        _ensure_app_logging()
+        assert package.handlers == []
+    finally:
+        package.handlers[:] = saved_package
+        logging.getLogger().handlers[:] = saved_root
 

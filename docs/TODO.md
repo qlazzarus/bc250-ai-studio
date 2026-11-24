@@ -35,6 +35,10 @@
 - [ ] 전체 테스트의 Linux/Fedora 의존 실패를 같은 커밋·환경으로 재현하고 코드 결함과 OS 요구사항 분류. 기존 실패를 임의 skip으로 숨기지 않기.
 - [ ] `scripts/inspect-db-service-references.py`, `scripts/test-verify-candidate-run.py`의 기존 lint 보고를 현 코드에서 재확인하고 필요시 수정. 과거 실패 개수를 현재 상태로 재사용하지 않기.
 
+## 통합 프롬프트 후보 진단
+
+- [ ] `cut_short`가 후보 검증 탈락(`dropped`)과 공급자 출력 잘림(`finish_reason` ∈ `length`/`abort`/`content_filter`)을 한 필드로 합치고 있다. 응답의 `cut_short=true`만으로는 "재시도하면 나아지는가"를 판단할 수 없으므로, 향후 `provider_truncated`(공급자 사실)와 `candidates_reduced`(검증 결과)를 분리한다. 현재 산식은 `prompt_compose.py`의 `cut_short = bool(dropped) or cut_by_provider`이며, API 계약 변경이므로 클라이언트 호환 범위를 함께 결정해야 한다. UCP09 후속 검토에서 범위 밖으로 확정.
+
 ## LLM Client 연동과 후보 코드
 
 모델 전환 제품 구현은 외부 Client 프로젝트 소유다. 다음은 이 저장소 후보를 실제로 채택할 때 남은 통합 조건이며 일반 Studio 릴리스의 선행 조건이 아니다.

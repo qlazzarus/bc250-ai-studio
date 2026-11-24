@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -24,8 +25,41 @@ from app.services.llm import FakeLLM, SystemdLLM
 from app.services.registry import Registry
 
 
+def _ensure_app_logging() -> None:
+    """Give this package's loggers a handler, once, without reconfiguring anything else.
+
+    The unit starts Studio as ``uvicorn app.main:create_app --factory`` with no logging
+    flags, and uvicorn's default config attaches handlers to its own ``uvicorn*`` loggers
+    only. The root logger is left with none, so an ``app.*`` record reaches
+    ``logging.lastResort``: WARNING and above to stderr, everything below discarded. The
+    compose diagnostic's INFO line ("some candidates were dropped") would therefore never
+    appear in the journal, which is exactly the case it exists to explain.
+
+    This is deliberately narrow:
+
+    * it touches only the ``app`` logger, never the root one, so uvicorn's access and error
+      formatting is untouched;
+    * it does nothing when a handler is already present, so a deployment that configures
+      logging properly (or a test that captures with ``caplog``) keeps its own setup;
+    * it adds no new format. The handler inherits whatever formatter the root has, and
+      falls back to uvicorn's default shape via ``logging.lastResort`` semantics otherwise.
+
+    ``disable_existing_loggers`` is not used and no dictConfig is applied: reconfiguring
+    the root here would silently change every other logger in the process.
+    """
+    package = logging.getLogger("app")
+    if package.handlers or logging.getLogger().handlers:
+        # A real configuration exists; adding a second handler would duplicate lines.
+        return
+    handler = logging.StreamHandler()
+    package.addHandler(handler)
+    # INFO is what the compose diagnostic uses. `WARNING` would hide partial-success drops.
+    package.setLevel(logging.INFO)
+
+
 def create_app(settings=None, engine=None, llm=None):
     settings = settings or Settings()
+    _ensure_app_logging()
 
     @asynccontextmanager
     async def lifespan(app):

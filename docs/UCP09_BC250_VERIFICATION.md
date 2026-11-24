@@ -358,9 +358,119 @@ pytest backend/tests/test_gate_epoch.py    → 24 passed
 
 
 
+## 후속 검증: `no_valid_candidates` 진단 (로컬 완료, 운영 대기)
+
+`no_valid_candidates` 응답에 원인 구분 정보가 없다는 문제로 진단 로그와 재현 절차를 추가했다. **로컬 수정·테스트·스크립트 검증만 완료했고 운영 배포는 하지 않았다.**
+
+### 확정 원인과 재현 결함의 구분
+
+**운영 장애의 확정 원인은 아니다.** 장애 당시 원본 모델 응답(LLM raw reply)을 보관하지 않았으므로, 어느 후보가 어떤 규칙에서 탈락했는지 사후 확정할 수 없다. 확인된 것은 다음 두 가지다.
+
+1. **응답 형태로 배제 가능한 것**: `detail=no_valid_candidates`는 `prompt_compose.py`의 한 지점에서만 생성되고, 그 지점은 파싱·장면 검증·selection 재조정·clarification 검증을 모두 통과한 뒤다. 따라서 `reply is not a complete JSON object`(파싱 실패)와는 다른 단계다. `warnings=["candidates_reduced"]`는 `dropped > 0`일 때만 붙으므로 후보가 최소 1개는 도착했고 전부 탈락했다(유형 B/C). `finish_reason=stop`이면 `cut_by_provider=False`이므로 `cut_short=true`는 `dropped` 때문에만 성립한다(유형 D 배제).
+2. **로컬에서 재현된 실제 결함**: 후보 스키마가 모델에게 알려주지 않은 제한이 검증에는 있었다. `preserved_ko`는 스키마에 개수·길이 제한이 없었지만 `_one_candidate`가 6개 초과·120자 초과·비문자열 항목이 있으면 **후보 전체를 탈락**시켰다. `preserved_ko`는 이미지 프롬프트에 들어가지 않는 표시용 메타데이터인데, 그 설명 때문에 실행 가능한 영어 프롬프트가 버려지는 구조다. 또한 `candidate_id` 64자 제한도 스키마에 없었고, 초과 시 pydantic `ValidationError`가 `validate_candidates`를 탈출해 500이 될 수 있었다.
+
+즉 **"`preserved_ko` 제한 때문에 이번 장애가 났다"는 확정이 아니라, 같은 증상을 만들 수 있는 결함이 실재했고 그것을 고쳤다**는 것이 정확한 서술이다. 운영 장애의 실제 원인은 배포 후 진단 로그로 확인해야 한다.
+
+### 로컬 변경
+
+| 위치 | 변경 |
+| --- | --- |
+| `prompt_compose.py` `_schema` | 실제 강제되는 `preserved_ko` 개수·길이·`candidate_id` 제한을 스키마에 명시 |
+| `prompt_compose.py` `_one_candidate` | `preserved_ko` 항목은 필터 후 상한 적용(후보 유지). `ComposeCandidate` 생성 실패는 `ReplyRejected`로 정규화 |
+| `prompt_compose.py` `_validation_reason` | pydantic 오류를 `필드:오류타입`으로 축약. **원본 입력값·메시지 미기록** |
+| `prompt_compose.py` `evaluate` | `no_valid_candidates` WARNING 1건, 부분 탈락 INFO 1건. 정상 응답은 무로그 |
+| `main.py` `_ensure_app_logging` | uvicorn 기본 설정에서 `app.*` INFO가 유실되던 문제 수정(항목 3의 전제) |
+| `scripts/ucp09/probe-compose-candidates.py` | 반복 호출·자원 샘플링·journal 수집 (신규) |
+
+`cut_short` 산식, `candidates_reduced` 조건, `no_valid_candidates` 반환 조건, API 계약, 프런트엔드, llama-server, GPU Gate는 변경하지 않았다.
+
+### 진단 로그 필드
+
+`app.prompt_compose` 로거가 남기는 값. **브리프 원문·후보 문장·원본 프롬프트는 기록하지 않는다.**
+
+| 필드 | 내용 |
+| --- | --- |
+| `request_id` | 요청 식별자 |
+| `offered` | 원본 후보 개수, `candidates` 키가 없으면 `absent` (0과 구분) |
+| `kept` / `dropped` | 검증 통과 / 탈락 개수 |
+| `finish_reason`, `output_tokens` | 공급자 보고값 |
+| `cut_short` | 현재 산식 결과 |
+| `reasons` | `[{"index": 0, "reason": "..."}]` 최대 8건, 사유당 120자 |
+
+사유는 `duplicate_positive_prompt`, `title_ko exceeds 40 characters`, `validation candidate_id:string_too_long`처럼 **규칙 이름과 필드명**이며, pydantic 메시지를 그대로 쓰지 않는다. `str(ValidationError)`에는 `input_value='...'`로 원본 값이 들어 있어 그대로 쓰면 후보 문장이 journal에 복사된다.
+
+### 로그 가시성 (항목 3의 전제)
+
+서비스 유닛은 `uvicorn app.main:create_app --factory`로 기동하며 로깅 플래그가 없다. uvicorn 기본 설정은 handler를 `uvicorn*` 로거에만 붙이고 root는 비워 두므로, `app.*` 레코드는 `logging.lastResort`로 가서 **WARNING 이상만 stderr로 나가고 INFO는 폐기된다.** 즉 부분 탈락 INFO 진단은 이 수정 없이는 journal에 남지 않는다. `main.py`의 `_ensure_app_logging`이 `app` 로거에 handler를 붙이고 INFO를 열어 준다.
+
+- root 로거는 건드리지 않는다(uvicorn access/error 서식 유지).
+- 이미 handler가 있으면 아무것도 하지 않는다(중복 출력 방지, `caplog` 보존).
+- 두 번 호출해도 handler는 하나다.
+
+로컬 확인: uvicorn 기본 설정을 재현한 상태에서 `app.prompt_compose`의 INFO는 `False → True`로 바뀌고, root handler 수는 `0`으로 유지되며, 두 번째 호출 후에도 handler는 1개였다. 회귀 테스트 2건이 이를 고정한다.
+
+### 운영 검증 절차
+
+이미지 생성은 필요 없다. Compose 호출만 한다. Studio가 `prompt_compose`를 광고하지 않으면 스크립트가 즉시 종료 코드 2로 멈추므로 무의미한 호출을 반복하지 않는다.
+
+```sh
+# 0) 사전 조건: 광고 확인. prompt_compose 키가 없으면 아래를 진행하지 않는다.
+curl -sS -H "Authorization: Bearer $STUDIO_API_KEY" \
+    http://127.0.0.1:18080/api/v1/system/capabilities \
+    | python3 -c 'import json,sys;print(json.load(sys.stdin).get("prompt_compose"))'
+```
+
+```sh
+# 1) 기존 실패 입력을 파일로 보존한다. 브리프는 증거 파일에 기록되지 않고 해시만 남는다.
+cat > /tmp/ucp09-brief.txt <<'EOF'
+<장애 당시 사용한 한국어 브리프를 그대로 붙여넣는다>
+EOF
+
+# 2) 반복 호출 + 자원 샘플링 + journal 수집.
+#    SSH는 inspect-bc250.sh와 같은 읽기 전용 계정·키를 쓴다.
+STUDIO_API_KEY=... STUDIO_BASE_URL=http://127.0.0.1:18080 \
+    uv run python scripts/ucp09/probe-compose-candidates.py \
+        --brief-file /tmp/ucp09-brief.txt --repeat 5 \
+        --out docs/evidence/ucp09-followup
+```
+
+호스트에 SSH가 없거나 자원 샘플링만 생략하려면 `--no-resources`를 준다. HTTP 검증은 그대로 수행된다.
+
+```sh
+# 3) 서버가 남긴 진단 로그 직접 확인. 계정이 systemd-journal 그룹이 아니면
+#    "not seeing messages"가 나온다 — 그 자체를 기록하고 sudo로 승격하지 않는다.
+journalctl -u bc250-ai-studio --since '-30 min' --no-pager \
+    -g 'compose (no_valid_candidates|candidates_dropped)' -o cat
+```
+
+```sh
+# 4) 순차 호출 중 메모리 추이(별도 창에서 5초 간격).
+while :; do
+    date '+%H:%M:%S'
+    awk '/^(MemAvailable|SwapFree):/{printf "  %s %s kB\n",$1,$2}' /proc/meminfo
+    for f in /sys/class/drm/card*/device/mem_info_vram_used \
+             /sys/class/drm/card*/device/mem_info_gtt_used; do
+        [ -r "$f" ] && printf '  %s %s\n' "$(basename "$f")" "$(cat "$f")"
+    done
+    sleep 5
+done
+```
+
+### 판정 기준
+
+| 확인 항목 | 통과 기준 |
+| --- | --- |
+| 후보 개수 | 호출별 `candidates`와 `offered/kept/dropped`가 일치 |
+| 검증 탈락 사유 | `reasons`가 규칙 이름·필드명으로 나오고 후보 문장이 없음 |
+| `finish_reason` | `length`면 잘림, `stop`이면 검증 탈락으로 해석 |
+| `output_tokens` | 제공 시 기록. 미제공이면 `null`로 남기고 추정하지 않음 |
+| `latency_ms` | 호출별 기록, 재현 시 비교 |
+| journal | 새 로그가 실제로 출력되는지 확인. 미출력이면 `_ensure_app_logging` 적용 여부 확인 |
+| RAM/Swap/VRAM/GTT | 호출 전후 값이 남고, 증가가 누적되면 메모리 인과관계 조사 |
+
+**로컬에서 검증한 것**: 스텁 서버로 스크립트를 실행해 보고된 응답 형태(`status=unavailable`, `detail=no_valid_candidates`, `warnings=["candidates_reduced"]`, `cut_short=true`, `finish_reason=stop`, `output_tokens=1270`)를 그대로 수집하는 것을 확인했고, 증거 파일에 브리프 원문이 없음도 확인했다(`grep` 0건).
+
 ## 롤백
-
-
 
 1. 실패 시 출력된 backup 경로를 확인한다. **root 필요**(`0700`).
 2. 호환되는 code·config·DB를 그 경로에서 복원한다. 이미지 자산은 백업에 없으므로 별도 정책을 따른다.

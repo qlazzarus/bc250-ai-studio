@@ -25,6 +25,7 @@ now). Those are checked before any response model is constructed.
 import asyncio
 import hashlib
 import json
+import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -71,6 +72,12 @@ MAX_BRIEF_CHARS = 4_000
 MAX_SELECTIONS = 100
 MAX_CANDIDATES = 3
 MAX_SCENE_STRING_CHARS = 200
+# §5's candidate limits, named once so `_schema` (what the model is told) and
+# `_one_candidate` (what is enforced) cannot drift apart. `preserved_ko` is advisory
+# display metadata — it is *not* part of the image prompt — so an over-long list is
+# bounded rather than made fatal (see `_one_candidate`).
+MAX_PRESERVED_ITEMS = 6
+MAX_PRESERVED_ITEM_CHARS = 120
 
 # §5: one structured call, no separate verification call. The budget is larger than
 # ``/proposals`` (1,024) because this reply carries a scene *and* up to three
@@ -113,6 +120,17 @@ WARNING_PRIORITY = (WARNING_CANDIDATES_REDUCED, WARNING_PROFILE_TOKEN_WINDOW)
 # The contract's cap on `warnings`. Named because three call sites enforce it and a bare
 # `4` in each is how the cap and its documentation drift apart.
 WARNING_LIMIT = 4
+
+# UCP09 diagnosis. `no_valid_candidates` on the wire says *that* nothing survived, never
+# *why*, so the cause used to be unrecoverable from a production report. These records are
+# operator diagnostics only: they are logged at WARNING under one logger name, and they
+# carry counts and reason codes — never a candidate sentence, the brief, or user text.
+logger = logging.getLogger("app.prompt_compose")
+
+# Bounded sizes for the diagnostic fields, so a hostile reply cannot flood the journal by
+# repeating the same reason for every candidate.
+_MAX_REASON_ENTRIES = 8
+_MAX_REASON_CHARS = 120
 
 ClarificationWhy = Literal["actor_unknown", "polarity_conflict", "model_mismatch",
                            "dictionary_missing"]
@@ -476,7 +494,7 @@ def _schema(validated: ValidatedInput, *, negative_ok: bool,
              "entity_id": None}
         ],
         "candidates": [{
-            "candidate_id": "candidate-1",
+            "candidate_id": "candidate-1 (<= 64 chars)",
             "title_ko": "<Korean title, <= 40 chars>",
             "difference_ko": "<what differs from the other candidates, <= 240 chars>",
             "positive_prompt": ("<English image prompt, <= "
@@ -484,7 +502,13 @@ def _schema(validated: ValidatedInput, *, negative_ok: bool,
             "negative_prompt": (f"<English negative prompt, <= "
                                 f"{profile.max_negative_chars} chars>"
                                 if negative_ok else None),
-            "preserved_ko": ["<a fact from the brief this candidate keeps>"],
+            # The count and per-item limits are enforced in `_one_candidate`, so they are
+            # stated here: a schema that omitted them asked for something the server
+            # silently refused, which is how a well-meaning reply lost a candidate. The
+            # value stays a one-item array so the *shape* is still a list.
+            "preserved_ko": [f"<a fact from the brief this candidate keeps, "
+                             f"<= {MAX_PRESERVED_ITEM_CHARS} chars; at most "
+                             f"{MAX_PRESERVED_ITEMS} items>"],
         }],
         "clarifications": [{
             "question_id": "q1", "question_ko": "<Korean question, <= 200 chars>",
@@ -646,6 +670,32 @@ def observe(body: bytes, *, latency_ms: int) -> tuple[bytes, Observation]:
 
 class ReplyRejected(ValueError):
     """The reply cannot be adopted. The message names the first failed rule."""
+
+
+def _validation_reason(error) -> str:
+    """A log-safe reason for a candidate that failed model construction.
+
+    ``str(ValidationError)`` embeds the offending value — pydantic renders
+    ``input_value='...'`` inside the message — so a pydantic error must never be logged or
+    returned verbatim. Doing so copies a candidate's English prompt, or a slice of the
+    user's Korean brief, into the journal.
+
+    Only the error *type* and the field path survive, which is enough to tell "too long"
+    from "wrong type" without carrying any of the data: ``candidate_id:string_too_long``.
+    ``input``, ``ctx`` and ``msg`` are all dropped on purpose — ``msg`` is currently a
+    static sentence, but that is pydantic's choice to change, not this module's contract.
+    """
+    try:
+        entries = error.errors()
+    except AttributeError:
+        # Not a pydantic error: its own message is this module's, so it is already safe.
+        return "candidate is invalid"
+    parts = []
+    for entry in entries[:_MAX_REASON_ENTRIES]:
+        kind = entry.get("type") or "invalid"
+        location = ".".join(str(part) for part in entry.get("loc") or ()) or "candidate"
+        parts.append(f"{location}:{kind}")
+    return "validation " + ",".join(parts)
 
 
 def _parse_object(payload: bytes) -> dict:
@@ -861,6 +911,21 @@ def _one_candidate(item: dict, *, excluded: frozenset[str],
     The field limits come from ``profile``, the same object ``_schema`` describes to the
     model: asking for 2,000 characters and then rejecting 2,000 characters because a
     hard-coded constant disagreed would make the schema a lie.
+
+    Two asymmetries are deliberate:
+
+    * **A limit that is about the image prompt is fatal.** ``positive_prompt`` is what the
+      engine actually runs, so a candidate over its budget cannot be used at all.
+    * **``preserved_ko`` is bounded, not fatal.** It is display metadata explaining what the
+      candidate kept; it never reaches the engine, and it is not covered by any warning code
+      on the wire. Refusing a usable prompt because its *explanation* ran long deletes the
+      only thing the user can act on. Over-long or non-string entries are dropped (never
+      rewritten, so no text is fabricated) and the list is capped at
+      ``MAX_PRESERVED_ITEMS`` — which is what ``ComposeCandidate`` allows anyway.
+
+    ``candidate_id`` is *not* repaired either: an id over the contract's 64 characters is a
+    failed candidate. Truncating it could give two candidates the same handle in the client,
+    which is worse than dropping one.
     """
     candidate_id = item.get("candidate_id")
     if not isinstance(candidate_id, str) or not candidate_id.strip():
@@ -875,23 +940,50 @@ def _one_candidate(item: dict, *, excluded: frozenset[str],
             # "absent when unsupported", so an empty string is normalised away.
             negative = None
     preserved = item.get("preserved_ko") or []
-    if not isinstance(preserved, list) or len(preserved) > 6:
-        raise ReplyRejected("preserved_ko is not a list of at most 6 items")
+    if not isinstance(preserved, list):
+        raise ReplyRejected("preserved_ko is not a list")
     for entry_id in excluded:
         # A veto inside the prompt sentence is invisible to the structure, so it is
         # caught here: an excluded chip appearing in the text is the model overriding a
         # decision the user made explicitly.
         if entry_id in positive:
             raise ReplyRejected(f"candidate re-introduces excluded id: {entry_id}")
-    return ComposeCandidate(
-        candidate_id=candidate_id,
-        title_ko=_text(item.get("title_ko"), 40, "title_ko", required=True),
-        difference_ko=_text(item.get("difference_ko"), 240, "difference_ko",
-                            required=True),
-        positive_prompt=positive,
-        negative_prompt=negative,
-        preserved_ko=[_text(text, 120, "preserved_ko") for text in preserved],
-    )
+    try:
+        return ComposeCandidate(
+            candidate_id=candidate_id,
+            title_ko=_text(item.get("title_ko"), 40, "title_ko", required=True),
+            difference_ko=_text(item.get("difference_ko"), 240, "difference_ko",
+                                required=True),
+            positive_prompt=positive,
+            negative_prompt=negative,
+            preserved_ko=[text for text in preserved
+                          if isinstance(text, str) and text.strip()
+                          and len(text) <= MAX_PRESERVED_ITEM_CHARS][:MAX_PRESERVED_ITEMS],
+        )
+    except ReplyRejected:
+        # `_text` already names the field that failed; keep that message rather than
+        # re-wrapping it, so the diagnostic reason code stays precise.
+        raise
+    except ValueError as error:
+        # `ComposeCandidate` re-checks the same bounds, so a disagreement surfaces as a
+        # ValidationError. `validate_candidates` only catches `ReplyRejected`; letting a
+        # pydantic error through would turn one bad candidate into a 500 for the whole
+        # request instead of a dropped, reported candidate.
+        #
+        # The message must not be `str(error)`: pydantic embeds `input_value='...'` in it,
+        # which would copy the candidate's text into the log. `_validation_reason` keeps
+        # only the field path and the error type.
+        raise ReplyRejected(_validation_reason(error)) from error
+
+
+def _offered(raw) -> int | str:
+    """How many candidates the model offered, or ``"absent"`` when the key was missing.
+
+    ``0`` and "no `candidates` key" are different facts — one is an empty list the model
+    wrote, the other is a shape the prompt asked for and did not get — and the diagnostic
+    must not collapse them.
+    """
+    return len(raw) if isinstance(raw, list) else "absent"
 
 
 def validate_candidates(
@@ -899,6 +991,7 @@ def validate_candidates(
     *,
     validated: ValidatedInput,
     candidate_count: int,
+    rejections: list[dict] | None = None,
 ) -> tuple[list[ComposeCandidate], list[str], int]:
     """Validate up to ``candidate_count`` candidates, dropping the invalid ones.
 
@@ -906,10 +999,23 @@ def validate_candidates(
     dropped whole — never trimmed, never merged with the next one. That is what makes a
     partial reply honest: what comes back is a shorter list of candidates that each
     passed, and ``candidates_reduced`` says the list is short.
+
+    ``rejections`` is an optional out-parameter for operator diagnostics (UCP09). Before
+    this existed, ``no_valid_candidates`` said *that* the list emptied but never *why*, so
+    a dropped candidate and an empty array were indistinguishable in a production report.
+    Each entry is ``{"index": int, "reason": str}`` and carries a reason code, never the
+    candidate's text.
     """
     negative_ok, negative_warning = negative_allowed(validated.target)
     profile = validated.target.profile
+    sink = rejections if rejections is not None else []
+
+    def reject(index: int, reason: str) -> None:
+        if len(sink) < _MAX_REASON_ENTRIES:
+            sink.append({"index": index, "reason": reason[:_MAX_REASON_CHARS]})
+
     if raw is None:
+        reject(0, "candidates field is absent")
         return [], [], 0
     if not isinstance(raw, list):
         raise ReplyRejected("candidates is not a list")
@@ -920,20 +1026,23 @@ def validate_candidates(
     negative_blocked = False
     weighted = False
     over_window = False
-    for item in raw:
+    for index, item in enumerate(raw):
         if len(kept) >= candidate_count:
             # More candidates than requested is not an error, but only the requested
             # number is returned — the client did not budget for more cards.
             dropped += 1
+            reject(index, "over_requested_count")
             continue
         if not isinstance(item, dict):
             dropped += 1
+            reject(index, "not_an_object")
             continue
         try:
             candidate = _one_candidate(item, excluded=validated.excluded_ids,
                                        profile=profile)
-        except ReplyRejected:
+        except ReplyRejected as error:
             dropped += 1
+            reject(index, str(error))
             continue
         if candidate.negative_prompt is not None and not negative_ok:
             # §5: never send a negative prompt to a model that cannot use one. The
@@ -945,6 +1054,7 @@ def validate_candidates(
             # Two identical prompts are one candidate; §5 allows returning fewer.
             dropped += 1
             duplicates += 1
+            reject(index, "duplicate_positive_prompt")
             continue
         seen.add(key)
         # Advisory checks run on the candidates that survive, so a warning can never
@@ -1171,6 +1281,7 @@ def evaluate(
         return _failed("invalid_reply", "request_id_mismatch", observation,
                        validated=validated)
 
+    candidate_rejections: list[dict] = []
     try:
         scene = parse_scene(raw.get("scene"))
         selections, selection_warnings = reconcile_selections(
@@ -1178,7 +1289,8 @@ def evaluate(
             scene=scene)
         candidates, candidate_warnings, dropped = validate_candidates(
             raw.get("candidates"), validated=validated,
-            candidate_count=validated.candidate_count)
+            candidate_count=validated.candidate_count,
+            rejections=candidate_rejections)
         clarifications = validate_clarifications(raw.get("clarifications"), scene=scene)
     except ReplyRejected as error:
         return _failed("invalid_reply", str(error), observation, validated=validated)
@@ -1200,6 +1312,17 @@ def evaluate(
     elif not candidates:
         # Nothing usable is `unavailable`, never an empty `ready`: an empty success would
         # read as "your scene needs no candidates".
+        #
+        # UCP09: distinguish the three ways a list can be empty. They have different
+        # causes and different next actions, and the wire only says
+        # `no_valid_candidates` for all of them. Counts and reason codes only — the
+        # candidates' own text and the brief never reach the log.
+        logger.warning(
+            "compose no_valid_candidates request_id=%s offered=%s kept=0 dropped=%s "
+            "finish_reason=%s output_tokens=%s cut_short=%s reasons=%s",
+            validated.request_id, _offered(raw.get("candidates")), dropped,
+            observation.finish_reason, observation.output_tokens, cut_short,
+            json.dumps(candidate_rejections, ensure_ascii=False))
         return ComposeOutcome(
             failure="invalid_reply", detail="no_valid_candidates",
             response=unavailable_response(
@@ -1209,6 +1332,17 @@ def evaluate(
             latency_ms=observation.latency_ms, observation=observation)
     else:
         status = "ready"
+        if dropped:
+            # Partial success. INFO, not WARNING: the user got a usable reply, but this is
+            # the shape that silently shrinks a list — a field limit that rejects a good
+            # candidate shows up here and nowhere else on the wire. Logged only when
+            # something was actually dropped, so a clean reply costs no log line.
+            logger.info(
+                "compose candidates_dropped request_id=%s offered=%s kept=%s dropped=%s "
+                "finish_reason=%s output_tokens=%s cut_short=%s reasons=%s",
+                validated.request_id, _offered(raw.get("candidates")), len(candidates),
+                dropped, observation.finish_reason, observation.output_tokens, cut_short,
+                json.dumps(candidate_rejections, ensure_ascii=False))
 
     response = ComposeResponse(
         schema_version=1, status=status,
