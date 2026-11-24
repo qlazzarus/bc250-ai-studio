@@ -110,6 +110,59 @@ export type ChipList = {
   pinned: number;
 };
 
+/**
+ * UIX02: one heading's worth of chips, for the multi-person view.
+ *
+ * `key` is the entity ID, or `scene` for chips attributed to nothing. `label` is what the
+ * heading says — `인물 1`, `인물 2`, `장면 전체`.
+ */
+export type ChipGroup = { key: string; label: string; chips: ChipView[] };
+
+/**
+ * Group chosen chips by attribution, **for display only**.
+ *
+ * Three properties this deliberately preserves:
+ *
+ * 1. **Edit order inside a group.** Chips are pushed in the order they appear in
+ *    `chips.chosen`, which is `edit.selections` order, so removing a chip still moves focus
+ *    to the neighbour the user just saw.
+ * 2. **No reordering of the state.** The caller renders from this array; `edit.selections`
+ *    is never touched, so `wireSelection` order and the request body are unchanged.
+ * 3. **A single group for a single-subject scene.** With one entity there is nothing to
+ *    disambiguate, and one heading above one list is noise — the flat list is returned with
+ *    an empty label, which the caller renders without a heading.
+ *
+ * `entityCount` is the number of scene entities, not the number of distinct attributions:
+ * a three-person scene where every chip says `장면 전체` still needs the whole-scene heading
+ * to say so, and a one-person scene never needs headings even if a chip is unattributed.
+ */
+export function groupChips(
+  chosen: readonly ChipView[],
+  labels: Map<string, string>,
+  entityCount: number,
+): ChipGroup[] {
+  if (entityCount <= 1) return [{ key: "scene", label: "", chips: [...chosen] }];
+  const order: string[] = [];
+  const buckets = new Map<string, ChipView[]>();
+  for (const chip of chosen) {
+    const key = chip.entityId ?? "scene";
+    const bucket = buckets.get(key);
+    if (bucket === undefined) {
+      buckets.set(key, [chip]);
+      order.push(key);
+    } else {
+      bucket.push(chip);
+    }
+  }
+  return order.map((key) => ({
+    key,
+    // A scene-local ID is a fingerprint, not a label; an unknown one degrades to the
+    // whole-scene wording rather than printing it.
+    label: key === "scene" ? "장면 전체" : labels.get(key) ?? "대상",
+    chips: buckets.get(key) ?? [],
+  }));
+}
+
 export function chipList(
   edit: { selections: EditSelection[] },
   dictionary: readonly DictionaryEntry[],

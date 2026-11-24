@@ -282,11 +282,30 @@
    user meets, and they are buttons, not links. */
 .prompt-paths { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
 .prompt-paths > .quiet { min-height: 44px; padding: 9px 13px; font-size: .8rem; text-align: left; }
-.prompt-paths > .quiet[aria-expanded="true"] { border-color: #c3a0ff; color: #fff; background: #322a45; }
+/* UIX01: exactly one path is marked current, so "where am I" is answerable without
+   re-reading the hint. The marker is `aria-current`, not a colour class, so it is the same
+   fact for assistive tech; the border is only its visual form. Both branches are styled
+   because the direct path is not an `aria-expanded` control. */
+.prompt-paths > .quiet[aria-expanded="true"],
+.prompt-paths > .quiet[aria-current="true"] { border-color: #c3a0ff; color: #fff; background: #322a45; }
 .prompt-paths__hint { flex: 1 1 220px; min-width: 0; color: #8f95a1; font-size: .74rem; line-height: 1.45; overflow-wrap: anywhere; }
 /* The path buttons sit outside `.prompt-builder`, so they need their own focus ring. */
 .prompt-paths > .quiet:focus-visible, #prompt-final:focus-visible { outline: 2px solid #d1adff; outline-offset: 3px; }
 .compose-path[hidden] { display: none; }
+/* UIX03: the folded-session strip. It replaces the panel's height while folded, so it has
+   to be quiet enough not to look like a result, and explicit enough that a request finishing
+   in the background is noticed. The left border is per-phase; the text always says it too. */
+.compose-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+  margin: 0 0 12px; padding: 8px 11px; border: 1px solid #3b3e49; border-left-width: 3px;
+  border-radius: 7px; background: #171920; color: #b9bfcb; font-size: .78rem; line-height: 1.45; }
+.compose-strip__text { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.compose-strip .quiet { min-height: 44px; padding: 8px 12px; font-size: .76rem; white-space: nowrap; }
+.compose-strip[data-phase="pending"] { border-left-color: #c3a0ff; }
+.compose-strip[data-phase="ready"] { border-left-color: #88e6a8; }
+.compose-strip[data-phase="stale"] { border-left-color: #6b5a33; color: #f4cb84; }
+.compose-strip[data-phase="failed"] { border-left-color: #d4756a; }
+.compose-strip[data-phase="clarify"] { border-left-color: #7fb3e6; }
+.compose-strip:focus-visible { outline: 2px solid #d1adff; outline-offset: 3px; }
 /* Measured composer widths (Chromium 149, 2026-11-16): 566px at 1440,
    496px at 1280, 355px at 960 in the two-column workspace, and 638px once the
    workspace collapses to one column below 820px. Splitting a 330–566px column
@@ -611,6 +630,19 @@
 .compose-unavailable .compose-fallback { flex: 1 1 240px; margin: 6px 0 0; }
 .compose-direct { min-height: 44px; padding: 9px 13px; font-size: .78rem; white-space: nowrap; }
 
+/* UIX02: counts that survive the fold. They sit outside `#compose-dictionary`, so a
+   collapsed panel still answers "how many did I pick, how many did I veto, what is
+   unresolved" without opening anything. Numbers are tabular so a change is visible. */
+.compose-counts { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.compose-count { display: inline-flex; align-items: baseline; gap: 4px; padding: 3px 9px;
+  border: 1px solid #41444f; border-radius: 99px; background: #191b21;
+  color: #b9bfcb; font-size: .74rem; font-weight: 600; }
+.compose-count strong { color: #eef0f4; font-size: .82rem; font-variant-numeric: tabular-nums; }
+/* The one number that is a problem, not a fact. `data-alert` is also in the text ("건"). */
+.compose-count[data-alert] { border-color: #6b5a33; background: #2a2418; color: #f4cb84; }
+.compose-count[data-alert] strong { color: #ffd79a; }
+.compose-search-count { margin: 2px 0 8px; font-variant-numeric: tabular-nums; }
+
 /* Dictionary: an in-flow expanded panel. Opening, searching or picking never
    unmounts it and never scrolls the page, so query/group/selection survive. */
 .compose-dictionary { border: 1px solid #41444f; border-radius: 8px; padding: 10px; background: #1b1d24; min-width: 0; }
@@ -637,10 +669,28 @@
 .compose-scene, .compose-clarify { border: 1px solid #41444f; border-radius: 8px; padding: 12px; background: #1b1d24; min-width: 0; }
 .compose-summary { margin: 8px 0 10px; color: #e6e8ef; font-size: .86rem; line-height: 1.55; overflow-wrap: anywhere; }
 .compose-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.compose-chip { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
-  max-width: 100%; padding: 4px 4px 4px 10px; border: 1px solid #4a4d59; border-radius: 99px;
-  background: #20222a; color: #e6e8ef; font-size: .76rem; font-weight: 600; }
+/* UIX02: a multi-subject scene is split by attribution so "which person owns this dress"
+   is readable without opening a select. Display-only grouping — the chip order inside a
+   group is still `edit.selections` order. With one subject there is no heading at all. */
+.compose-chip-group { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px;
+  min-width: 0; max-width: 100%; }
+.compose-chip-group + .compose-chip-group { margin-top: 10px; }
+.compose-chips:has(.compose-chip-group[data-group]:not([data-group="scene"])) {
+  flex-direction: column; }
+.compose-chip-group__heading { flex: 1 1 100%; display: flex; align-items: baseline; gap: 6px;
+  margin: 0 0 2px; padding: 0; color: #cfd4e0; font-size: .74rem; font-weight: 800; }
+.compose-chip-group__count { color: #8f95a1; font-size: .7rem; font-weight: 600;
+  font-variant-numeric: tabular-nums; }
+/* The card reads top-to-bottom: name + state first, the controls that edit it underneath
+   in their own bordered row, so a press is never ambiguous about its subject. */
+.compose-chip { display: grid; gap: 2px; max-width: 100%; padding: 6px 8px;
+  border: 1px solid #4a4d59; border-radius: 12px; background: #20222a;
+  color: #e6e8ef; font-size: .76rem; font-weight: 600; }
 .compose-chip[data-pinned] { border-color: #c5a2ff; }
+.compose-chip__head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
+  min-width: 0; }
+.compose-chip__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  min-width: 0; padding-top: 2px; border-top: 1px solid #31343d; }
 .compose-chip__label { min-width: 0; overflow-wrap: anywhere; }
 .compose-chip__entity, .compose-chip__unmapped, .compose-chip__badge {
   padding: 1px 6px; border-radius: 99px; font-size: .66rem; font-weight: 800; letter-spacing: .02em; }
@@ -648,15 +698,20 @@
 .compose-chip__badge { background: #343742; color: #cfd4e0; }
 .compose-chip__entity { background: #2b3340; color: #a8c6ee; }
 .compose-chip__unmapped { background: #2a2418; color: #f4cb84; }
-/* 44px hit areas on a pill: the pill grows instead of the finger missing. */
-.compose-chip > button { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
-  border: 0; border-radius: 99px; background: transparent; color: #cfd4e0; font-size: .74rem; font-weight: 700; }
-.compose-chip > button[aria-pressed="true"] { color: #17111f; background: #c5a2ff; }
+/* 44px hit areas inside a chip card. The descendant selector (not `>`) is required now
+   that the controls live inside `.compose-chip__actions`; the UCP08 responsive checks
+   measure the first `.compose-chip button`, so this floor must keep applying there. */
+.compose-chip button { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 8px; background: transparent; color: #cfd4e0; font-size: .74rem; font-weight: 700; }
+.compose-chip button[aria-pressed="true"] { color: #17111f; background: #c5a2ff; }
 .compose-excluded { margin-top: 10px; }
 .compose-excluded strong { display: block; margin-bottom: 4px; color: #9aa1ad; font-size: .74rem; }
 .compose-excluded ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
 .compose-excluded li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px;
   padding: 2px 0; color: #9aa1ad; font-size: .78rem; }
+/* UIX02: name and source first, exactly like a chosen chip card. */
+.compose-excluded__head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
+  min-width: 0; flex: 1 1 140px; padding: 2px 0; color: #9aa1ad; }
 .compose-excluded .quiet { min-height: 44px; }
 .compose-scene > .quiet { margin-top: 10px; min-height: 44px; }
 
@@ -668,14 +723,25 @@
 .compose-clashes ul { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
 .compose-clashes li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 6px; font-size: .78rem; overflow-wrap: anywhere; }
-.compose-clashes__actions { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+/* UIX02: the vetoed chip and the two ways out of the conflict stay on one row, so the
+   question and its answers never scroll apart on a narrow column. */
+.compose-clashes__target { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
+  min-width: 0; flex: 1 1 180px; }
+.compose-clashes__label { font-weight: 800; color: #ffd79a; }
+.compose-clashes__phrase { min-width: 0; overflow-wrap: anywhere; color: #e6cf9b; }
+.compose-clashes__actions { display: inline-flex; flex-wrap: wrap; gap: 6px; flex: 0 1 auto; }
 .compose-clashes .quiet { min-height: 44px; }
 
 /* Attribution select. It is an input, so the 44px rule applies to the control itself
    rather than to a pill-shaped button. */
-.compose-chip__attribute { display: inline-flex; align-items: center; gap: 4px; }
-.compose-chip__attribute-label { color: #9aa1ad; font-size: .68rem; font-weight: 700; }
-.compose-chip__attribute select { min-height: 44px; font-size: 16px; border-radius: 8px;
+/* A labelled control, not two flex items fighting for width: the label stays on its own
+   line above the select at every width, so "대상" never wraps per character and the
+   control it names is unambiguous inside a narrow chip card. */
+.compose-chip__attribute { display: grid; gap: 2px; min-width: 0; flex: 1 1 132px; }
+.compose-chip__attribute-label { color: #9aa1ad; font-size: .68rem; font-weight: 700;
+  white-space: nowrap; }
+.compose-chip__attribute select { min-height: 44px; width: 100%; min-width: 0;
+  font-size: 16px; border-radius: 8px;
   border: 1px solid #4a4d59; background: #191b21; color: #eef0f4; padding: 2px 6px; }
 
 /* Alerts, in the three categories the spec separates: advisory (amber),
@@ -712,7 +778,24 @@
   background: #1b1d24; min-width: 0; }
 .compose-candidate[data-applied] { border-color: #88e6a8; }
 .compose-candidate:focus-visible { outline: 2px solid #d1adff; outline-offset: 3px; }
-.compose-candidate h4 { margin: 0; font-size: .85rem; line-height: 1.4; overflow-wrap: anywhere; }
+/* UIX03: the header *is* the toggle. It carries the identity (which candidate), the Korean
+   difference from the brief, the impact on the final prompt, and the applied state — so the
+   choice can be made without opening a 1000-character English body. */
+.compose-candidate h4 { margin: 0; font-size: .85rem; line-height: 1.4; }
+.compose-candidate__toggle { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px;
+  width: 100%; min-height: 44px; padding: 4px 2px; border: 0; border-radius: 6px;
+  background: transparent; color: inherit; font: inherit; text-align: left; }
+.compose-candidate__toggle:hover { background: #22252d; }
+.compose-candidate__title { flex: 1 1 220px; min-width: 0; font-weight: 800; overflow-wrap: anywhere; }
+/* The impact line is the "what happens if I press apply" answer, in words, not colour. */
+.compose-candidate__impact { flex: 1 1 100%; color: #9aa1ad; font-size: .74rem;
+  font-weight: 600; overflow-wrap: anywhere; }
+.compose-candidate[data-open] .compose-candidate__impact { color: #b9bfcb; }
+.compose-candidate__chevron { flex: 0 0 auto; color: #c5a2ff; font-size: .72rem; font-weight: 800; }
+/* A collapsed body keeps its markup (so `hidden` alone decides visibility) and must not be
+   laid out: `display:none` is restated because the `> *` column rules below could win. */
+.compose-candidate__body { display: grid; gap: 6px; min-width: 0; }
+.compose-candidate__body[hidden] { display: none; }
 .compose-candidate__difference { margin: 0; color: #b9bfcb; font-size: .78rem; line-height: 1.45; overflow-wrap: anywhere; }
 /* The English body is the thing being chosen, so it is never truncated. */
 .compose-candidate__prompt { margin: 2px 0; padding: 8px 9px; border-radius: 6px; background: #14161b;
@@ -740,6 +823,8 @@
 /* Container breakpoints, per the UCP01 table. The panel never exceeds ~638px in
    this workspace, so `>= 640px` is the first width where two columns fit. */
 @container compose (max-width: 359px) {
+  /* A chip card keeps a rounded rectangle rather than a pill: the controls are now a
+     second row, and a pill would clip them. */
   .compose-chip { border-radius: 10px; }
   .compose-candidate h4, .compose-candidate__prompt { font-size: .8rem; }
 }

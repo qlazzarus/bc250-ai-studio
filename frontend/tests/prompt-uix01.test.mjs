@@ -32,6 +32,7 @@ const SRC = join(here, 'src');
 const appSource = readFileSync(join(SRC, 'App.tsx'), 'utf8');
 const panelSource = readFileSync(join(SRC, 'components/ComposePanel.tsx'), 'utf8');
 const builderSource = readFileSync(join(SRC, 'components/PromptBuilder.tsx'), 'utf8');
+const stylesSource = readFileSync(join(SRC, 'styles.css'), 'utf8');
 
 function bareSpecifier(specifier) {
   // `react/jsx-runtime` comes from the JSX transform; `react` itself is imported by the
@@ -183,6 +184,17 @@ test('openPath writes no value and never calls the API', () => {
   // It only decides which region is in front and where focus lands.
   assert.match(body, /setComposePathOpen\(false\)/);
   assert.match(body, /setFinalFocusTick\(\(tick\) => tick \+ 1\)/);
+});
+
+test('exactly one path is marked current, and marking it writes nothing', () => {
+  // `aria-current` is the same fact for a screen reader and for CSS, so there is one
+  // source of truth for "which path am I on" rather than a decorative class.
+  const current = appSource.match(/aria-current=\{composePathOpen \? (?:undefined|"true") : (?:undefined|"true")\}/g) ?? [];
+  assert.equal(current.length, 2, 'both path buttons must derive their current state');
+  assert.match(appSource, /aria-current=\{composePathOpen \? "true" : undefined\}/);
+  assert.match(appSource, /aria-current=\{composePathOpen \? undefined : "true"\}/);
+  // The two are mutually exclusive by construction: both read the same flag.
+  assert.match(stylesSource, /\.prompt-paths > \.quiet\[aria-current="true"\]/);
 });
 
 test('the direct path targets the field that already exists', () => {

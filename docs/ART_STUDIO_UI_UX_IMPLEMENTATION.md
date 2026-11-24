@@ -1,6 +1,6 @@
 # Art Studio UI/UX 개선 실행 계획
 
-2026-11-23 · 구현 담당 `deepseek-v4.1-flash` · 다음 태스크 **UIX02**
+2026-11-24 · 구현 담당 `deepseek-v4.1-flash` · 다음 태스크 **UIX03**
 
 사용자가 모델을 고르고, 장면을 영어 프롬프트로 구성하거나 직접 입력하고, 생성한 작업과 결과를 다시 찾는 흐름을 개선한다. 기존 UCP 기능을 사용하는 Art Studio가 범위다. Pixel Studio는 진입·복귀 회귀만 확인한다. 현재 판단 근거는 프런트엔드 소스와 기존 UCP 브라우저 검증 기록이다. 아래 배치와 동작은 구현 목표이며 새 화면의 사용성은 아직 측정하지 않았다.
 
@@ -19,7 +19,7 @@ deepseek-v4.1-flash는 구현 담당이다. Studio 런타임 모델, API, 배포
 | ID | 사용자가 얻는 결과 | 선행 | 상태 |
 | --- | --- | --- | --- |
 | UIX01 | 장면 구성과 영어 직접 입력의 진입점 식별 | 없음 | 완료 |
-| UIX02 | 사전 선택을 요약에서 확인하고 수정 | UIX01 | 대기 |
+| UIX02 | 사전 선택을 요약에서 확인하고 수정 | UIX01 | 완료 |
 | UIX03 | 긴 영어 후보를 비교하고 적용 결과 확인 | UIX01 | 대기 |
 | UIX04 | 기본 설정으로 생성하고 막힌 입력으로 이동 | UIX01 | 대기 |
 | UIX05 | 접수한 작업 추적과 실패한 작업 재시도 | UIX04 | 대기 |
@@ -65,13 +65,56 @@ deepseek-v4.1-flash는 구현 담당이다. Studio 런타임 모델, API, 배포
   - `docs/evidence/prompt-composer-gap04/`의 기존 스크린샷이 이번 코드 기준으로 전부 재생성되어 diff가 크다. UIX07에서 한 번 더 정리·대조할 것을 권한다.
 - **다음 ID** — **UIX02** (사전 선택을 요약에서 확인하고 수정). 선행 UIX01이 완료되어 대기 조건이 충족됐다.
 
+### UIX01 후속 검증 (2026-11-24, UIX02 실행 중 확인)
+
+승인 시 지시된 네 항목을 확인했다. UIX01 구현 자체는 재작업하지 않았다.
+
+- [x] **접힌 영역의 진행·준비·실패 상태를 UIX03에서 읽기 전용으로 표시할 수 있는가** — 가능하다. `ComposePanel`에 `onStatusChange`(선택 prop)와 `ComposeStatusView`(`phase`·`candidateCount`·`stale`·`failureKo`)를 추가했고, `App.tsx`는 이를 `composeStatus`로만 받아 `#compose-path`가 `hidden`일 때 `.compose-strip`(읽기 전용 `<p>`)으로 렌더한다. 스트립은 값을 쓰지 않고 후보를 적용하지 않으며 포커스를 스스로 옮기지 않는다. 즉 UIX03이 요구하는 “접힌 상태에서 상태를 읽는다”가 성립한다. *단, 이 코드는 UIX03 절의 승인 전 선행 작업이며 아래 남은 문제 참고.*
+- [x] **현재 입력 경로의 시각적 구분** — 두 경로 버튼이 같은 플래그(`composePathOpen`)에서 `aria-current`를 파생하므로 항상 정확히 하나만 현재로 표시된다. 스타일은 `[aria-expanded="true"]`와 `[aria-current="true"]`를 같은 규칙으로 묶어 직접 입력 경로(=`aria-expanded`가 없는 버튼)도 동일하게 강조한다. 전환은 `hidden` 토글과 포커스 이동뿐이라 데이터 초기화·후보 적용이 없다(브라우저 검사로 확인).
+- [x] **UIX07 인계 항목** — 경로 전환 중 요청, 접힌 상태 응답 도착, 직접 입력 수정 중 응답 도착, 모델 변경·실패 후 재시도는 UIX07 통합 회귀에서 확인할 항목으로 남긴다. UIX03 스트립은 “응답이 도착해도 사용자의 입력·커서를 건드리지 않는다”는 전제로 작성되어 있다.
+- [x] **gap04 증거 복구 가능 여부** — 가능하다. UIX01 커밋(`782ee4d`)에서 `docs/evidence/prompt-composer-gap04/results.json`이 334→581 항목으로 덮였으나, 그 이전 원본은 `b672935`에 그대로 있다. `git show b672935:docs/evidence/prompt-composer-gap04/results.json`으로 334항목이 온전히 복구되고 추적 스크린샷 79개도 남아 있다. **이후 증거는 태스크별 디렉터리(`docs/evidence/art-studio-uix02/`)에만 기록했고 gap04는 건드리지 않았다.**
+
 ### UIX02 · 사전 선택과 충돌
 
 `frontend/src/components/ComposePanel.tsx`에 검색·분류, 칩별 귀속·고정·삭제, 제외 복구와 충돌 해소가 이미 있다. 많은 칩을 편집할 때 어느 선택에 조작이 적용되는지 알아보기 쉽게 한다.
 
-- [ ] 사전을 접어도 선택 개수와 미해결 충돌 건수를 볼 수 있게 한다. 검색 결과 수와 선택 개수를 구분하고, 검색 결과가 비면 기존 검색어·분류 초기화 동작을 연결한다.
-- [ ] 칩 이름과 출처를 먼저 읽게 하고 상세 조작을 해당 칩에 묶는다. 충돌은 당사 항목과 해소 동작을 함께 보여 준다. 기존 제외 복구와 ‘AI에게 맡기기’를 유지한다. 수정 대상은 ComposePanel과 `frontend/src/styles.css`다.
+- [x] 사전을 접어도 선택 개수와 미해결 충돌 건수를 볼 수 있게 한다. 검색 결과 수와 선택 개수를 구분하고, 검색 결과가 비면 기존 검색어·분류 초기화 동작을 연결한다.
+- [x] 칩 이름과 출처를 먼저 읽게 하고 상세 조작을 해당 칩에 묶는다. 충돌은 당사 항목과 해소 동작을 함께 보여 준다. 기존 제외 복구와 ‘AI에게 맡기기’를 유지한다. 수정 대상은 ComposePanel과 `frontend/src/styles.css`다.
 - **완료 기준** — 다인 장면에서 속성 귀속 변경 → 고정 → 다른 칩 제거 → 제외 복구를 수행한다. 변경한 칩과 개수가 일치하고 검색·패널 재열기 후 선택이 보존된다. 충돌 발생·해소 시 요약도 함께 변한다.
+
+**결과 (2026-11-24 완료)**
+
+- **변경 파일**
+  - `frontend/src/components/ComposePanel.tsx` — `#compose-dictionary` 바깥(사전 접기 버튼 아래)에 `.compose-counts`(`role="group" aria-label="선택 요약"`)를 두고 `선택·고정·제외·미해결 충돌` 네 수치를 항상 렌더한다. 0도 숨기지 않고 표시하며, 미해결 충돌만 `data-alert`로 강조한다. 검색 줄은 `검색 결과 n개 · 선택 n개`로 두 수치를 한 문장에서 구분한다(`.compose-search-count`). 칩을 `.compose-chip__head`(이름·출처·배지·귀속 라벨) + `.compose-chip__actions`(`role="group" aria-label="{이름} 조작"`) 2단 카드로 재구성해 이름을 먼저 읽고 조작은 해당 칩 안에 묶었다. `chipGroups = groupChips(chips.chosen, entityLabels, entities.length)`로 표시 계층만 귀속별로 묶고(`{label && <h4>}`라 단일 인물 장면은 제목 없음), `대상`은 `<select>`(장면 전체 + 인물별)로 유지했다. 충돌 행은 `data-chip-id`·`.compose-clashes__label`·`.compose-clashes__phrase`·`.compose-clashes__actions`로 당사 항목과 해소 버튼(`제외 해제`, `원문에서 지우기`)을 함께 보여 준다.
+  - `frontend/src/prompt/composeChips.ts` — 표시 전용 `groupChips(chips, entityLabels, entityCount)` 추가. 첫 등장 순서를 그대로 유지해 그룹을 만들고, 단일 인물 장면이면 라벨 없는 단일 그룹을 반환한다. 상태 배열·순서·직렬화는 건드리지 않는다.
+  - `frontend/src/styles.css` — `.compose-counts`/`.compose-count`(wrap, tabular-nums, `[data-alert]`), `.compose-search-count`, `.compose-chip-group*`(다인일 때만 `column`), `.compose-chip`을 2단 카드 grid로, `.compose-chip button`을 자손 선택자로 바꿔 44px 하한을 유지(기존 `>` 선택자는 조작이 한 단계 내려가면 적용되지 않는다), `.compose-chip__attribute`를 라벨/셀렉트 2행 grid로 바꿔 `대상`이 글자 단위로 쪼개지지 않게 했다.
+  - `frontend/tests/prompt-uix02.test.mjs` — 신규 단위 테스트 12건. `groupChips`의 단일/다인 그룹화와 순서, 그룹화가 `edit.selections`와 `buildComposeBody` 직렬화(순서·`entity_id`)를 바꾸지 않음, 수치가 패널과 같은 목록에서 나옴, 충돌이 파생값임을 검증한다. 렌더 테스트로 네 수치·`data-kind`를 확인하고, 요약이 접히는 영역·draft·후보 목록에 의존하지 않음을 소스 구조로 단언한다. `panelOpen`/`query`/`group`이 `update()`를 거치지 않고 `runSend`가 현재/응답 edit에만 호출됨도 검사한다.
+  - `scripts/prompt-composer-browser/suite-uix02.mjs` — 신규 브라우저 절(단독 76항목, 판정 66건). 연속 조작, 검색·접기, 충돌, 실패·재시도, 360/1280 레이아웃을 실제 클릭·키 입력으로 확인한다.
+  - `scripts/prompt-composer-browser/suite.mjs` — `runUix02`를 UCP08 뒤에 연결. UIX01 절에는 후속 항목인 현재 경로 표시 검사 6건(`aria-current` 단일 표시, 강조색, 전환 후 요약 유지, 전환 중 요청 0건)을 추가했다.
+  - `frontend/tests/prompt-uix01.test.mjs` — 현재 경로 표시 단언 1건 추가(총 8건).
+  - `docs/evidence/art-studio-uix02/` — 신규 태스크별 증거 디렉터리(스크린샷 74개 + `results.json`). 기존 `gap04`/`ucp08` 증거는 덮어쓰지 않았다.
+- **실제 동작**
+  - 사전을 접어도 네 수치가 그대로 보이고, 접힌 상태에서 화면 안에 있다. 0도 `0개`로 표시된다.
+  - 다인 장면은 `인물 1`, `인물 2`, `장면 전체` 제목으로 나뉘고 각 그룹에 개수가 붙는다. 그룹을 모두 펼쳐 이으면 칩 순서가 원래 선택 순서와 같다.
+  - 칩 카드는 `서 있기 / 자동 / 인물 1`처럼 이름·출처·귀속을 먼저 보여 주고, 그 아래 줄에 `고정`·`×`·`대상` 셀렉트가 있다. 각 조작 그룹은 `aria-label`이 칩 이름으로 시작한다.
+  - 귀속 변경은 그 칩만 옮기고 개수를 바꾸지 않으며 요청을 보내지 않는다. 고정은 대상 칩에만 적용되고 `고정` 배지와 수치가 함께 갱신된다. 다른 칩 제거는 제외를 1 늘리고 선택을 1 줄이며, 제외 해제는 행을 지우되 선택을 되살리지 않는다(다음 응답이 다시 고를 수 있음).
+  - 검색 0건·검색어 지우기·접기·재열기 어디서도 선택이 유지되고 `/prompt/compose` 요청은 늘지 않는다.
+  - 원문에 제외 항목을 다시 쓰면 `미해결 충돌`이 1건으로 오르고, 행 안의 `제외 해제`로 해소하면 0건이 되며 제외 목록도 빈다.
+  - 실패 후 재시도에서 사용자의 고정은 유지된다. 귀속은 `mergeSelections` 계약대로 서버 파생값으로 돌아온다(초기화가 아님).
+- **검증 명령과 결과**
+  - `npm --prefix frontend run lint` → 통과(출력 없음).
+  - `npm --prefix frontend run build` → `tsc -b && vite build` 성공.
+  - `node --experimental-strip-types --test frontend/tests/*.test.mjs` → **334 tests, 334 pass, 0 fail**(신규 `prompt-uix02` 12건, `prompt-uix01` 8건 포함). 시스템 `python3`에 pydantic이 없어 저장소 `.venv`의 `python3`를 PATH 앞에 두고 실행했다(`PATH=$PWD/.venv/bin:$PATH`).
+  - `scripts/prompt-composer-browser/run.mjs` / `verify.sh`(fake 엔진·임시 DB·`STUDIO_FAKE_DELAY=2`, Chromium CDP) → **558 checks, 0 failed**. 이 중 UIX02 단언 66건, UIX01 후속 6건 전부 통과. 결과·스크린샷은 `docs/evidence/art-studio-uix02/`에 기록.
+  - 360px/1280px: 가로 넘침 없음(`overflow` 0 / -15), 상세 조작 대상 식별, 버튼 44px 이상, 요약이 화면 안, `대상` 라벨 한 줄 — 모두 통과.
+  - `git diff --check` → 경고 없음.
+  - UCP 계약 회귀: 취소·revision/stale·적용/되돌리기·v3 저장/복원·413·`snapshot_trim` 검사가 모두 통과했다. 칩 ID·`wireSelection`·`composeRevisions`·스냅샷 직렬화는 수정하지 않았다.
+- **남은 문제**
+  - **작업 트리에 UIX03 선행 코드가 일부 들어와 있다.** 이번 실행 지시는 “UIX02만 수행”이지만, UIX01 후속 항목 1(“접힌 Compose 영역의 상태를 UIX03에서 읽기 전용으로 표시”)을 확인하려고 `onStatusChange`/`ComposeStatusView`(ComposePanel), `composeStatus`·`composeStrip`(App), `.compose-strip`(styles)을 작성했다. `suite-uix03.mjs`(494줄)는 어디에서도 import되지 않는 미연결 상태이며 UIX03 절은 아직 `[ ]`다. 즉 UIX03은 **완료가 아니라 착수 전 상태**이고, UIX02의 검증·기록은 이 코드와 무관하게 558검사 0실패로 통과했다. 다음 실행에서 UIX03을 진행할 때 이 코드를 이어 쓰거나, 지시대로 UIX02만 남기려면 해당 부분을 되돌리면 된다. 어느 쪽이든 UIX02 계약(칩 ID·revision·직렬화)은 건드리지 않았다.
+  - `docs/evidence/prompt-composer-gap04/results.json`은 UIX01 커밋(`782ee4d`)에서 재생성되며 334→581 항목으로 덮였다. UIX01 이전 원본은 `b672935`에서 그대로 복구 가능하다(`git show b672935:docs/evidence/prompt-composer-gap04/results.json`, 334항목 확인). 스크린샷 79개도 전부 추적 상태로 남아 있다.
+  - `:has()` 기반 다인 그룹 세로 배치는 Chromium/Safari/Firefox 최신에서 동작하지만, 구형 브라우저에서는 그룹이 가로로 흐를 뿐 판독에는 지장이 없다.
+  - 실기기 IME·소프트 키보드는 이 환경에 없어 확인하지 못했다(UIX07 인계).
+- **다음 ID** — **UIX03** (긴 영어 후보를 비교하고 적용 결과 확인). 선행 UIX01이 완료되어 대기 조건이 충족됐다.
 
 ### UIX03 · 후보 비교와 적용
 

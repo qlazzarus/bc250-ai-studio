@@ -44,7 +44,7 @@ import {
 } from "../prompt/composeSession";
 import { buildComposeBody, parseComposeReply } from "../prompt/composeRequest";
 import { failureAlert, warningAlerts, type ComposeAlert } from "../prompt/composeAlerts";
-import { chipList, entityLabels as entityLabelMap } from "../prompt/composeChips";
+import { chipList, entityLabels as entityLabelMap, groupChips } from "../prompt/composeChips";
 import { applyDiff, needsOverwriteConfirm, planApply } from "../prompt/composeApply";
 import { composeFallbackNotice, type ComposeCapability } from "../prompt/composeCapability";
 
@@ -103,7 +103,30 @@ export type ComposePanelProps = {
    * only moves focus — it never writes a prompt, so a refused candidate cannot become one.
    */
   onUseDirectInput?: () => void;
+  /**
+   * UIX01/UIX03: a read-only projection of the compose session, for the strip App shows
+   * while the Korean region is folded.
+   *
+   * This is a *projection*, not a second source: it is derived here from `visible` and
+   * reported one way. App never writes it back, and nothing fetches because of it — so a
+   * folded region can still say "생성 중", "후보 3개 준비됨", "실패", "다시 구성 필요"
+   * without a duplicate state machine and without a second truth.
+   */
+  onStatusChange?: (status: ComposeStatusView) => void;
 };
+
+/** The four facts the folded strip needs. Deliberately flat and serializable. */
+export type ComposeStatusView = {
+  phase: "idle" | "pending" | "ready" | "needs_clarification" | "failed" | "cancelled";
+  /** Usable candidates in the current draft; 0 unless the phase carries a reply. */
+  candidateCount: number;
+  /** The displayed reply no longer matches the edit (brief/chips/model moved). */
+  stale: boolean;
+  /** The headline of the failure alert, when the phase is `failed`. */
+  failureKo: string | null;
+};
+
+type CandidateView = { key: string; expanded: string[]; collapsed: string[] };
 
 const GROUP_LABEL: Record<string, string> = {
   subject: "대상", appearance: "외형", clothing: "의상", expression: "표정",
@@ -125,6 +148,7 @@ const WHY_LABEL: Record<string, string> = {
 export default function ComposePanel({
   capability, target: targetProp, candidateCount = 3, negativeSupported, prompt, negative,
   onApply, onRestore, onAppliedChange, appliedPrompt, send, examples = [], onUseDirectInput,
+  onStatusChange,
 }: ComposePanelProps) {
   /**
    * A placeholder target for the no-model state. It is never sent: `capability.supported`
@@ -181,6 +205,19 @@ export default function ComposePanel({
   const [undoTarget, setUndoTarget] = useState<ComposeTarget | null>(null);
   /** A candidate the user must press twice: the first press explains the negative loss. */
   const [armed, setArmed] = useState<string | null>(null);
+  /**
+   * UIX03: which candidate bodies are open.
+   *
+   * Keyed by the draft's `resultId`, so a *new* reply starts from the default (first body
+   * open) instead of inheriting the previous reply's expansion — two replies can even share
+   * a candidate id, and a bare id set would open the wrong card. `collapsed` exists so the
+   * default-open first card can be closed; without it, closing it would be indistinguishable
+   * from "not touched yet" and it would spring back open on the next render.
+   *
+   * View state only: toggling a body never touches `edit`, so no revision moves, nothing is
+   * sent, and the final prompt cannot change.
+   */
+  const [candidateView, setCandidateView] = useState<CandidateView>({ key: "", expanded: [], collapsed: [] });
 
   const pending = isPending(visible);
   const edit = visible.edit;
@@ -533,10 +570,70 @@ export default function ComposePanel({
    */
   const clashes = exclusionClashes(edit, DICTIONARY);
 
+  /**
+   * UIX02: the three numbers the user needs while the dictionary is folded.
+   *
+   * Derived from the same `chips`/`clashes` the rest of the panel renders, so the bar can
+   * never disagree with the lists below it. `chips.chosen`/`chips.excluded` are already
+   * filtered by `source`, which is why `excluded` here is a length and not a second filter.
+   */
+  const counts = {
+    chosen: chips.chosen.length,
+    excluded: chips.excluded.length,
+    clashes: clashes.length,
+    pinned: chips.pinned,
+  };
+  /**
+   * Chips grouped by attribution for the multi-person view. Display only — the state array
+   * is untouched, so request order and serialization do not move (UIX02 constraint).
+   */
+  const chipGroups = groupChips(chips.chosen, entityLabels, entities.length);
+
   const summary = visible.draft?.summaryKo ?? "";
   const questions = visible.phase === "needs_clarification" ? visible.questions : [];
   const candidates = visible.phase === "ready" ? visible.draft.candidates : [];
   const groups = Array.from(new Set(options.map((entry) => entry.category)));
+
+  /**
+   * UIX03: which candidate bodies are open for the *current* reply.
+   *
+   * A mismatched key means "this is a different reply", so the stored expansion is ignored
+   * wholesale and the defaults apply. Deriving it here — instead of clearing it in an effect
+   * — means the first render of a new reply already shows the right card, so no frame ever
+   * pairs the new candidate ids with the previous reply's open set.
+   */
+  const viewKey = visible.draft?.resultId ?? "";
+  const bodyView = candidateView.key === viewKey
+    ? candidateView : { key: viewKey, expanded: [], collapsed: [] };
+  /** The first body is open unless the user closed it; the rest only on request. */
+  const bodyOpen = (candidateId: string, index: number): boolean => index === 0
+    ? !bodyView.collapsed.includes(candidateId) : bodyView.expanded.includes(candidateId);
+  const toggleBody = (candidateId: string, index: number) => {
+    setCandidateView((current) => {
+      const base = current.key === viewKey
+        ? current : { key: viewKey, expanded: [], collapsed: [] };
+      const list = index === 0 ? base.collapsed : base.expanded;
+      const next = list.includes(candidateId)
+        ? list.filter((id) => id !== candidateId) : [...list, candidateId];
+      return index === 0 ? { ...base, collapsed: next } : { ...base, expanded: next };
+    });
+  };
+
+  /**
+   * UIX01 hand-off: report the session to `App` for the folded strip.
+   *
+   * Reported from the *same* `visible` the panel renders, so the strip cannot describe a
+   * phase the panel is not in. The effect depends on the five scalars only — an object
+   * dependency would fire every render and loop if `App` stored it unconditionally.
+   */
+  const statusFailure = visible.phase === "failed"
+    ? failureAlert(visible.failure, visible.detail, visible.message || undefined).title : null;
+  const statusPhase = visible.phase;
+  const statusCandidateCount = candidates.length;
+  useEffect(() => {
+    onStatusChange?.({ phase: statusPhase, candidateCount: statusCandidateCount,
+      stale, failureKo: statusFailure });
+  }, [onStatusChange, statusPhase, statusCandidateCount, stale, statusFailure]);
 
   const fallback = composeFallbackNotice(capability);
   const placeholder = "예: 붉은 원피스를 입은 여성이 비 오는 거리에 서 있다";
@@ -573,6 +670,24 @@ export default function ComposePanel({
           {panelOpen ? "사전 접기" : "사전에서 고르기"}
         </button>
       </div>
+      {/* UIX02: the counts live *outside* `#compose-dictionary` so folding the panel keeps
+          them readable. Each is a word plus a number — a colour or an icon alone would not
+          survive a screenshot in a bug report. */}
+      <div className="compose-counts" role="group" aria-label="선택 요약">
+        <span className="compose-count" data-kind="chosen">
+          선택 <strong>{counts.chosen}</strong>개
+        </span>
+        <span className="compose-count" data-kind="pinned">
+          고정 <strong>{counts.pinned}</strong>개
+        </span>
+        <span className="compose-count" data-kind="excluded">
+          제외 <strong>{counts.excluded}</strong>개
+        </span>
+        <span className="compose-count" data-kind="clashes"
+          data-alert={counts.clashes > 0 || undefined}>
+          미해결 충돌 <strong>{counts.clashes}</strong>건
+        </span>
+      </div>
       {fallback && <div className="compose-unavailable">
         <p className="compose-fallback" data-tone="caution">{fallback}</p>
         {onUseDirectInput && <button type="button" className="quiet compose-direct" onClick={onUseDirectInput}>
@@ -589,6 +704,12 @@ export default function ComposePanel({
           onKeyDown={onSearchKeyDown}
           placeholder="예: 인물, 조명, 전신" />
       </label>
+      {/* UIX02: the search result count and the selection count are two different numbers,
+          so they are labelled as such instead of both being "개". */}
+      <p className="compose-meta compose-search-count" role="status">
+        검색 결과 {options.length}개 · 선택 {counts.chosen}개
+        {group ? ` · ${groupLabel(group)} 분류` : ""}
+      </p>
       <div className="compose-groups" role="group" aria-label="사전 분류">
         {["", ...groups].map((item) => <button type="button" key={item || "all"}
           aria-pressed={group === item} onClick={() => setGroup(item)}>
@@ -632,65 +753,101 @@ export default function ComposePanel({
       <h3 className="compose-heading">이렇게 이해했어요</h3>
       <p className="compose-summary">{summary || "장면 요약이 없습니다."}</p>
       <div className="compose-chips">
-        {chips.chosen.map((chip) => <div className="compose-chip" key={chip.id}
-          data-source={chip.source} data-pinned={chip.pinned || undefined}>
-          <span className="compose-chip__label">{chip.labelKo}</span>
-          {chip.entityLabel && <span className="compose-chip__entity">{chip.entityLabel}</span>}
-          {chip.unmapped && <span className="compose-chip__unmapped">이 모델 미변환</span>}
-          {chip.badges.map((badge) =>
-            <span className="compose-chip__badge" key={badge}>{badge}</span>)}
-          {chip.source === "manual" && <button type="button" className="quiet"
-            aria-label={`${chip.labelKo} 직접 선택을 AI 선택으로 되돌리기`}
-            onClick={() => toAuto(chip.id)}>AI에게 맡기기</button>}
-          <button type="button" id={`compose-chip-${chip.id}`}
-            aria-pressed={chip.pinned}
-            aria-label={`${chip.labelKo} ${chip.pinned ? "고정 해제" : "고정"}`}
-            onClick={() => togglePin(chip.id, !chip.pinned)}>고정</button>
-          <button type="button" aria-label={`${chip.labelKo} 제거`}
-            onClick={() => dropChip(chip.id)}>×</button>
-          {/* Attribution is a select, not a toggle: with three people a toggle cannot say
-              which one, and "someone else" would silently move a dress to the wrong body. */}
-          {entities.length > 0 && <label className="compose-chip__attribute">
-            <span className="compose-chip__attribute-label">대상</span>
-            <select value={chip.entityId ?? ""}
-              aria-label={`${chip.labelKo} 귀속 대상`}
-              onChange={(event) => attribute(chip.id, event.target.value || null)}>
-              <option value="">장면 전체</option>
-              {entities.map((entity) =>
-                <option key={entity.entityId} value={entity.entityId}>
-                  {entityLabels.get(entity.entityId) ?? entity.entityId}
-                </option>)}
-            </select>
-          </label>}
+        {/* UIX02: name and source are read first; the controls that edit this chip live in
+            a labelled group inside the same card, so a press can never be ambiguous about
+            which chip it applies to. Grouping by attribution is display-only — see
+            `groupChips`; the state array and its order are untouched. */}
+        {chipGroups.map((chipGroup) => <div className="compose-chip-group" key={chipGroup.key}
+          data-group={chipGroup.key} role="group"
+          aria-label={chipGroup.label ? `${chipGroup.label} 선택 항목` : "선택 항목"}>
+          {chipGroup.label && <h4 className="compose-chip-group__heading">
+            {chipGroup.label}
+            <span className="compose-chip-group__count">{chipGroup.chips.length}개</span>
+          </h4>}
+          {chipGroup.chips.map((chip) => <div className="compose-chip" key={chip.id}
+            data-source={chip.source} data-pinned={chip.pinned || undefined}>
+            <span className="compose-chip__head">
+              <span className="compose-chip__label">{chip.labelKo}</span>
+              {chip.badges.map((badge) =>
+                <span className="compose-chip__badge" key={badge}>{badge}</span>)}
+              {chip.entityLabel && <span className="compose-chip__entity">{chip.entityLabel}</span>}
+              {chip.unmapped && <span className="compose-chip__unmapped">이 모델 미변환</span>}
+            </span>
+            <span className="compose-chip__actions" role="group"
+              aria-label={`${chip.labelKo} 조작`}>
+              {chip.source === "manual" && <button type="button" className="quiet"
+                aria-label={`${chip.labelKo} 직접 선택을 AI 선택으로 되돌리기`}
+                onClick={() => toAuto(chip.id)}>AI에게 맡기기</button>}
+              <button type="button" id={`compose-chip-${chip.id}`}
+                aria-pressed={chip.pinned}
+                aria-label={`${chip.labelKo} ${chip.pinned ? "고정 해제" : "고정"}`}
+                onClick={() => togglePin(chip.id, !chip.pinned)}>고정</button>
+              <button type="button" aria-label={`${chip.labelKo} 제거`}
+                onClick={() => dropChip(chip.id)}>×</button>
+              {/* Attribution is a select, not a toggle: with three people a toggle cannot say
+                  which one, and "someone else" would silently move a dress to the wrong body. */}
+              {entities.length > 0 && <label className="compose-chip__attribute">
+                <span className="compose-chip__attribute-label">대상</span>
+                <select value={chip.entityId ?? ""}
+                  aria-label={`${chip.labelKo} 귀속 대상`}
+                  onChange={(event) => attribute(chip.id, event.target.value || null)}>
+                  <option value="">장면 전체</option>
+                  {entities.map((entity) =>
+                    <option key={entity.entityId} value={entity.entityId}>
+                      {entityLabels.get(entity.entityId) ?? entity.entityId}
+                    </option>)}
+                </select>
+              </label>}
+            </span>
+          </div>)}
         </div>)}
         {chips.chosen.length === 0 && <p className="compose-meta">
           사전에서 고른 항목이 없습니다. 원문만으로 후보를 만듭니다.
         </p>}
       </div>
+      {/* UIX02: a veto is still a chip with a name and a source, so it reads the same way as
+          a chosen one — name and badges first, the single recovery control after them. */}
       {chips.excluded.length > 0
         && <div className="compose-excluded" role="group" aria-label="제외한 항목">
           <strong>제외한 항목 {chips.excluded.length}개</strong>
-          <ul>{chips.excluded.map((chip) => <li key={chip.id}>
-            <span>{chip.labelKo}</span>
+          <ul>{chips.excluded.map((chip) => <li key={chip.id} data-chip-id={chip.id}>
+            <span className="compose-excluded__head">
+              <span className="compose-chip__label">{chip.labelKo}</span>
+              {chip.badges.map((badge) =>
+                <span className="compose-chip__badge" key={badge}>{badge}</span>)}
+              {chip.entityLabel && <span className="compose-chip__entity">{chip.entityLabel}</span>}
+            </span>
             <button type="button" className="quiet"
+              aria-label={`${chip.labelKo} 제외 해제`}
               onClick={() => unexclude(chip.id)}>제외 해제</button>
           </li>)}</ul>
         </div>}
-      {/* UCP06: a veto the current brief contradicts. Both answers discard something the
-          user said, so this asks instead of choosing — and it never applies on its own. */}
+      {/* UCP06/UIX02: a veto the current brief contradicts. Both answers discard something
+          the user said, so this asks instead of choosing — and it never applies on its own.
+          Each row names the vetoed chip (with its source and pinned state, the same facts
+          the chip card above shows) and keeps both UCP resolutions beside it, so the item
+          and the fix for it are read together. */}
       {clashes.length > 0 && <div className="compose-clashes" role="group"
         aria-label="제외와 원문이 충돌합니다">
-        <strong>원문과 제외 항목이 충돌합니다</strong>
+        <strong>원문과 제외 항목이 충돌합니다 · {clashes.length}건</strong>
         <p className="compose-meta">
           제외한 항목을 원문에서 다시 말했습니다. 둘 중 하나는 포기해야 하므로 선택해 주세요.
         </p>
         <ul>{clashes.map((clash) => {
           const entry = DICTIONARY.find((item) => item.id === clash.id);
-          return <li key={clash.id}>
-            <span>{entry?.labelKo ?? clash.id} · 원문에 “{clash.phrase}”</span>
+          const vetoed = chips.excluded.find((chip) => chip.id === clash.id);
+          return <li key={clash.id} data-chip-id={clash.id}>
+            <span className="compose-clashes__target">
+              <span className="compose-clashes__label">{entry?.labelKo ?? clash.id}</span>
+              {vetoed && vetoed.badges.map((badge) =>
+                <span className="compose-chip__badge" key={badge}>{badge}</span>)}
+              <span className="compose-clashes__phrase">원문에 “{clash.phrase}”</span>
+              {vetoed?.entityLabel && <span className="compose-chip__entity">{vetoed.entityLabel}</span>}
+            </span>
             <span className="compose-clashes__actions">
               {CLASH_RESOLUTIONS.map((resolution) =>
                 <button type="button" className="quiet" key={resolution.value}
+                  aria-label={`${entry?.labelKo ?? clash.id} ${resolution.labelKo}`}
                   onClick={() => resolve(clash.id, resolution.value)}>
                   {resolution.labelKo}
                 </button>)}
@@ -750,28 +907,51 @@ export default function ComposePanel({
         const diff = applyDiff(candidate, { currentPrompt: prompt,
           currentNegative: negative, negativeSupported });
         const isApplied = visible.applied?.candidateId === candidate.candidateId;
+        const open = bodyOpen(candidate.candidateId, index);
+        const bodyId = `compose-candidate-body-${candidate.candidateId}`;
+        // UIX03: the headline answers "which candidate is this and does it change my text"
+        // before any long English body is read. The toggle is the header, so the open state
+        // and the title are one control and the keyboard has a single stop per card.
         return <article className="compose-candidate" key={candidate.candidateId}
-          tabIndex={-1} data-applied={isApplied || undefined}>
-          <h4>{index === 0 ? "원문 충실" : `대안 ${index}`} · {candidate.titleKo}</h4>
+          tabIndex={-1} data-applied={isApplied || undefined} data-open={open || undefined}>
+          <h4>
+            <button type="button" className="compose-candidate__toggle"
+              aria-expanded={open} aria-controls={bodyId}
+              onClick={() => toggleBody(candidate.candidateId, index)}>
+              <span className="compose-candidate__title">
+                {index === 0 ? "원문 충실" : `대안 ${index}`} · {candidate.titleKo}
+              </span>
+              <span className="compose-candidate__impact">
+                {diff.positive === "same" ? "최종 프롬프트 같음" : "최종 프롬프트 교체"}
+                {diff.negative === "replace" ? " · negative 교체"
+                  : diff.negative === "blocked" ? " · negative 빠짐" : " · negative 유지"}
+              </span>
+              {isApplied && <span className="compose-candidate__applied" role="status">적용됨</span>}
+              <span className="compose-candidate__chevron" aria-hidden="true">
+                {open ? "접기" : "펼치기"}
+              </span>
+            </button>
+          </h4>
           <p className="compose-candidate__difference">{candidate.differenceKo}</p>
-          <p className="compose-candidate__prompt">{candidate.positivePrompt}</p>
-          {candidate.negativePrompt !== null && <p className="compose-candidate__negative">
-            negative: {candidate.negativePrompt}
-            {diff.negative === "blocked" && <span className="compose-candidate__block">
-              {" "}· 이 모델은 negative prompt를 지원하지 않아 적용 시 빠집니다
-            </span>}
-          </p>}
-          {candidate.preservedKo.length > 0 && <ul className="compose-candidate__preserved">
-            {candidate.preservedKo.map((item) => <li key={item}>{item}</li>)}
-          </ul>}
-          {/* The diff names the field it will *touch*: a candidate with no negative leaves
-              the user's own negative alone, so "negative 유지" is a fact, not a placeholder. */}
-          <p className="compose-candidate__diff">
-            최종 프롬프트: {diff.positive === "same" ? "같음" : "교체"}
-            {diff.negative === "replace" ? " · negative 교체"
-              : diff.negative === "blocked" ? " · negative 빠짐" : " · negative 유지"}
-          </p>
-          {isApplied && <p className="compose-candidate__applied" role="status">적용됨</p>}
+          <div className="compose-candidate__body" id={bodyId} hidden={!open}>
+            <p className="compose-candidate__prompt">{candidate.positivePrompt}</p>
+            {candidate.negativePrompt !== null && <p className="compose-candidate__negative">
+              negative: {candidate.negativePrompt}
+              {diff.negative === "blocked" && <span className="compose-candidate__block">
+                {" "}· 이 모델은 negative prompt를 지원하지 않아 적용 시 빠집니다
+              </span>}
+            </p>}
+            {candidate.preservedKo.length > 0 && <ul className="compose-candidate__preserved">
+              {candidate.preservedKo.map((item) => <li key={item}>{item}</li>)}
+            </ul>}
+            {/* The diff names the field it will *touch*: a candidate with no negative leaves
+                the user's own negative alone, so "negative 유지" is a fact, not a placeholder. */}
+            <p className="compose-candidate__diff">
+              최종 프롬프트: {diff.positive === "same" ? "같음" : "교체"}
+              {diff.negative === "replace" ? " · negative 교체"
+                : diff.negative === "blocked" ? " · negative 빠짐" : " · negative 유지"}
+            </p>
+          </div>
           <button type="button" className="compose-apply"
             onClick={() => apply(candidate.candidateId)}>
             {armed === candidate.candidateId ? "negative 없이 적용" : "이 프롬프트 사용"}

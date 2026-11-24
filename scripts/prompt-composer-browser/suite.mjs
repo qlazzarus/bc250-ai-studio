@@ -7,6 +7,7 @@ import { runContracts } from "./suite-contracts.mjs";
 import { runTrans06 } from "./suite-trans06.mjs";
 import { runU12 } from "./suite-u12.mjs";
 import { runUcp08 } from "./suite-ucp08.mjs";
+import { runUix02 } from "./suite-uix02.mjs";
 import { adjustOpen, closeAdjust, openAdjust, pickEntry, stageOrder, waitAdjustOpen, waitSearchFocus } from "./ui.mjs";
 
 export async function runSuite({ page, browser, sessionId, check, record, sleep, shots }) {
@@ -81,6 +82,21 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
   check("UIX01 · 두 입력 경로 노출", JSON.stringify(["한글 장면으로 만들기", "최종 프롬프트 직접 입력"]),
     JSON.stringify(paths.buttons));
   check("UIX01 · 경로 그룹 이름", "프롬프트 입력 경로", paths.label);
+  // Exactly one path is marked current, and the marker follows the fold both ways. This is
+  // the UIX02 follow-up: the *current* path must be identifiable at a glance, and marking
+  // it must not change any value (that is asserted by the round-trip checks below).
+  const currentPath = () => evaluate(`(() => {
+    const marked = [...document.querySelectorAll('.prompt-paths > .quiet')]
+      .filter((n) => n.getAttribute('aria-current') === 'true')
+      .map((n) => n.textContent.trim());
+    return marked;
+  })()`);
+  check("UIX01 · 기본은 한글 경로가 현재", JSON.stringify(["한글 장면으로 만들기"]),
+    JSON.stringify(await currentPath()));
+  check("UIX01 · 표시등이 2px 테두리로 보임", true, await evaluate(`(() => {
+    const node = document.querySelector('.prompt-paths > .quiet[aria-current="true"]');
+    return !!node && getComputedStyle(node).borderTopColor === 'rgb(195, 160, 255)';
+  })()`));
 
   // Both entries must be keyboard reachable, not merely present.
   await evaluate(`document.querySelector('.composer select').focus()`);
@@ -124,6 +140,8 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
   check("UIX01 · 직접 입력이 최종 필드로 포커스", true, direct.focused);
   check("UIX01 · 전환 후 영어 값 보존", "a woman standing in a rainy alley", direct.english);
   check("UIX01 · 접혀도 한글 값 보존", "비 오는 골목의 여성", direct.korean);
+  check("UIX01 · 직접 입력 경로가 현재로 표시", JSON.stringify(["최종 프롬프트 직접 입력"]),
+    JSON.stringify(await currentPath()));
 
   await clickByText(".prompt-paths button", "한글 장면으로 만들기");
   await sleep(300);
@@ -139,6 +157,8 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
   check("UIX01 · 왕복 후 한글 값 보존", "비 오는 골목의 여성", roundTrip.korean);
   check("UIX01 · 왕복 후 영어 값 보존", "a woman standing in a rainy alley", roundTrip.english);
   check("UIX01 · 왕복이 요청을 보내지 않음", 0, await evaluate(`window.__composeRequests`));
+  check("UIX01 · 왕복 후 한글 경로가 현재로 복귀", JSON.stringify(["한글 장면으로 만들기"]),
+    JSON.stringify(await currentPath()));
   record("UIX01 왕복", JSON.stringify(roundTrip));
   await shot(shots, "03b-uix01-paths.png");
 
@@ -154,6 +174,14 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
   await sleep(200);
   check("UIX01 · 패널 마운트 유지(재생성 없음)", true,
     identity && await evaluate(`document.querySelector('.compose') === window.__composeNode`));
+  // UIX02 follow-up: switching the visible path must never clear a choice or bump a
+  // revision. The summary the panel publishes is the observable form of that claim.
+  const summaryAfter = await evaluate(`(() => {
+    const node = document.querySelector('.compose-counts');
+    return node ? node.textContent.replace(/\\s+/g, ' ').trim() : null;
+  })()`);
+  check("UIX01 · 전환 후에도 선택 요약 유지", true, typeof summaryAfter === "string");
+  check("UIX01 · 전환이 요청을 늘리지 않음", 0, await evaluate(`window.__composeRequests`));
 
   // The dictionary draft tool is named for its purpose, and it no longer shares the
   // "프롬프트 구성" wording with anything else on the screen. The suffix follows the panel's
@@ -327,4 +355,7 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
   // UCP08 replaces the capability/endpoint stubs with its own and reloads, so it runs
   // last: its v3 submit must not inherit a v2 `remainder` stub from §N.
   await runUcp08({ page, check, record, sleep, shots });
+  // UIX02 registers its own compose stub and reloads, so it starts from a clean document
+  // and does not depend on what UCP08 left applied.
+  await runUix02({ page, check, record, sleep, shots });
 }
