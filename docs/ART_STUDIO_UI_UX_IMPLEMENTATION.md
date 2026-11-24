@@ -1,6 +1,6 @@
 # Art Studio UI/UX 개선 실행 계획
 
-2026-11-23 · 구현 담당 `deepseek-v4.1-flash` · 다음 태스크 **UIX01**
+2026-11-23 · 구현 담당 `deepseek-v4.1-flash` · 다음 태스크 **UIX02**
 
 사용자가 모델을 고르고, 장면을 영어 프롬프트로 구성하거나 직접 입력하고, 생성한 작업과 결과를 다시 찾는 흐름을 개선한다. 기존 UCP 기능을 사용하는 Art Studio가 범위다. Pixel Studio는 진입·복귀 회귀만 확인한다. 현재 판단 근거는 프런트엔드 소스와 기존 UCP 브라우저 검증 기록이다. 아래 배치와 동작은 구현 목표이며 새 화면의 사용성은 아직 측정하지 않았다.
 
@@ -18,7 +18,7 @@ deepseek-v4.1-flash는 구현 담당이다. Studio 런타임 모델, API, 배포
 
 | ID | 사용자가 얻는 결과 | 선행 | 상태 |
 | --- | --- | --- | --- |
-| UIX01 | 장면 구성과 영어 직접 입력의 진입점 식별 | 없음 | 대기 |
+| UIX01 | 장면 구성과 영어 직접 입력의 진입점 식별 | 없음 | 완료 |
 | UIX02 | 사전 선택을 요약에서 확인하고 수정 | UIX01 | 대기 |
 | UIX03 | 긴 영어 후보를 비교하고 적용 결과 확인 | UIX01 | 대기 |
 | UIX04 | 기본 설정으로 생성하고 막힌 입력으로 이동 | UIX01 | 대기 |
@@ -32,9 +32,38 @@ deepseek-v4.1-flash는 구현 담당이다. Studio 런타임 모델, API, 배포
 
 현재 `frontend/src/App.tsx`는 모델 아래에 `PromptBuilder`의 ‘프롬프트 구성 열기’, `ComposePanel`, 최종 입력을 순서대로 렌더링한다. 사용자는 비슷한 이름의 두 구성 경로를 먼저 구별해야 한다.
 
-- [ ] 모델 다음에 ‘한글 장면으로 만들기’와 ‘최종 프롬프트 직접 입력’으로 이동하는 경로를 둔다. 직접 입력은 기존 textarea로 연결한다. 기존 builder 열기는 ‘사전 초안·고급 도구’로 용도를 드러낸다.
-- [ ] compose 미지원 시 이유와 직접 입력을 같은 위치에서 찾게 한다. 접기·펼치기로 편집 컴포넌트를 재마운트하거나 요청을 보내지 않는다.
+- [x] 모델 다음에 ‘한글 장면으로 만들기’와 ‘최종 프롬프트 직접 입력’으로 이동하는 경로를 둔다. 직접 입력은 기존 textarea로 연결한다. 기존 builder 열기는 ‘사전 초안·고급 도구’로 용도를 드러낸다.
+- [x] compose 미지원 시 이유와 직접 입력을 같은 위치에서 찾게 한다. 접기·펼치기로 편집 컴포넌트를 재마운트하거나 요청을 보내지 않는다.
 - **완료 기준** — 360px와 1280px에서 각 경로에 키보드로 진입한다. 한글·영어를 각각 입력한 뒤 왕복해도 양쪽 값이 보존된다. 미지원 fixture에서도 최종 입력으로 생성 가능하다. 기존 builder 복원 상태 표시도 접근 가능하다.
+
+**결과 (2026-11-23 완료)**
+
+- **변경 파일**
+  - `frontend/src/App.tsx` — 모델 셀렉트 바로 뒤에 `.prompt-paths` 그룹(`role="group" aria-label="프롬프트 입력 경로"`)을 두고 ‘한글 장면으로 만들기’(aria-expanded/aria-controls=`compose-path`)와 ‘최종 프롬프트 직접 입력’(aria-controls=`prompt-final`)을 배치했다. `openPath()`는 보이는 영역과 포커스만 바꾸며 어떤 값도 쓰지 않는다. 한글 영역은 `hidden={!composePathOpen}`만 토글하므로 `ComposePanel`이 언마운트되지 않는다. `PromptBuilder`는 최종 프롬프트 필드 옆(고급 도구 위치)으로 옮겼고, 최종 textarea에 `id="prompt-final"`·`ref`를 부여했다. 미지원/번역 강등/복원 안내는 경로 그룹 아래, 한글 영역 위에 그대로 유지한다. 빈 입력 힌트 문구도 새 진입점 이름을 가리키도록 고쳤다.
+  - `frontend/src/components/ComposePanel.tsx` — `onUseDirectInput` 선택 prop 추가. 미지원 사유(`.compose-fallback`) 바로 옆 같은 블록(`.compose-unavailable`)에서 ‘최종 프롬프트 직접 입력’을 제공한다. 이 버튼은 포커스 이동만 위임하며 후보 적용 경로를 호출하지 않는다.
+  - `frontend/src/components/PromptBuilder.tsx` — 열기 라벨을 ‘프롬프트 구성 열기/닫기’에서 ‘사전 초안·고급 도구/닫기’로 변경. 복원 상태(`.prompt-status`, `role="status"`)는 접히는 `#prompt-builder-panel` 바깥에 그대로 두어 접힌 상태에서도 읽힌다.
+  - `frontend/src/styles.css` — `.prompt-paths`(flex, 44px 터치 하한, 포커스 링), `.compose-path[hidden]{display:none}`(아래 `display:grid` 규칙이 UA `[hidden]`을 덮어쓰지 않도록 명시), `.compose-unavailable`/`.compose-direct` 스타일 추가.
+  - `frontend/tests/prompt-uix01.test.mjs` — 신규 단위 테스트 7건. 구조 단언(경로 순서, `hidden` 사용, `openPath`가 `setSettings`/`api.`/`onChange`를 호출하지 않음, `aria-controls` 대상 일치)과 `renderToStaticMarkup`으로 렌더한 `ComposePanel` 마크업(미지원 사유 다음에 직접 입력 버튼, 지원 시 둘 다 없음)을 함께 검증한다.
+  - `scripts/prompt-composer-browser/suite.mjs` — UIX01 브라우저 절 추가. 경로 노출·그룹 이름, 모델 다음 Tab 도달(1280/360 양쪽), 한글·영어 왕복 값 보존, 왕복 중 `fetch` 스파이로 `/prompt/compose` 요청 0건, `.compose` 노드 동일성(재마운트 없음), 고급 도구 명칭, 360px 가로 넘침 0·버튼 44px, 복원 상태가 접히는 패널 밖에 있음을 검사한다.
+  - `scripts/prompt-composer-browser/suite-contracts.mjs` — 기존 capability 미지원 절(M) 뒤에 M2 추가. 미지원 블록에서 사유→직접 입력 순서, 포커스 이동·한글 영역 접힘, 그 상태에서 최종 입력만으로 생성이 접수되는지(작업 상태 `completed`)를 확인한다.
+  - `scripts/prompt-composer-browser/suite-keyboard.mjs` — Shift+Tab 역순 기대값의 라벨을 새 명칭으로 갱신.
+  - `docs/evidence/prompt-composer-gap04/` — 하네스 스크린샷·`results.json` 재생성(신규 `03b-uix01-paths.png`, `03c-uix01-360.png`, `03d-uix01-1280.png`, `14b-uix01-unsupported.png` 포함).
+- **실제 동작**
+  - 모델을 고르면 바로 아래에 두 경로가 있고, ‘한글 장면으로 만들기’가 기본으로 펼쳐진다. ‘최종 프롬프트 직접 입력’을 누르면 한글 영역이 `hidden`으로 접히고 포커스가 `#prompt-final`로 이동한다. 다시 ‘한글 장면으로 만들기’를 누르면 `#compose-brief`로 포커스가 돌아온다.
+  - 왕복해도 양쪽 값, 칩, 후보, 진행 중 요청이 그대로 남고 `/prompt/compose` 요청은 0건이다. `.compose` DOM 노드도 동일해 재마운트가 없다.
+  - compose 미지원/미광고 계열에서는 사유 문장 바로 옆에 ‘최종 프롬프트 직접 입력’이 있고, 그 버튼으로 최종 필드에 도달해 compose 없이 생성이 접수된다.
+  - builder는 최종 프롬프트 필드 옆의 ‘사전 초안·고급 도구’로 열리고, 적용·복원 상태 표시는 접힌 상태에서도 보인다.
+- **검증 명령과 결과**
+  - `npm --prefix frontend run lint` → 통과(출력 없음).
+  - `npm --prefix frontend run build` → `tsc -b && vite build` 성공.
+  - `node --experimental-strip-types --test frontend/tests/*.test.mjs` → **321 tests, 321 pass, 0 fail**(신규 `prompt-uix01` 7건 포함). 시스템 `python3`에 pydantic이 없어 `prompt-p5`가 깨지므로 venv의 `python3`를 PATH 앞에 두고 실행했다.
+  - `scripts/prompt-composer-browser/run.mjs`(fake 엔진·임시 DB·`STUDIO_FAKE_DELAY=2`, Chromium CDP) → **484 checks, 0 failed**. 이 중 UIX01 단언 27건 전부 통과. 결과·스크린샷은 `docs/evidence/prompt-composer-gap04/`에 기록.
+  - UCP 계약 회귀: 취소(`취소 후 원문·칩 보존`, `취소 후 재시도 가능`), revision/stale(`모델 변경 후 후보 사라짐`, `K3 최종 프롬프트는 사용자 작업으로 유지`), 적용/되돌리기(`복원이 적용 문자열·negative·모델을 되살림`, `후보 적용 후 되돌리기`), 저장(`v3 스냅샷 기록`, `413 처리`, `snapshot_trim 안내`) 검사가 모두 통과해 기존 계약이 유지됨을 확인했다.
+- **남은 문제**
+  - 실기기 IME·소프트 키보드·회전은 이 환경에 없어 확인하지 못했다(UIX07 인계 항목).
+  - 한글 영역을 접어도 상태는 남지만 화면상 보이지 않으므로, 진행 중 요청의 진행 표시는 사용자가 한글 경로로 돌아와야 보인다. 요구 사항은 “재마운트·재요청 금지”이므로 의도된 동작이다.
+  - `docs/evidence/prompt-composer-gap04/`의 기존 스크린샷이 이번 코드 기준으로 전부 재생성되어 diff가 크다. UIX07에서 한 번 더 정리·대조할 것을 권한다.
+- **다음 ID** — **UIX02** (사전 선택을 요약에서 확인하고 수정). 선행 UIX01이 완료되어 대기 조건이 충족됐다.
 
 ### UIX02 · 사전 선택과 충돌
 

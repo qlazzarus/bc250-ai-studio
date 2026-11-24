@@ -30,7 +30,7 @@ export async function runKeyboard({ page, check, record, sleep, shots }) {
 
   // VERIFY01: Shift+Tab must retrace the exact forward stops, not merely produce
   // three records. Comparing identifiers is what makes a broken key event fail.
-  const expectedBack = [seen[2], seen[1], seen[0], { tag: "BUTTON", id: null, label: null, text: "프롬프트 구성 닫기" }];
+  const expectedBack = [seen[2], seen[1], seen[0], { tag: "BUTTON", id: null, label: null, text: "사전 초안·고급 도구 닫기" }];
   check("키보드 · 역순 정확히 일치", JSON.stringify(expectedBack.map(idOf)),
     JSON.stringify(backward.map(idOf)));
 

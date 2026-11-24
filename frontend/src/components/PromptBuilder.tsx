@@ -810,8 +810,10 @@ export default function PromptBuilder({
   }
 
   return <div className="prompt-builder">
+    {/* UIX01: the label names what the panel produces (a dictionary draft) and that it is an
+        advanced tool, so it is no longer a second "구성" the user has to disambiguate. */}
     <button type="button" className="quiet" aria-expanded={open} aria-controls="prompt-builder-panel" onClick={() => setOpen(!open)}>
-      {open ? "프롬프트 구성 닫기" : "프롬프트 구성 열기"}
+      {open ? "사전 초안·고급 도구 닫기" : "사전 초안·고급 도구"}
     </button>
     <HelpNote summary="저장 범위 안내">초안을 적용하면 서버 지원 여부에 따라 선택 사항과 초안이 생성 결과에 함께 저장됩니다. 새로고침 전 입력은 저장되지 않습니다.</HelpNote>
     {state.applied && <div role="status" className="prompt-status">

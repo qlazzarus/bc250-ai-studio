@@ -121,6 +121,20 @@ function App() {
   const [studio, setStudio] = useState<"art" | "pixel">("art");
   const [promptDirty, setPromptDirty] = useState(false);
   const [promptBlurred, setPromptBlurred] = useState(false);
+  /**
+   * UIX01: the Korean path folds but never unmounts.
+   *
+   * `hidden` rather than a conditional render keeps the composer's session — brief, chips,
+   * candidates, request id — alive while the user looks at the English field. Folding
+   * therefore cannot drop work, cannot remount the editor and cannot send a request.
+   * The default is open, so the first screen is the one the earlier tasks measured.
+   */
+  const [composePathOpen, setComposePathOpen] = useState(true);
+  const composeRegionRef = useRef<HTMLDivElement | null>(null);
+  const finalPromptRef = useRef<HTMLTextAreaElement | null>(null);
+  /** Focus is applied after the commit that reveals the target; see the two effects below. */
+  const [composeFocusTick, setComposeFocusTick] = useState(0);
+  const [finalFocusTick, setFinalFocusTick] = useState(0);
 
   const api = useMemo(() => new StudioApi("/api/v1", API_KEY), []);
   const activeModel = models.find((model) => model.model_id === settings.modelId);
@@ -296,6 +310,40 @@ function App() {
     return () => controller.abort();
   }, [api]);
 
+  /**
+   * UIX01: switching the visible input path.
+   *
+   * Nothing is written and nothing is fetched: the Korean region only gains or loses the
+   * `hidden` attribute, so its mounted state (brief, chips, candidates, in-flight request)
+   * is untouched, and the English field is always mounted. Focus is moved through a tick
+   * and an effect, because a control inside a just-unfolded region cannot take focus in the
+   * same commit that reveals it.
+   */
+  function openPath(path: "compose" | "final") {
+    if (path === "compose") {
+      // Re-clicking the active path must not steal focus from whatever the user is editing.
+      if (composePathOpen) return;
+      setComposePathOpen(true);
+      setComposeFocusTick((tick) => tick + 1);
+      return;
+    }
+    // The Korean region folds on the direct path so the field it links to is what the user
+    // lands on, rather than a long form they have to scroll past.
+    setComposePathOpen(false);
+    setFinalFocusTick((tick) => tick + 1);
+  }
+
+  useEffect(() => {
+    if (!composeFocusTick) return;
+    const node = composeRegionRef.current?.querySelector<HTMLTextAreaElement>("#compose-brief");
+    node?.focus();
+  }, [composeFocusTick]);
+
+  useEffect(() => {
+    if (!finalFocusTick) return;
+    finalPromptRef.current?.focus();
+  }, [finalFocusTick]);
+
   function changeBuilderFamily(family: string): boolean {
     if (!builder.scene.targetFamily || builder.scene.targetFamily === family) return true;
     if (builder.scene.selections.length && !window.confirm("모델 계열을 변경하면 사전 항목을 새 계열의 표현으로 다시 연결합니다. 기존 최종 프롬프트는 유지됩니다. 계속할까요?")) return false;
@@ -396,7 +444,7 @@ function App() {
   const promptTouched = promptDirty || promptBlurred;
   const showPromptIssues = settings.prompt.length > 0 || promptTouched;
   const promptHint = !promptTouched && settings.prompt.length === 0
-    ? "생성할 장면을 적거나, 위의 사전 구성으로 초안을 만들어 적용하세요." : "";
+    ? "생성할 장면을 적거나, 위의 ‘한글 장면으로 만들기’로 초안을 만들어 적용하세요." : "";
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -539,34 +587,49 @@ function App() {
           <label>모델<select value={settings.modelId} onChange={(event) => chooseModel(event.target.value)}>
             <option value="">모델 선택</option>{models.map((model) => <option key={model.model_id} value={model.model_id} disabled={!model.execution_enabled}>{model.display_name}{model.execution_enabled ? "" : " · 사용 불가"}</option>)}
           </select></label>
+          <div className="prompt-paths" role="group" aria-label="프롬프트 입력 경로">
+            <button type="button" className="quiet" aria-expanded={composePathOpen}
+              aria-controls="compose-path"
+              onClick={() => openPath("compose")}>한글 장면으로 만들기</button>
+            <button type="button" className="quiet" aria-controls="prompt-final"
+              onClick={() => openPath("final")}>최종 프롬프트 직접 입력</button>
+            <span className="prompt-paths__hint">
+              한글 장면은 사전 초안과 영어 후보를 만들어 최종 프롬프트에 적용하고, 직접 입력은 그 필드로 바로 이동합니다. 두 값은 전환해도 그대로 남습니다.
+            </span>
+          </div>
           {!compositionSupported && <p className="prompt-notice" data-tone="caution">서버가 구성 이력 저장을 지원하지 않거나 확인할 수 없습니다. 최종 프롬프트만 저장됩니다.</p>}
           {remainderDowngraded && <p className="prompt-notice" data-tone="caution">서버가 번역 기록(v2)을 지원하지 않아 이번 저장에는 포함한 번역이 빠집니다. 최종 프롬프트에는 그대로 남습니다.</p>}
           {composeRestoreNotice && <p className="prompt-notice" data-tone="caution" role="status">{composeRestoreNotice}<button type="button" onClick={() => setComposeRestoreNotice(null)}>닫기</button></p>}
+          {/*
+            UIX01: the Korean path folds but is never unmounted. Folding is the `hidden`
+            attribute on the wrapper, so the composer's session — brief, chips, candidates,
+            an in-flight request — survives a trip to the English field and back, and no
+            toggle can resend. `ComposePanel` writes the final prompt only from one
+            candidate's apply press.
+          */}
+          <div id="compose-path" className="compose-path" ref={composeRegionRef} hidden={!composePathOpen}>
+            <ComposePanel
+              capability={composeCapability}
+              target={composeTarget}
+              negativeSupported={negativeEnabled}
+              prompt={settings.prompt}
+              negative={settings.negativePrompt}
+              appliedPrompt={composedApplied}
+              onApply={applyComposedPrompt}
+              onRestore={restoreComposedPrompt}
+              onAppliedChange={setComposeRecord}
+              send={composeCapability.supported ? (body, signal) => api.compose(body, signal) : undefined}
+              examples={COMPOSE_EXAMPLES}
+              onUseDirectInput={() => openPath("final")}
+            />
+          </div>
+          {/* UIX01: the dictionary draft is an advanced tool that writes the final prompt, so it sits next to that field and stays reachable whichever path is in front. */}
           <PromptBuilder compositionSupported={compositionSupported} remainderSupported={remainderSupported} family={activeModel?.family ?? ""} value={settings.prompt}
             onChange={(prompt) => { setPromptDirty(true); setSettings((old) => ({ ...old, prompt })); }}
             state={builder} setState={setBuilder}
             proposalCapability={proposalCapability}
             sendProposal={proposalCapability.supported ? (body, signal) => api.proposals(body, signal) : undefined} />
-          {/*
-            UCP05: the integrated path sits between the dictionary builder and the final
-            prompt field. It is *additive* — every control above and below still works, and
-            `QuickCompose` only writes `settings.prompt`/`negativePrompt` when the user
-            presses one candidate's apply button.
-          */}
-          <ComposePanel
-            capability={composeCapability}
-            target={composeTarget}
-            negativeSupported={negativeEnabled}
-            prompt={settings.prompt}
-            negative={settings.negativePrompt}
-            appliedPrompt={composedApplied}
-            onApply={applyComposedPrompt}
-            onRestore={restoreComposedPrompt}
-            onAppliedChange={setComposeRecord}
-            send={composeCapability.supported ? (body, signal) => api.compose(body, signal) : undefined}
-            examples={COMPOSE_EXAMPLES}
-          />
-          <label>최종 프롬프트<textarea aria-invalid={showPromptIssues && promptIssues.length > 0} aria-describedby="prompt-errors" value={settings.prompt} onChange={(event) => { setPromptDirty(true); setSettings({ ...settings, prompt: event.target.value }); }} onBlur={() => setPromptBlurred(true)} placeholder="장면, 피사체, 조명, 스타일을 설명하세요." rows={5} /></label>
+          <label>최종 프롬프트<textarea id="prompt-final" ref={finalPromptRef} aria-invalid={showPromptIssues && promptIssues.length > 0} aria-describedby="prompt-errors" value={settings.prompt} onChange={(event) => { setPromptDirty(true); setSettings({ ...settings, prompt: event.target.value }); }} onBlur={() => setPromptBlurred(true)} placeholder="장면, 피사체, 조명, 스타일을 설명하세요." rows={5} /></label>
           <div id="prompt-errors" role="status"><p className="prompt-hint">{characterCount(settings.prompt)}/8000자</p>{promptHint && <p className="prompt-hint">{promptHint}</p>}{showPromptIssues && promptIssues.map((issue, index) => <p className="prompt-error" key={index}>{issue.message}</p>)}</div>
           <label className={negativeEnabled ? "" : "disabled"}>Negative prompt<textarea aria-invalid={negativeIssues.length > 0} aria-describedby="negative-errors" disabled={!negativeEnabled} value={settings.negativePrompt} onChange={(event) => setSettings({ ...settings, negativePrompt: event.target.value })} placeholder={negativeEnabled ? "제외할 요소를 입력하세요." : "이 모델의 현재 CFG에서는 negative prompt를 사용할 수 없습니다."} rows={2} /></label>
           <div id="negative-errors" role="status">{negativeIssues.map((issue, index) => <p className="prompt-error" key={index}>{issue.message}</p>)}</div>

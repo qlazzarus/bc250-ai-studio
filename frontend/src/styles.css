@@ -275,6 +275,18 @@
 }
 
 .prompt-builder { margin-bottom: 16px; }
+/* UIX01: the two input paths, and the region each one shows. `[hidden]` is restated
+   because a `display: grid` rule below would otherwise win over the UA sheet and the
+   folded Korean region would keep its height — which is the bug this guard exists for.
+   The 44px floor matches the composer's touch rule; these are the first controls a
+   user meets, and they are buttons, not links. */
+.prompt-paths { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
+.prompt-paths > .quiet { min-height: 44px; padding: 9px 13px; font-size: .8rem; text-align: left; }
+.prompt-paths > .quiet[aria-expanded="true"] { border-color: #c3a0ff; color: #fff; background: #322a45; }
+.prompt-paths__hint { flex: 1 1 220px; min-width: 0; color: #8f95a1; font-size: .74rem; line-height: 1.45; overflow-wrap: anywhere; }
+/* The path buttons sit outside `.prompt-builder`, so they need their own focus ring. */
+.prompt-paths > .quiet:focus-visible, #prompt-final:focus-visible { outline: 2px solid #d1adff; outline-offset: 3px; }
+.compose-path[hidden] { display: none; }
 /* Measured composer widths (Chromium 149, 2026-11-16): 566px at 1440,
    496px at 1280, 355px at 960 in the two-column workspace, and 638px once the
    workspace collapses to one column below 820px. Splitting a 330–566px column
@@ -593,6 +605,11 @@
 .compose-status { margin: 4px 0 0; min-height: 1.2em; color: #b9c6d4; font-size: .78rem; line-height: 1.5; overflow-wrap: anywhere; }
 .compose-fallback { margin: 6px 0 0; padding: 6px 9px; border: 1px solid #6b5a33; border-radius: 6px;
   color: #f4cb84; background: #2a2418; font-size: .78rem; line-height: 1.5; overflow-wrap: anywhere; }
+/* UIX01: the unsupported reason and the way out of it stay in one block, so a user who
+   cannot compose does not have to hunt for the field the sentence names. */
+.compose-unavailable { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.compose-unavailable .compose-fallback { flex: 1 1 240px; margin: 6px 0 0; }
+.compose-direct { min-height: 44px; padding: 9px 13px; font-size: .78rem; white-space: nowrap; }
 
 /* Dictionary: an in-flow expanded panel. Opening, searching or picking never
    unmounts it and never scrolls the page, so query/group/selection survive. */

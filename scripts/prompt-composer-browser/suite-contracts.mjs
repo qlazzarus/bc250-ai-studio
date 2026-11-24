@@ -319,6 +319,56 @@ export async function runContracts({ page, check, record, sleep, shots }) {
   record("capability 미지원", JSON.stringify(degraded));
   await shot(shots, "14-capability-off.png");
 
+  // ── M2. UIX01: compose unavailable → the reason and the exit share one spot ──
+  // The sentence already tells the user to write the prompt themselves. The completion
+  // criterion is that the field it names is one press away *at that spot*, and that a
+  // generation still works without compose.
+  await openBuilder(page);
+  await select(".composer select", "fake-sd15");
+  await sleep(800);
+  const unsupported = await evaluate(`(() => {
+    const block = document.querySelector('.compose-unavailable');
+    const fallback = block?.querySelector('.compose-fallback')?.textContent ?? null;
+    const exit = block?.querySelector('button')?.textContent.trim() ?? null;
+    return { block: !!block, fallback, exit,
+      reasonBeforeExit: !!block && block.firstElementChild === block.querySelector('.compose-fallback') };
+  })()`);
+  check("UIX01 · 미지원 사유와 직접 입력이 같은 블록", true, unsupported.block);
+  check("UIX01 · 사유가 직접 입력보다 먼저", true, unsupported.reasonBeforeExit);
+  check("UIX01 · 미지원 블록의 직접 입력 버튼", "최종 프롬프트 직접 입력", unsupported.exit);
+  record("UIX01 미지원 블록", JSON.stringify(unsupported));
+
+  if (unsupported.block) {
+    await clickByText(".compose-unavailable button", "최종 프롬프트 직접 입력");
+    await sleep(300);
+    const exited = await evaluate(`(() => ({
+      focused: document.activeElement === document.querySelector('#prompt-final'),
+      hidden: !!document.querySelector('#compose-path')?.hidden,
+    }))()`);
+    check("UIX01 · 미지원에서 최종 입력으로 포커스", true, exited.focused);
+    check("UIX01 · 미지원에서 한글 영역 접힘", true, exited.hidden);
+    // Generation must still work from the text alone with no compose capability.
+    // Proven against the API, not the card list: the queue is paginated and earlier
+    // sections created jobs, so a DOM count cannot say *which* job this click made.
+    await typeInto("#prompt-final", "a single lantern in the dark");
+    await sleep(300);
+    const enabled = await evaluate(`!document.querySelector('button.generate').disabled`);
+    await click("button.generate");
+    await sleep(2000);
+    const recorded = await waitFor(`(async () => {
+      const response = await fetch('/api/v1/jobs?limit=5',
+        { headers: { Authorization: window.__authHeader } });
+      if (!response.ok) return false;
+      const jobs = await response.json();
+      const hit = jobs.find((job) => job.prompt === 'a single lantern in the dark');
+      return hit ? hit.status : false;
+    })()`, { label: "UIX01 unsupported direct job", timeout: 20000 });
+    check("UIX01 · 미지원에서 직접 생성 가능", true, enabled);
+    check("UIX01 · 미지원 직접 생성이 접수됨", true, typeof recorded === "string");
+    record("UIX01 미지원 생성", JSON.stringify({ ...exited, enabled, status: recorded }));
+    await shot(shots, "14b-uix01-unsupported.png");
+  }
+
   // ── N. LLM-I04: supported capability → one explicit request, no auto-call ────
   // The fake engine cannot serve a proposal, so the only honest way to exercise the
   // supported path in isolation is to augment the real capabilities payload and stub

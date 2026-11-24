@@ -69,7 +69,150 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
   record("UX05 예시 적용", JSON.stringify({ length: filled.text.length, notice: filled.notice }));
   await shot(shots, "03-examples.png");
 
-  // ── D. GAP03 entry point ─────────────────────────────────────────────────────
+  // ── D. UIX01: two named input paths, and a round trip that keeps both values ─
+  // The task's completion criteria are a keyboard reach, a round trip that preserves both
+  // languages, and a degraded server that still reaches the English field. Each is checked
+  // against the DOM after real clicks and real Tab presses, not against source strings.
+  const paths = await evaluate(`(() => {
+    const group = document.querySelector('.prompt-paths');
+    const buttons = group ? [...group.querySelectorAll('button')].map((n) => n.textContent.trim()) : [];
+    return { present: !!group, buttons, label: group?.getAttribute('aria-label') ?? null };
+  })()`);
+  check("UIX01 · 두 입력 경로 노출", JSON.stringify(["한글 장면으로 만들기", "최종 프롬프트 직접 입력"]),
+    JSON.stringify(paths.buttons));
+  check("UIX01 · 경로 그룹 이름", "프롬프트 입력 경로", paths.label);
+
+  // Both entries must be keyboard reachable, not merely present.
+  await evaluate(`document.querySelector('.composer select').focus()`);
+  const pathStops = [];
+  for (let index = 0; index < 2; index += 1) {
+    await press("Tab", "Tab", 9);
+    pathStops.push(await evaluate(`(() => {
+      const node = document.activeElement;
+      return node ? (node.textContent || '').trim().slice(0, 24) : null;
+    })()`));
+  }
+  check("UIX01 · 모델 다음 두 경로에 키보드 도달", true,
+    pathStops[0] === "한글 장면으로 만들기" && pathStops[1] === "최종 프롬프트 직접 입력");
+  record("UIX01 키보드 경로", JSON.stringify(pathStops));
+
+  // Korean in the composer, English in the field, then round trip: both survive.
+  // The compose endpoint is counted too: folding is a layout change, and a request here
+  // would mean the panel re-ran on a click that only meant "show me the other field".
+  await evaluate(`(() => {
+    if (!window.__realFetchUiX01) window.__realFetchUiX01 = window.fetch;
+    window.__composeRequests = 0;
+    window.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/prompt/compose")) window.__composeRequests += 1;
+      return window.__realFetchUiX01(input, init);
+    };
+    return true;
+  })()`);
+  await typeInto("#compose-brief", "비 오는 골목의 여성");
+  await typeInto("#prompt-final", "a woman standing in a rainy alley");
+  await sleep(200);
+  await clickByText(".prompt-paths button", "최종 프롬프트 직접 입력");
+  await sleep(300);
+  const direct = await evaluate(`(() => ({
+    koreanHidden: !!document.querySelector('#compose-path')?.hidden,
+    focused: document.activeElement === document.querySelector('#prompt-final'),
+    english: document.querySelector('#prompt-final').value,
+    korean: document.querySelector('#compose-brief').value,
+  }))()`);
+  check("UIX01 · 직접 입력이 접힌 한글 영역을 숨김", true, direct.koreanHidden);
+  check("UIX01 · 직접 입력이 최종 필드로 포커스", true, direct.focused);
+  check("UIX01 · 전환 후 영어 값 보존", "a woman standing in a rainy alley", direct.english);
+  check("UIX01 · 접혀도 한글 값 보존", "비 오는 골목의 여성", direct.korean);
+
+  await clickByText(".prompt-paths button", "한글 장면으로 만들기");
+  await sleep(300);
+  const roundTrip = await evaluate(`(() => ({
+    koreanVisible: !document.querySelector('#compose-path')?.hidden,
+    focused: document.activeElement === document.querySelector('#compose-brief'),
+    korean: document.querySelector('#compose-brief').value,
+    english: document.querySelector('#prompt-final').value,
+    requests: window.__composeCalls ? window.__composeCalls.length : null,
+  }))()`);
+  check("UIX01 · 한글 경로 복귀 시 영역 노출", true, roundTrip.koreanVisible);
+  check("UIX01 · 한글 경로 복귀 시 설명으로 포커스", true, roundTrip.focused);
+  check("UIX01 · 왕복 후 한글 값 보존", "비 오는 골목의 여성", roundTrip.korean);
+  check("UIX01 · 왕복 후 영어 값 보존", "a woman standing in a rainy alley", roundTrip.english);
+  check("UIX01 · 왕복이 요청을 보내지 않음", 0, await evaluate(`window.__composeRequests`));
+  record("UIX01 왕복", JSON.stringify(roundTrip));
+  await shot(shots, "03b-uix01-paths.png");
+
+  // Folding must not remount the panel: the same node identity survives the round trip.
+  const identity = await evaluate(`(() => {
+    const before = document.querySelector('.compose');
+    window.__composeNode = before;
+    return !!before;
+  })()`);
+  await clickByText(".prompt-paths button", "최종 프롬프트 직접 입력");
+  await sleep(200);
+  await clickByText(".prompt-paths button", "한글 장면으로 만들기");
+  await sleep(200);
+  check("UIX01 · 패널 마운트 유지(재생성 없음)", true,
+    identity && await evaluate(`document.querySelector('.compose') === window.__composeNode`));
+
+  // The dictionary draft tool is named for its purpose, and it no longer shares the
+  // "프롬프트 구성" wording with anything else on the screen. The suffix follows the panel's
+  // own open/closed state, so only the stem is compared.
+  const advanced = await evaluate(`(() => ({
+    openLabel: document.querySelector('.prompt-builder > .quiet')?.textContent.trim() ?? null,
+    stale: [...document.querySelectorAll('button')].some((n) => n.textContent.includes('프롬프트 구성 열기')),
+  }))()`);
+  check("UIX01 · 사전 초안·고급 도구 명칭", true,
+    (advanced.openLabel ?? "").startsWith("사전 초안·고급 도구"));
+  check("UIX01 · 중복된 '프롬프트 구성 열기' 없음", false, advanced.stale);
+  record("UIX01 고급 도구 명칭", JSON.stringify(advanced));
+
+  // 360px: no horizontal overflow, both path buttons keep the 44px touch floor, and the
+  // same keyboard entry works at the narrow width (the criterion names both 360 and 1280).
+  await page.viewport(360, 740, true);
+  await sleep(400);
+  const narrow = await evaluate(`(() => {
+    const buttons = [...document.querySelectorAll('.prompt-paths > .quiet')].map((n) => {
+      const r = n.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height) };
+    });
+    return { overflow: document.documentElement.scrollWidth - innerWidth, buttons };
+  })()`);
+  check("UIX01 · 360px 가로 넘침 없음", true, narrow.overflow <= 1);
+  check("UIX01 · 360px 경로 버튼 44px 이상", true,
+    narrow.buttons.length === 2 && narrow.buttons.every((b) => b.h >= 44));
+
+  await evaluate(`document.querySelector('.composer select').focus()`);
+  const narrowStops = [];
+  for (let index = 0; index < 2; index += 1) {
+    await press("Tab", "Tab", 9);
+    narrowStops.push(await evaluate(`(document.activeElement?.textContent || '').trim().slice(0, 24)`));
+  }
+  check("UIX01 · 360px 두 경로에 키보드 도달", true,
+    narrowStops[0] === "한글 장면으로 만들기" && narrowStops[1] === "최종 프롬프트 직접 입력");
+
+  // The builder's restore status must not be nested in the part that folds, or a closed
+  // panel would hide the fact that a composition was applied. Checked structurally, so it
+  // holds whether or not an apply has happened yet in this run.
+  const statusPlacement = await evaluate(`(() => {
+    const panel = document.querySelector('#prompt-builder-panel');
+    const status = document.querySelector('.prompt-status');
+    return {
+      nested: !!panel?.querySelector('.prompt-status'),
+      present: !!status,
+      visible: status ? status.getBoundingClientRect().height > 0 : null,
+    };
+  })()`);
+  check("UIX01 · 복원 상태가 접히는 패널 밖", false, statusPlacement.nested);
+  check("UIX01 · 복원 상태가 보이는 위치", true,
+    statusPlacement.present === false || statusPlacement.visible === true);
+  record("UIX01 360px", JSON.stringify({ ...narrow, narrowStops, statusPlacement }));
+  await shot(shots, "03c-uix01-360.png");
+  await page.viewport(1280, 900, false);
+  await sleep(300);
+  await shot(shots, "03d-uix01-1280.png");
+
+  // ── D2. GAP03 entry point ─────────────────────────────────────────────────────
   check("GAP03 · 초기 목록은 전체", true, await evaluate(`(() => {
     const active = [...document.querySelectorAll('.prompt-categories button')]
       .find((node) => node.getAttribute('aria-pressed') === 'true');

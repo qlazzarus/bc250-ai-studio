@@ -95,6 +95,14 @@ export type ComposePanelProps = {
   send?: (body: unknown, signal: AbortSignal) => Promise<unknown>;
   /** Korean examples, so a first-time user is not facing an empty box. */
   examples?: string[];
+  /**
+   * UIX01: move to the English field from the place that explains why compose is unavailable.
+   *
+   * The fallback text already tells the user to write the prompt themselves; without this
+   * the instruction was a dead end and the field it names was somewhere down the form. It
+   * only moves focus — it never writes a prompt, so a refused candidate cannot become one.
+   */
+  onUseDirectInput?: () => void;
 };
 
 const GROUP_LABEL: Record<string, string> = {
@@ -116,7 +124,7 @@ const WHY_LABEL: Record<string, string> = {
 
 export default function ComposePanel({
   capability, target: targetProp, candidateCount = 3, negativeSupported, prompt, negative,
-  onApply, onRestore, onAppliedChange, appliedPrompt, send, examples = [],
+  onApply, onRestore, onAppliedChange, appliedPrompt, send, examples = [], onUseDirectInput,
 }: ComposePanelProps) {
   /**
    * A placeholder target for the no-model state. It is never sent: `capability.supported`
@@ -565,7 +573,12 @@ export default function ComposePanel({
           {panelOpen ? "사전 접기" : "사전에서 고르기"}
         </button>
       </div>
-      {fallback && <p className="compose-fallback" data-tone="caution">{fallback}</p>}
+      {fallback && <div className="compose-unavailable">
+        <p className="compose-fallback" data-tone="caution">{fallback}</p>
+        {onUseDirectInput && <button type="button" className="quiet compose-direct" onClick={onUseDirectInput}>
+          최종 프롬프트 직접 입력
+        </button>}
+      </div>}
       <p className="compose-status" id="compose-status" role="status">{notice}</p>
     </div>
 
