@@ -1,4 +1,5 @@
 import asyncio
+import threading
 
 import pytest
 from app.core.studio_files import FileLock, LockBusyError
@@ -226,20 +227,86 @@ def test_chat_priority_yields_batch_at_image_boundary(settings):
         assert [item["seed"] for item in job["items"]] == [1, 2, 3]
 
 
+class GatedEngine(FakeEngine):
+    """Holds one chosen image open until the test releases it.
+
+    ``status == "running"`` is set when image 0 *starts*, not when it finishes, so it does
+    not tell the test where the job actually is. On a loaded runner the 100 ms fake image
+    can finish before the PUT arrives; the boundary check after image 0 then ran with the
+    pre-change mode, image 1 starts, and the reply legitimately holds 2 assets. That is the
+    reported failure, and it is a defect in the test's timing assumption, not in the
+    scheduler. Blocking a specific image until the test says so removes the race instead of
+    narrowing it (a fixed ``sleep`` only shrinks the window — measured: the failure needs
+    the PUT to land between 0.10 s and 0.25 s after "running").
+
+    ``hold_index`` is 1-based: 1 blocks the first image, 2 the second.
+    """
+
+    def __init__(self, hold_index=1):
+        super().__init__(0)
+        self.hold_index = hold_index
+        self.started = threading.Event()
+        self.release = threading.Event()
+        self.count = 0
+
+    async def generate(self, *args):
+        self.count += 1
+        if self.count == self.hold_index:
+            self.started.set()
+            # Poll rather than await a thread event: the app loop is on another thread.
+            while not self.release.is_set():
+                await asyncio.sleep(0.01)
+        await super().generate(*args)
+
+
 def test_policy_change_waits_for_image_boundary(settings):
     from conftest import ADMIN
 
-    settings.fake_delay = 0.1
     llm = FakeLLM()
-    with TestClient(create_app(settings, llm=llm), headers=HEADERS) as client:
+    engine = GatedEngine(hold_index=1)
+    with TestClient(create_app(settings, llm=llm, engine=engine), headers=HEADERS) as client:
         id = submit(client, job_type="image.batch", batch_count=3)
-        wait_job(client, id, {"running"})
+        # The change lands while image 0 is still running, so the boundary right after it
+        # must see the new mode and stop with exactly one image done.
+        assert engine.started.wait(5), "the first image never started"
         client.put("/api/v1/system/policies", json={"mode": "manual"}, headers=ADMIN)
+        engine.release.set()
         job = wait_job(client, id, {"queued"})
         assert len(job["output_asset_ids"]) == 1
+        assert [item["status"] for item in job["items"]] == [
+            "completed", "pending", "pending"]
         assert llm.active and not llm.paused
         client.post("/api/v1/system/manual-grant", headers=ADMIN)
-        assert wait_job(client, id)["status"] == "completed"
+        completed = wait_job(client, id)
+        assert completed["status"] == "completed"
+        assert len(completed["output_asset_ids"]) == 3
+
+
+def test_a_policy_change_after_a_boundary_applies_at_the_next_one(settings):
+    """A change is not retroactive: it takes effect at the boundary that observes it.
+
+    This pins the semantics the test above depends on. When the PUT arrives *after* the
+    check that followed image 0, image 1 correctly starts and the stop happens one image
+    later — 2 assets, not 1. Without this, a future reader could see 2 in a log and
+    "fix" the scheduler for behaving exactly as specified.
+    """
+    from conftest import ADMIN
+
+    llm = FakeLLM()
+    engine = GatedEngine(hold_index=2)
+    with TestClient(create_app(settings, llm=llm, engine=engine), headers=HEADERS) as client:
+        id = submit(client, job_type="image.batch", batch_count=3)
+        # Image 0 has completed and its boundary check already passed when this PUT lands.
+        assert engine.started.wait(5), "the second image never started"
+        assert len(client.get(f"/api/v1/jobs/{id}").json()["output_asset_ids"]) == 1
+        client.put("/api/v1/system/policies", json={"mode": "manual"}, headers=ADMIN)
+        engine.release.set()
+        job = wait_job(client, id, {"queued"})
+        assert len(job["output_asset_ids"]) == 2
+        assert [item["status"] for item in job["items"]] == [
+            "completed", "completed", "pending"]
+
+
 
 
 async def test_inactive_llm_gate_failure_remains_recoverable(settings):
