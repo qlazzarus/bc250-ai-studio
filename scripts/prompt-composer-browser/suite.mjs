@@ -9,6 +9,7 @@ import { runU12 } from "./suite-u12.mjs";
 import { runUcp08 } from "./suite-ucp08.mjs";
 import { runUix02 } from "./suite-uix02.mjs";
 import { runUix03 } from "./suite-uix03.mjs";
+import { runUix04 } from "./suite-uix04.mjs";
 import { adjustOpen, closeAdjust, openAdjust, pickEntry, stageOrder, waitAdjustOpen, waitSearchFocus } from "./ui.mjs";
 
 export async function runSuite({ page, browser, sessionId, check, record, sleep, shots }) {
@@ -363,4 +364,9 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
   // bodies, changes model mid-request and stubs a negative-less model through `/models`,
   // all of which would leave the shared document in a state the blocks above did not assert.
   await runUix03({ page, check, record, sleep, shots });
+  // UIX04 runs last and owns a fresh document: it replaces the preset fixture (all four presets
+  // are identical in the YAML, which would make a preset assertion vacuous) and ties the negative
+  // field to CFG 7. Everything above it has already asserted its own request bodies, so a later
+  // fixture swap cannot change what they proved.
+  await runUix04({ page, check, record, sleep, shots });
 }

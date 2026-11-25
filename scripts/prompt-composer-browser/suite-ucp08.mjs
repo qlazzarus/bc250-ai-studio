@@ -1238,8 +1238,13 @@ export async function runUcp08({ page, check, record, sleep, shots }) {
   })()`);
 
   // 1. The save route answers 413. The user must see which cap was hit, not a silent no-op.
-  await stubOnce(`(url) => url.includes('/api/v1/jobs')`, 413,
-    { detail: "Prompt composition exceeds 32 KiB and could not be trimmed" });
+  //
+  // The predicate must name the method, like the other stubs in this file do: the queue polls
+  // `GET /api/v1/jobs?limit=…` every 4 s, and a URL-only match lets a poll consume the one-shot
+  // stub. The 413 would then be spent on a list read, the real POST would succeed, and the
+  // check would fail for a reason that has nothing to do with the client's error handling.
+  await stubOnce(`(url, init) => url.includes('/api/v1/jobs') && init && init.method === 'POST'`,
+    413, { detail: "Prompt composition exceeds 32 KiB and could not be trimmed" });
   await click("button.generate").catch(() => false);
   await sleep(700);
   const after413 = await evaluate(`(() => {

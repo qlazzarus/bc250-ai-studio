@@ -1,6 +1,6 @@
 # Art Studio UI/UX 개선 실행 계획
 
-2026-11-24 · 구현 담당 `deepseek-v4.1-flash` · 다음 태스크 **UIX03**
+2026-11-24 · 구현 담당 `deepseek-v4.1-flash` · 다음 태스크 **UIX05**
 
 사용자가 모델을 고르고, 장면을 영어 프롬프트로 구성하거나 직접 입력하고, 생성한 작업과 결과를 다시 찾는 흐름을 개선한다. 기존 UCP 기능을 사용하는 Art Studio가 범위다. Pixel Studio는 진입·복귀 회귀만 확인한다. 현재 판단 근거는 프런트엔드 소스와 기존 UCP 브라우저 검증 기록이다. 아래 배치와 동작은 구현 목표이며 새 화면의 사용성은 아직 측정하지 않았다.
 
@@ -21,7 +21,7 @@ deepseek-v4.1-flash는 구현 담당이다. Studio 런타임 모델, API, 배포
 | UIX01 | 장면 구성과 영어 직접 입력의 진입점 식별 | 없음 | 완료 |
 | UIX02 | 사전 선택을 요약에서 확인하고 수정 | UIX01 | 완료 |
 | UIX03 | 긴 영어 후보를 비교하고 적용 결과 확인 | UIX01 | 완료 |
-| UIX04 | 기본 설정으로 생성하고 막힌 입력으로 이동 | UIX01 | 대기 |
+| UIX04 | 기본 설정으로 생성하고 막힌 입력으로 이동 | UIX01 | 완료 |
 | UIX05 | 접수한 작업 추적과 실패한 작업 재시도 | UIX04 | 대기 |
 | UIX06 | 갤러리에서 결과 확인 후 원래 위치로 복귀 | UIX01 | 대기 |
 | UIX07 | 모바일·키보드·과거 결과 복원 회귀 검증 | UIX02~06 | 대기 |
@@ -198,9 +198,68 @@ ComposePanel은 각 후보의 영문 전체, 차이, negative, 보존 내용, �
 
 `App.tsx`의 생성 폼은 해상도·수량 뒤에 Steps·CFG·Seed와 고정 옵션을 모두 표시한다. Seed 검사는 submit에서 전역 오류로 반환한다.
 
-- [ ] 프리셋·해상도·수량·생성 버튼은 기본 경로에 둔다. Steps·CFG·Seed와 sampler/scheduler 설명은 ‘세부 생성 설정’에 묶고 선택된 값의 요약을 표시한다. Negative 사용 조건은 해당 입력 옆에 유지한다.
-- [ ] 생성이 막히면 버튼 근처에 첫 원인과 수정할 필드로의 이동을 제공한다. 접힌 설정의 오류로 이동하면 먼저 펼친다. 기존 제출 검사와 모델별 허용 조건을 재사용한다.
+- [x] 프리셋·해상도·수량·생성 버튼은 기본 경로에 둔다. Steps·CFG·Seed와 sampler/scheduler 설명은 ‘세부 생성 설정’에 묶고 선택된 값의 요약을 표시한다. Negative 사용 조건은 해당 입력 옆에 유지한다.
+- [x] 생성이 막히면 버튼 근처에 첫 원인과 수정할 필드로의 이동을 제공한다. 접힌 설정의 오류로 이동하면 먼저 펼친다. 기존 제출 검사와 모델별 허용 조건을 재사용한다.
 - **완료 기준** — 기본 생성 및 세부 설정 변경 후 생성에서 요청 본문의 프리셋 관련 값·seed·수량이 기존 계약과 일치한다. 빈 최종 입력, 잘못된 seed, CFG에 따른 negative 제한을 각각 확인하고 수정 뒤 제출한다. 펼침만으로 설정이 초기화되지 않는다.
+
+**결과 (2026-11-25 완료)**
+
+- **변경 파일**
+  - `frontend/src/lib/generate.ts` (신규) — 세부 설정 요약과 오류 라우팅의 순수 함수. `FIELD_ORDER`·`FIELD_SELECTOR`·`FIELD_IN_DETAILS`·`FIELD_LABEL`, `seedIssue`, `firstIssue`, `detailSummary`. React·네트워크·capability 판정을 포함하지 않는다.
+  - `frontend/src/App.tsx` — `settingsOpen`(UI 전용) 접기 상태, `pendingFieldRef`+`settingsFocusTick`로 커밋 후 포커스, `<div id="prompt-settings" hidden={!settingsOpen}>`로 Steps/CFG/Seed를 접음(`hidden`, 언마운트 아님), 요약은 `settings`에서 파생, `.generate-blocker` 추가, `submittingRef` 재진입 가드 추가. 사용하지 않던 `detailFieldRefs`·`negativeRef` 제거(효과가 selector로 해석한다).
+  - `frontend/src/styles.css` — `.prompt-settings__row`·`.prompt-settings__toggle`(44px)·`.prompt-settings__summary`·`.prompt-settings[hidden]`·`.generate-blocker`(44px 이동 버튼), 그리고 `.chips button { min-height: 44px; }`(프리셋 터치 영역).
+  - `frontend/tests/prompt-uix04.test.mjs` (신규) — 24건. 요약 파생·고정 CFG·빈 seed·투영 우선순위·재진입 가드 위치·44px·마크업 단언.
+  - `scripts/prompt-composer-browser/suite-uix04.mjs` (신규) — 브라우저 A~K절. `/models`만 stub해 프리셋 값을 서로 다르게 하고 negative를 CFG 7에 묶는다. 그 외 요청은 실제 fake 엔진으로 나가며, 본문은 `POST /api/v1/jobs` 가로채기로 검사한다.
+  - `scripts/prompt-composer-browser/suite-ucp08.mjs` — **기존 검사의 결함 수정**(아래 참조).
+  - `scripts/prompt-composer-browser/suite.mjs` — UIX04를 마지막에 연결.
+  - `docs/evidence/art-studio-uix04/` — 신규 증거.
+
+- **실제 동작**
+  - 기본 경로에 모델·경로 선택·최종 프롬프트·Negative·프리셋 3개·해상도·수량·생성 버튼이 있고, Steps/CFG/Seed는 ‘세부 생성 설정 펼치기’ 뒤에 접혀 있다. 접힌 채로 `Steps 6 · CFG 1 · Seed -1` 요약이 보인다(fixture의 `balanced` 프리셋 steps 6, 모델 CFG 기본값 1.0).
+  - 프리셋을 누르면 Steps/CFG가 그 값으로 채워지고 Seed는 건드리지 않는다. 그 뒤 수동으로 고친 값이 요약과 **요청 본문**에 함께 실린다(`steps 31`, `cfg_scale 5.5`, `seed 4242`, `width/height 768`, `batch_count 3`, `job_type image.batch`, `preset quality`).
+  - 접기·펼치기를 반복해도 값·요약이 그대로이고 `/prompt/compose`·`POST /jobs` 요청은 늘지 않는다.
+  - 빈 최종 프롬프트나 잘못된 seed는 버튼 위 `.generate-blocker`에 첫 원인을 표시하고 ‘수정 위치로 이동’을 제공한다. 접힌 세부 설정의 오류면 문장에 ‘(세부 생성 설정을 펼칩니다)’가 붙고, 이동하면 펼친 뒤 해당 필드에 포커스가 간다. 필드를 고치면 별도 조작 없이 표시가 사라진다.
+  - 서버 거부(413)는 `.errorbox`에만 남고 버튼 옆에는 붙지 않는다.
+
+- **선행 코드 · 기존 검사에서 고친 것 (신규 구현 아님)**
+  - **`submittingRef` (앱 결함).** `submitting`은 React state라 같은 이벤트 루프 턴에서는 아직 `false`다. `button.click()`을 연속 3회 동기 호출하면 셋 다 통과해 작업 3건이 접수됐다(`jobsBeforeClick 2 → jobsAfterClick 5`). `disabled`도 다음 커밋에야 붙으므로 막지 못한다. ref는 즉시 갱신되므로 같은 턴의 중복도 막는다. 이 라운드에서 잡은 유일한 앱 버그다.
+  - **`suite-ucp08.mjs` 413 stub (하네스 결함).** `stubOnce`의 술어가 `url.includes('/api/v1/jobs')`로 메서드를 보지 않았다. 큐 폴링이 4초마다 `GET /api/v1/jobs?limit=…`를 부르므로 **폴링이 1회용 413을 소비**하고, 실제 POST는 성공해 오류 상자가 뜨지 않았다. 같은 파일의 다른 stub 3곳은 모두 `init.method === 'POST'`를 본다. 술어에 메서드를 추가해 고쳤다. 앱 코드는 손대지 않았다 — 격리 재현(`/tmp` 스크립트)에서 413 경로 자체는 정상 동작함을 먼저 확인했다.
+  - **프리셋 터치 영역.** 공용 `.chips button` 규칙이 31px를 만들었다. UIX03이 후보 카드에 44px를 요구한 것과 같은 기준을 기본 경로 버튼에도 적용했다(`.chips`로 한정 — `.prompt-chip`은 별개).
+
+- **검증 명령과 결과**
+  - `npm --prefix frontend run lint` → 통과.
+  - `npm --prefix frontend run build` → `tsc -b && vite build` 성공(410.57 kB).
+  - `node --experimental-strip-types --test frontend/tests/*.test.mjs` → **374 tests, 374 pass, 0 fail**(신규 `prompt-uix04` 24건 포함).
+  - `sh scripts/prompt-composer-browser/verify.sh`(fake 엔진·임시 DB·`STUDIO_FAKE_DELAY=2`, Chromium CDP) → **785 checks, 0 failed**. UIX04 단언 114건, UCP08 181건 전부 통과. `results.json` 913항목 = 판정 785 + 정보 128.
+  - `git diff --check` → clean.
+
+- **요구사항별 검증 근거**
+
+  | 요구 | 근거 |
+  | --- | --- |
+  | 기본 설정으로 생성 시 기존 요청 본문 계약 | 브라우저 §C `UIX04 · 요청이 생성됨` + 본문 `steps/cfg_scale/seed/width/height/batch_count/job_type/preset` 8건 |
+  | 프리셋 선택 후 Steps·CFG·Seed 수동 변경 및 생성 | 브라우저 §C `프리셋이 Steps를 채움`·`프리셋이 CFG를 채움`·`프리셋이 Seed를 바꾸지 않음`·`수동 수정이 프리셋 값을 덮어씀` → 본문 `31 / 5.5 / 4242` |
+  | 접기·펼치기 이후 값과 요약 보존 | 브라우저 §B `접어도 Steps/CFG/Seed 보존`·`접어도 요약 보존`·`다시 펼쳐도 …` 6건 |
+  | 해상도·수량의 정확한 본문 반영 | 브라우저 §C `본문 해상도가 선택값 768`·`본문 높이도 선택값`·`본문 수량이 입력값 3` |
+  | 기존 Seed 허용값과 잘못된 값 검증 | 단위 `the seed accepts -1 (random) and rejects everything below it`(-1·0·12345·공백 통과, -2·1.5·abc 거부) |
+  | 빈 최종 프롬프트 제출 오류 및 포커스 이동 | 브라우저 §E `빈 최종 프롬프트가 생성을 막음`·`막힌 이유가 최종 프롬프트를 지목함`·`최종 프롬프트로 포커스 이동` |
+  | 접힌 Seed 오류에서 자동 펼침 및 포커스 | 브라우저 §D `접힌 상태에서 펼침을 예고함`·`이동이 접힌 세부 설정을 펼침`·`이동이 Seed 필드에 포커스를 둠` |
+  | 오류 수정 후 정상 제출 | 브라우저 §D `수정하면 막힘 표시가 사라짐`·`오류 수정 후 정상 제출`·`수정한 Seed가 본문에 실림` |
+  | CFG·capability에 따른 Negative 처리 | 브라우저 §F `CFG 7에서 Negative 사용 가능`·`CFG 2.5에서 Negative 비활성`·`계약대로 Negative 값이 비워짐` |
+  | 모델 변경 후 기존 설정 계약 유지 | 브라우저 §I `모델 변경 후에도 펼침 상태 유지`·`모델 변경 후 요약이 새 모델 값을 반영`·`CFG 7로 돌아오면 다시 사용 가능` |
+  | 접기·펼치기만으로 요청 없음 | 브라우저 §B `접기·펼치기로 compose 요청 없음`·`생성 요청 없음`(fetch 스파이 카운터 비교) |
+  | 제출 연속 클릭 중복 보호 | 브라우저 §H `연속 클릭이 한 건만 접수`(동기 3회 클릭 → 1건) + 단위 재진입 가드 3건 |
+  | 360px·1280px 넘침·터치·키보드 | 브라우저 §J 360/1280 각 8건(넘침 0, 토글·생성·프리셋 44px, 요약 화면 안), §K Tab/Enter 5건 |
+  | 서버 오류와 입력 오류 구분 | 브라우저 §G `서버 오류가 오류 상자에 표시됨`·`서버 오류는 버튼 옆에 붙지 않음`·`입력 보존`·`재시도 가능` |
+  | 필드 수정 후 오류 표시 일치 | 단위 `the blocking line and the button read the same list`(한 목록 `allIssues`를 버튼·필드·블로커가 함께 읽음) |
+
+- **남은 문제**
+  - 실기기 IME·소프트 키보드·회전은 이 환경에 없다(UIX07 인계).
+  - Negative 미지원 경로는 `/models` 응답을 페이지에서 stub한다. 서버측 검증은 UCP 계약 테스트 담당이다.
+  - 해상도·수량에는 별도 오류 문구를 만들지 않았다. 두 필드 모두 `min`/`max`와 모델의 `supported_resolutions`가 값을 제한하고, 서버가 최종 판정한다 — 여기에 두 번째 검증기를 두면 버튼과 판정이 갈릴 수 있다.
+  - `native window.confirm`은 UIX03과 같은 이유로 스크린샷에 담기지 않는다(변경하지 않음).
+- **증거** — `docs/evidence/art-studio-uix04/`
+- **다음 ID** — **UIX05** (접수 확인과 작업 큐).
 
 ### UIX05 · 접수 확인과 작업 큐
 

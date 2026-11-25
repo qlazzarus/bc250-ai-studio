@@ -22,8 +22,9 @@ import { readComposeCapability, COMPOSE_UNSUPPORTED, type ComposeCapability } fr
 import { type AppliedResult, type ComposeTarget } from "./prompt/composeSession";
 import type { EditSelection, StructuredScene } from "./prompt/structuredScene";
 import { toSnapshot, fromSnapshot, restoreGaps, COMPOSE_COMPILER_VERSION } from "./prompt/composeSnapshot";
-import { characterCount, validateSubmission } from "./prompt/validation";
+import { characterCount, validateSubmission, type ValidationIssue } from "./prompt/validation";
 import { queueCounts, queueExpanded, queueSummary } from "./lib/queue";
+import { detailSummary, FIELD_IN_DETAILS, FIELD_LABEL, FIELD_SELECTOR, firstIssue, seedIssue } from "./lib/generate";
 
 const initialSettings: Settings = {
   modelId: "", prompt: "", negativePrompt: "", preset: "balanced", resolution: "512x512",
@@ -119,6 +120,16 @@ function App() {
   const [composeRestoreNotice, setComposeRestoreNotice] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * UIX04: a synchronous twin of `submitting`, for the double-submit guard.
+   *
+   * `submitting` is React state, so it is still `false` inside the *same* event-loop turn that
+   * sets it: three programmatic clicks dispatched together all read the pre-update value and all
+   * create a job. The disabled attribute does not help either — it lands with the next commit,
+   * after the third click has already run. A ref updates immediately, which is what makes the
+   * guard hold for clicks that arrive before React has re-rendered.
+   */
+  const submittingRef = useRef(false);
   const [studio, setStudio] = useState<"art" | "pixel">("art");
   const [promptDirty, setPromptDirty] = useState(false);
   const [promptBlurred, setPromptBlurred] = useState(false);
@@ -144,6 +155,23 @@ function App() {
    * strip is a projection, and a fold must not restart the request it reports on.
    */
   const [composeStatus, setComposeStatus] = useState<ComposeStatusView | null>(null);
+  /**
+   * UIX04: whether 세부 생성 설정 (Steps/CFG/Seed and the sampler notes) is unfolded.
+   *
+   * UI-only, and deliberately not part of `settings`: folding must not be able to change what
+   * is sent. The region is folded with `hidden`, never unmounted, so a preset's values and any
+   * manual edit survive any number of folds — the inputs keep their DOM nodes and `settings`
+   * keeps owning the values either way.
+   */
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /**
+   * The field a blocked submit wants to move to, applied after the commit that unfolds it.
+   *
+   * A ref rather than state because it is read exactly once by the effect below and must not
+   * cause a render of its own; the tick only exists to schedule that read after the commit.
+   */
+  const pendingFieldRef = useRef<string | null>(null);
+  const [settingsFocusTick, setSettingsFocusTick] = useState(0);
 
   const api = useMemo(() => new StudioApi("/api/v1", API_KEY), []);
   const activeModel = models.find((model) => model.model_id === settings.modelId);
@@ -438,6 +466,23 @@ function App() {
   }
   const submissionIssues = validateSubmission(buildRequest(), activeModel?.family ?? "", maxBodyBytes);
   /**
+   * UIX04: the seed is checked once, by `seedIssue`, and folded into the same list.
+   *
+   * `validateSubmission` has never covered the seed — it validates the composition record and the
+   * body size — so the seed check has to be added rather than duplicated. Appending it keeps one
+   * list for the button, the field marks and the blocker line.
+   */
+  const seedProblem = seedIssue(settings.seed);
+  /**
+   * One list decides "blocked": the button, the field marks and the inline line all read it.
+   *
+   * The seed is appended rather than re-validated here, so a model whose CFG box is disabled or a
+   * Steps value the server rejects cannot be described two different ways.
+   */
+  const allIssues: ValidationIssue[] = seedProblem ? [...submissionIssues, seedProblem] : submissionIssues;
+  /** True when the given field carries a blocking issue; used for `aria-invalid` only. */
+  const hasIssue = (field: string) => allIssues.some((issue) => issue.field === field);
+  /**
    * TRANS05: the accepted translations go to a v2 server only. When the snapshot on
    * screen is v2 but the server advertises v1, the body is sent as v1 and the
    * translations are dropped — say so, because the difference is invisible otherwise
@@ -463,23 +508,90 @@ function App() {
    */
   const composeStrip = composeStripView(composeStatus);
 
+  /**
+   * UIX04: the first blocking reason in reading order, or `null` when nothing blocks.
+   *
+   * `firstIssue` sorts by where the field sits on screen rather than by the order the validators
+   * produced their entries, so the line always points at the topmost thing to fix. Nothing here
+   * decides *whether* the submission is blocked: `allIssues.length` does, and the button reads
+   * the same list.
+   */
+  const blocker = firstIssue(allIssues);
+  /**
+   * An untouched empty prompt is a hint, not a failure, so its blocking line is withheld until
+   * the user has actually engaged with the field — the same rule `showPromptIssues` applies to the
+   * field's own message, and the same reason `promptHint` exists above. The button stays disabled
+   * either way; this only decides whether the first visit is greeted with an error.
+   */
+  const blockerVisible = blocker !== null
+    && !(blocker.field === "prompt" && !promptTouched && settings.prompt.length === 0);
+
+  const detail = detailSummary({
+    steps: settings.steps, cfgScale: settings.cfgScale, seed: settings.seed,
+    sampling: settings.samplingMethod, scheduler: settings.scheduler,
+    cfgEditable, samplingEditable: editable(samplingOption),
+    schedulerEditable: editable(schedulerOption),
+  });
+
+  /**
+   * UIX04: move to the field a blocked submit names.
+   *
+   * The fold is opened *first* and the focus is applied from an effect, because a control inside a
+   * subtree that is still `hidden` cannot take focus — `focus()` on it is a silent no-op, so the
+   * user would be told "move here" with nothing moving. `settingsFocusTick` schedules the read
+   * after the commit that removes `hidden`; the ref carries *which* field across that commit
+   * without a second render.
+   */
+  function moveToField(field: string) {
+    const target = FIELD_SELECTOR[field];
+    if (!target) return;
+    if (FIELD_IN_DETAILS.includes(field) && !settingsOpen) setSettingsOpen(true);
+    pendingFieldRef.current = field;
+    setSettingsFocusTick((tick) => tick + 1);
+  }
+
+  useEffect(() => {
+    if (!settingsFocusTick) return;
+    const field = pendingFieldRef.current;
+    pendingFieldRef.current = null;
+    if (!field) return;
+    const selector = FIELD_SELECTOR[field];
+    const node = selector ? document.querySelector<HTMLElement>(selector) : null;
+    // A disabled control (the CFG box on a fixed-CFG model, the negative field when the model
+    // forbids it) cannot take focus either. Fall back to the region that explains the limit
+    // instead of failing silently.
+    if (node && !(node as HTMLInputElement).disabled) { node.focus(); return; }
+    document.querySelector<HTMLElement>("#prompt-settings")?.scrollIntoView({ block: "nearest" });
+  }, [settingsFocusTick]);
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!api || !activeModel) return;
-    const seed = Number(settings.seed);
+    // Re-entry guard first: see `submittingRef`. A second submit in the same turn must not even
+    // build a body, or it would queue a job the user did not ask for twice.
+    if (submittingRef.current) return;
     const body = buildRequest();
     const issues = validateSubmission(body, activeModel.family, maxBodyBytes);
-    if (issues.length) { setError(issues.map((issue) => `${issue.field}: ${issue.message}`).join(" / ")); return; }
-    if (!Number.isInteger(seed) || seed < -1) {
-      setError("올바른 seed 값을 입력하세요."); return;
+    const seed = seedIssue(settings.seed);
+    const blocking = seed ? [...issues, seed] : issues;
+    if (blocking.length) {
+      // Same list the button is disabled by, so this branch is only reachable by a submit the
+      // button could not have made (Enter in a field, or a race with a re-render). Report the
+      // first issue in reading order and offer the move, exactly like the inline line does.
+      const first = firstIssue(blocking) ?? blocking[0];
+      setError(`${FIELD_LABEL[first.field] ?? first.field}: ${first.message}`);
+      return;
     }
+    submittingRef.current = true;
     setSubmitting(true); setError("");
     try {
       await api.createJob(body);
       setJobPage(0);
     } catch (reason) {
+      // Server answers stay in `.errorbox`: they are not fixable by moving to a field, and
+      // reporting them next to the button would suggest they are.
       setError(reason instanceof Error ? reason.message : "작업 접수 실패");
-    } finally { setSubmitting(false); }
+    } finally { submittingRef.current = false; setSubmitting(false); }
   }
 
   async function inspect(asset: Asset) {
@@ -664,17 +776,61 @@ function App() {
             sendProposal={proposalCapability.supported ? (body, signal) => api.proposals(body, signal) : undefined} />
           <label>최종 프롬프트<textarea id="prompt-final" ref={finalPromptRef} aria-invalid={showPromptIssues && promptIssues.length > 0} aria-describedby="prompt-errors" value={settings.prompt} onChange={(event) => { setPromptDirty(true); setSettings({ ...settings, prompt: event.target.value }); }} onBlur={() => setPromptBlurred(true)} placeholder="장면, 피사체, 조명, 스타일을 설명하세요." rows={5} /></label>
           <div id="prompt-errors" role="status"><p className="prompt-hint">{characterCount(settings.prompt)}/8000자</p>{promptHint && <p className="prompt-hint">{promptHint}</p>}{showPromptIssues && promptIssues.map((issue, index) => <p className="prompt-error" key={index}>{issue.message}</p>)}</div>
-          <label className={negativeEnabled ? "" : "disabled"}>Negative prompt<textarea aria-invalid={negativeIssues.length > 0} aria-describedby="negative-errors" disabled={!negativeEnabled} value={settings.negativePrompt} onChange={(event) => setSettings({ ...settings, negativePrompt: event.target.value })} placeholder={negativeEnabled ? "제외할 요소를 입력하세요." : "이 모델의 현재 CFG에서는 negative prompt를 사용할 수 없습니다."} rows={2} /></label>
+          <label className={negativeEnabled ? "" : "disabled"}>Negative prompt<textarea id="prompt-negative" aria-invalid={negativeIssues.length > 0} aria-describedby="negative-errors" disabled={!negativeEnabled} value={settings.negativePrompt} onChange={(event) => setSettings({ ...settings, negativePrompt: event.target.value })} placeholder={negativeEnabled ? "제외할 요소를 입력하세요." : "이 모델의 현재 CFG에서는 negative prompt를 사용할 수 없습니다."} rows={2} /></label>
           <div id="negative-errors" role="status">{negativeIssues.map((issue, index) => <p className="prompt-error" key={index}>{issue.message}</p>)}</div>
+          {/* UIX04: the negative condition stays next to the input it constrains, not inside the
+              fold — a limit the user cannot see where it applies is a limit they will hit. */}
           {negativeOption && <p className="option-note">Negative prompt: {optionStatus(negativeOption)}{requiredCfg && ` · CFG ${requiredCfg.join(" / ")}에서만 사용 가능`}{negativeOption.note && ` · ${negativeOption.note}`}</p>}
           <div className="chips">{activeModel && Object.keys(activeModel.presets).map((name) => <button type="button" className={settings.preset === name ? "selected" : ""} key={name} onClick={() => choosePreset(name)}>{name}{activeModel.presets[name].validation_status === "experimental" ? " · experimental" : ""}</button>)}</div>
-          <div className="grid2"><label>해상도<select value={settings.resolution} onChange={(event) => setSettings({ ...settings, resolution: event.target.value })}>{activeModel?.supported_resolutions.map(([width, height]) => <option key={`${width}x${height}`}>{width}x{height}</option>)}</select></label><label>수량<input type="number" min="1" max="16" value={settings.batchCount} onChange={(event) => setSettings({ ...settings, batchCount: Number(event.target.value) })} /></label></div>
-          <div className="grid3"><label>Steps<input type="number" min="1" max="100" value={settings.steps} onChange={(event) => setSettings({ ...settings, steps: Number(event.target.value) })} /></label><label>CFG{cfgEditable && cfgOption?.allowed_values.length ? <select value={settings.cfgScale} onChange={(event) => { const cfgScale = Number(event.target.value); setSettings((old) => ({ ...old, cfgScale, negativePrompt: requiredCfg?.includes(cfgScale) ? old.negativePrompt : "" })); }}>{cfgOption.allowed_values.map((value) => <option key={String(value)} value={String(value)}>{value}</option>)}</select> : <input disabled={!cfgEditable} type="number" min={cfgOption?.minimum ?? 0} max={cfgOption?.maximum ?? 30} step="0.1" value={settings.cfgScale} onChange={(event) => { const cfgScale = Number(event.target.value); setSettings((old) => ({ ...old, cfgScale, negativePrompt: requiredCfg?.includes(cfgScale) ? old.negativePrompt : "" })); }} />}</label><label>Seed<input value={settings.seed} onChange={(event) => setSettings({ ...settings, seed: event.target.value })} /></label></div>
-          {cfgOption && <p className="option-note">CFG: {optionStatus(cfgOption)}{cfgOption.note && ` · ${cfgOption.note}`}</p>}
-          {generationOptions && <div className="fixed-options"><span>Sampler: {fixedValue(samplingOption, "CLI 기본값")} · {optionStatus(samplingOption)}</span><span>Scheduler: {fixedValue(schedulerOption, "CLI 기본값 (생략)")} · {optionStatus(schedulerOption)}</span></div>}
+          <div className="grid2"><label>해상도<select id="prompt-resolution" value={settings.resolution} onChange={(event) => setSettings({ ...settings, resolution: event.target.value })}>{activeModel?.supported_resolutions.map(([width, height]) => <option key={`${width}x${height}`}>{width}x{height}</option>)}</select></label><label>수량<input id="prompt-batch" type="number" min="1" max="16" value={settings.batchCount} onChange={(event) => setSettings({ ...settings, batchCount: Number(event.target.value) })} /></label></div>
+          {/* UIX04: Steps/CFG/Seed fold, the summary does not. The summary is what makes the fold
+              safe: the values keep being the ones the next request will use, and the user can read
+              them without opening anything. It is derived from `settings`, so a manual edit after a
+              preset press shows the edit, not the preset. */}
+          <div className="prompt-settings__row">
+            <button type="button" className="quiet prompt-settings__toggle" aria-expanded={settingsOpen}
+              aria-controls="prompt-settings" onClick={() => setSettingsOpen((open) => !open)}>
+              세부 생성 설정 {settingsOpen ? "접기" : "펼치기"}
+            </button>
+            <p className="prompt-settings__summary" data-open={settingsOpen ? "true" : undefined}>{detail.text}</p>
+          </div>
+          <div id="prompt-settings" className="prompt-settings" hidden={!settingsOpen}>
+            <div className="grid3">
+              <label>Steps<input id="prompt-steps"
+                aria-invalid={hasIssue("steps")} aria-describedby="settings-errors"
+                type="number" min="1" max="100" value={settings.steps} onChange={(event) => setSettings({ ...settings, steps: Number(event.target.value) })} /></label>
+              <label>CFG{cfgEditable && cfgOption?.allowed_values.length
+                ? <select id="prompt-cfg"
+                    aria-invalid={hasIssue("cfg_scale")} aria-describedby="settings-errors"
+                    value={settings.cfgScale} onChange={(event) => { const cfgScale = Number(event.target.value); setSettings((old) => ({ ...old, cfgScale, negativePrompt: requiredCfg?.includes(cfgScale) ? old.negativePrompt : "" })); }}>{cfgOption.allowed_values.map((value) => <option key={String(value)} value={String(value)}>{value}</option>)}</select>
+                : <input id="prompt-cfg"
+                    aria-invalid={hasIssue("cfg_scale")} aria-describedby="settings-errors"
+                    disabled={!cfgEditable} type="number" min={cfgOption?.minimum ?? 0} max={cfgOption?.maximum ?? 30} step="0.1" value={settings.cfgScale} onChange={(event) => { const cfgScale = Number(event.target.value); setSettings((old) => ({ ...old, cfgScale, negativePrompt: requiredCfg?.includes(cfgScale) ? old.negativePrompt : "" })); }} />}</label>
+              <label>Seed<input id="prompt-seed"
+                aria-invalid={seedProblem !== null} aria-describedby="settings-errors"
+                value={settings.seed} onChange={(event) => setSettings({ ...settings, seed: event.target.value })} /></label>
+            </div>
+            {cfgOption && <p className="option-note">CFG: {optionStatus(cfgOption)}{cfgOption.note && ` · ${cfgOption.note}`}</p>}
+            {generationOptions && <div className="fixed-options"><span>Sampler: {fixedValue(samplingOption, "CLI 기본값")} · {optionStatus(samplingOption)}</span><span>Scheduler: {fixedValue(schedulerOption, "CLI 기본값 (생략)")} · {optionStatus(schedulerOption)}</span></div>}
+            {/* Only the seed's own message is repeated here. The CFG/Steps limits are enforced by
+                the fields' own `min`/`max` and by the server, so this box must not invent a second
+                verdict about them — that is how two error lists start disagreeing. */}
+            <div id="settings-errors" role="status">{seedProblem && <p className="prompt-error">{seedProblem.message}</p>}</div>
+          </div>
           <div role="status">{otherIssues.map((issue, index) => <p className="prompt-error" key={index}>저장할 구성/요청 · {issue.field}: {issue.message} 선택·설명을 수정한 뒤 초안을 다시 적용하세요.</p>)}</div>
           {maxBodyBytes === null && <p className="prompt-hint">서버 요청 크기 한도를 확인할 수 없어 전체 바이트 제한은 서버에서 검사합니다.</p>}
-          <button className="generate" disabled={submitting || !activeModel?.execution_enabled || submissionIssues.length > 0}>{submitting ? "접수 중…" : settings.batchCount > 1 ? `${settings.batchCount}개 생성` : "이미지 생성"}</button>
+          {/* UIX04: the first blocking reason, right next to the button it blocks, with the move
+              that resolves it. `blocker` is the same `submissionIssues` list the button's own
+              `disabled` reads, so fixing the field removes this line without any extra bookkeeping
+              — and no second validator can disagree with the button. Tone is neutral while the
+              prompt is merely untouched: a blank first visit is not a mistake the user made. */}
+          {blocker && blockerVisible && <p className="generate-blocker" data-field={blocker.field}
+            role="status" id="generate-blocker">
+            <span className="generate-blocker__text">생성할 수 없습니다 · {FIELD_LABEL[blocker.field] ?? blocker.field}: {blocker.message}
+              {FIELD_IN_DETAILS.includes(blocker.field) && !settingsOpen ? " (세부 생성 설정을 펼칩니다)" : ""}</span>
+            <button type="button" className="quiet" onClick={() => moveToField(blocker.field)}>수정 위치로 이동</button>
+          </p>}
+          <button className="generate" disabled={submitting || !activeModel?.execution_enabled || allIssues.length > 0}>{submitting ? "접수 중…" : settings.batchCount > 1 ? `${settings.batchCount}개 생성` : "이미지 생성"}</button>
         </form>
       </section>
       <section className="panel jobs" data-collapsed={queueOpen ? undefined : "true"}><div className="section-title jobs-title"><h2>작업 큐</h2>
