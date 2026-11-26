@@ -469,6 +469,23 @@ export async function runUix03({ page, check, record, sleep, shots }) {
   check("UIX03 · 띠의 링크가 한글 영역을 다시 엶", false, returned.folded);
   check("UIX03 · 띠의 링크가 최종 입력을 바꾸지 않음", beforeReturn.prompt, returned.prompt);
 
+  // A response arriving on another route must not steal focus from that route.
+  await evaluate(`window.__composeDelay = 1800; window.__composeReply = ${JSON.stringify(replyWith({
+    result_id: "cmp-uix07-route", summary_ko: "화면 이동 중 도착한 장면",
+  }))};`);
+  await click('.compose-generate');
+  await clickByText('.art-nav a', '작업 큐');
+  await waitFor(`location.pathname === '/art/jobs'`, { label: 'navigate while compose pending' });
+  await evaluate(`document.querySelector('.art-nav a[href="/art/jobs"]').focus()`);
+  await waitFor(`document.querySelector('.compose-summary')?.textContent.includes('화면 이동 중 도착한 장면')`,
+    { label: 'compose response on jobs route', timeout: 10000 });
+  check('UIX07 · 화면 이동 중 응답이 큐 포커스를 유지', true,
+    await evaluate(`document.activeElement === document.querySelector('.art-nav a[href="/art/jobs"]')`));
+  check('UIX07 · 화면 이동 중 응답이 현재 주소 유지', '/art/jobs',
+    await evaluate('location.pathname'));
+  await clickByText('.art-nav a', '개요');
+  await waitFor(`location.pathname === '/art'`, { label: 'return after compose' });
+
   // ── I. failure and cancel both reach the strip ─────────────────────────────
   await evaluate(`window.__composeDelay = 0; window.__composeMode = "fail";`);
   await click(".compose-generate");
@@ -651,7 +668,7 @@ export async function runUix03({ page, check, record, sleep, shots }) {
   })()`);
   await sleep(300);
 
-  for (const [width, height, label] of [[360, 800, "360px"], [1280, 900, "1280px"]]) {
+  for (const [width, height, label] of [[360, 800, "360px"], [390, 844, "390px"], [1280, 900, "1280px"]]) {
     await page.viewport(width, height, width < 500);
     await sleep(450);
     // Open every body: the widest case this layout can be asked to draw.
@@ -709,7 +726,7 @@ export async function runUix03({ page, check, record, sleep, shots }) {
   // Each is captured at 360 and 1280 so the comparison can be made side by side rather than
   // trusting one width to represent the other. State is set explicitly per shot, because a
   // screenshot that happens to follow another state is not evidence about *this* one.
-  for (const [width, height, label] of [[360, 800, "360"], [1280, 900, "1280"]]) {
+  for (const [width, height, label] of [[360, 800, "360"], [390, 844, "390"], [1280, 900, "1280"]]) {
     await page.viewport(width, height, width < 500);
     await sleep(400);
     // The previous iteration ends with the path folded for its strip shot, and a hidden

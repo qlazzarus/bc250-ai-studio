@@ -252,10 +252,20 @@ export async function runUix02({ page, check, record, sleep, shots }) {
   const beforeAttribution = start.chips.find((chip) => chip.label.includes(target));
   check("UIX02 · 대상 칩은 처음에 다른 인물", true, beforeAttribution?.entityId === "entity-2");
 
+  await evaluate(`(() => {
+    const chip = [...document.querySelectorAll('.compose-chip')]
+      .find((node) => node.querySelector('.compose-chip__label')?.textContent.includes(${JSON.stringify(target)}));
+    chip?.querySelector('select')?.focus();
+  })()`);
   await evaluate(attribute(target, "entity-1"));
   await sleep(300);
   const afterAttribution = await evaluate(VIEW);
   const movedChip = afterAttribution.chips.find((chip) => chip.label.includes(target));
+  check("UIX07 · 귀속 변경 후 해당 선택에 포커스 유지", true, await evaluate(`(() => {
+    const active = document.activeElement;
+    return active?.tagName === 'SELECT' &&
+      active.closest('.compose-chip')?.querySelector('.compose-chip__label')?.textContent.includes(${JSON.stringify(target)});
+  })()`));
   check("UIX02 · 귀속 변경이 대상 칩에만 적용", "entity-1", movedChip?.entityId);
   check("UIX02 · 귀속 변경 후 그룹이 이동", "entity-1", movedChip?.group);
   check("UIX02 · 귀속 변경이 개수를 바꾸지 않음",
@@ -517,7 +527,7 @@ export async function runUix02({ page, check, record, sleep, shots }) {
   }
 
   // ── G. detail controls are identifiable per chip at both widths ─────────────
-  for (const [width, height] of [[360, 740], [1280, 900]]) {
+  for (const [width, height] of [[360, 740], [390, 844], [1280, 900]]) {
     await page.viewport(width, height, width < 500);
     await sleep(450);
     const layout = await evaluate(`(() => {

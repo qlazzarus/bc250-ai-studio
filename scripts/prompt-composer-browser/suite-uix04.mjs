@@ -462,7 +462,7 @@ export async function runUix04({ page, check, record, sleep, shots }) {
   // follow another state is not evidence about *this* one. The detail values are normalised to
   // one baseline (a preset press plus a fresh seed, both real user paths) so the two widths
   // document the *same* default rather than whatever the previous iteration left behind.
-  for (const [width, height, label] of [[360, 800, "360"], [1280, 900, "1280"]]) {
+  for (const [width, height, label] of [[360, 800, "360"], [390, 844, "390"], [1280, 900, "1280"]]) {
     await page.viewport(width, height, width < 500);
     await sleep(400);
     // Start from the default path: folded details, a real prompt, no blocker.

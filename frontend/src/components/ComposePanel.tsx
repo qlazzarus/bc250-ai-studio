@@ -179,6 +179,7 @@ export default function ComposePanel({
   const resultRef = useRef<HTMLDivElement | null>(null);
   /** Set before a render that removes a chip; the id is focused after that commit. */
   const pendingFocusRef = useRef<string | null>(null);
+  const pendingAttributeFocusRef = useRef<string | null>(null);
   /**
    * UCP06: what the prompt fields held before the last apply, so one undo can restore it.
    *
@@ -242,6 +243,11 @@ export default function ComposePanel({
 
   /** One-shot focus restore after a chip is removed, so the keyboard path is not lost. */
   useEffect(() => {
+    const attributeId = pendingAttributeFocusRef.current;
+    if (attributeId !== null) {
+      pendingAttributeFocusRef.current = null;
+      document.getElementById(`compose-attribute-${attributeId}`)?.focus();
+    }
     const id = pendingFocusRef.current;
     if (id === null) return;
     pendingFocusRef.current = null;
@@ -548,6 +554,7 @@ export default function ComposePanel({
    * scene does not contain is refused here rather than becoming a `422` on the next send.
    */
   const attribute = ((id: string, entityId: string | null) => {
+    pendingAttributeFocusRef.current = id;
     update((current) => attributeTo(current, id, entityId, sceneEntityIds(scene)));
   });
 
@@ -781,7 +788,7 @@ export default function ComposePanel({
                   which one, and "someone else" would silently move a dress to the wrong body. */}
               {entities.length > 0 && <label className="compose-chip__attribute">
                 <span className="compose-chip__attribute-label">대상</span>
-                <select value={chip.entityId ?? ""}
+                <select id={`compose-attribute-${chip.id}`} value={chip.entityId ?? ""}
                   aria-label={`${chip.labelKo} 귀속 대상`}
                   onChange={(event) => attribute(chip.id, event.target.value || null)}>
                   <option value="">장면 전체</option>

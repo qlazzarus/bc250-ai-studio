@@ -1,0 +1,358 @@
+[
+  {
+    "name": "증거 출처",
+    "pass": null,
+    "detail": "{\"engine\":\"fake\",\"llm\":\"stubbed in page\",\"storage\":\"real sqlite in the disposable STUDIO_DATA_DIR\",\"app\":\"http://localhost:4226/\",\"claim\":\"storage/http/dom only; translation quality is NOT measured here\"}"
+  },
+  {
+    "name": "UIX07 fixture jobs",
+    "pass": true,
+    "expected": "13",
+    "actual": "13"
+  },
+  {
+    "name": "UIX06A · /art 직접 진입 시 화면",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · /art 직접 진입 시 주소",
+    "pass": true,
+    "expected": "/art",
+    "actual": "\"/art\""
+  },
+  {
+    "name": "UIX06A · /art/compose 직접 진입 시 화면",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · /art/compose 직접 진입 시 주소",
+    "pass": true,
+    "expected": "/art/compose",
+    "actual": "\"/art/compose\""
+  },
+  {
+    "name": "UIX06A · /art/generate 직접 진입 시 화면",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · /art/generate 직접 진입 시 주소",
+    "pass": true,
+    "expected": "/art/generate",
+    "actual": "\"/art/generate\""
+  },
+  {
+    "name": "UIX06A · /art/jobs 직접 진입 시 화면",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · /art/jobs 직접 진입 시 주소",
+    "pass": true,
+    "expected": "/art/jobs",
+    "actual": "\"/art/jobs\""
+  },
+  {
+    "name": "UIX06A · /art/gallery 직접 진입 시 화면",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · /art/gallery 직접 진입 시 주소",
+    "pass": true,
+    "expected": "/art/gallery",
+    "actual": "\"/art/gallery\""
+  },
+  {
+    "name": "UIX06A · /pixel 직접 진입 시 화면",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · /pixel 직접 진입 시 주소",
+    "pass": true,
+    "expected": "/pixel",
+    "actual": "\"/pixel\""
+  },
+  {
+    "name": "UIX06A 직접 진입",
+    "pass": null,
+    "detail": "[{\"path\":\"/art\",\"landed\":\"/art\",\"screen\":\"overview\",\"shown\":true},{\"path\":\"/art/compose\",\"landed\":\"/art/compose\",\"screen\":\"compose\",\"shown\":true},{\"path\":\"/art/generate\",\"landed\":\"/art/generate\",\"screen\":\"generate\",\"shown\":true},{\"path\":\"/art/jobs\",\"landed\":\"/art/jobs\",\"screen\":\"jobs\",\"shown\":true},{\"path\":\"/art/gallery\",\"landed\":\"/art/gallery\",\"screen\":\"gallery\",\"shown\":true},{\"path\":\"/pixel\",\"landed\":\"/pixel\",\"screen\":\"pixel\",\"shown\":true}]"
+  },
+  {
+    "name": "UIX06A · 루트가 /art로 이동",
+    "pass": true,
+    "expected": "/art",
+    "actual": "\"/art\""
+  },
+  {
+    "name": "UIX06A · 없는 경로는 페이지 없음 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · 페이지 없음에 복귀 링크",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · 두 단계 작업 경로는 없는 경로",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A 없는 경로",
+    "pass": null,
+    "detail": "{\"notFound\":{\"composer\":false,\"jobs\":false,\"gallery\":false,\"pixel\":false,\"notFound\":true,\"nav\":[],\"viewer\":false,\"metadata\":false,\"dialogLabels\":[]}}"
+  },
+  {
+    "name": "UIX06A · 메뉴 이동이 URL을 바꿈",
+    "pass": true,
+    "expected": "/art/jobs",
+    "actual": "\"/art/jobs\""
+  },
+  {
+    "name": "UIX06A · 이동한 화면이 큐",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · 메뉴가 현재 화면을 표시",
+    "pass": true,
+    "expected": "/art/jobs",
+    "actual": "\"/art/jobs\""
+  },
+  {
+    "name": "UIX06A · 현재 화면 표시가 하나뿐",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX06A · 뒤로 가기가 이전 주소로",
+    "pass": true,
+    "expected": "/art",
+    "actual": "\"/art\""
+  },
+  {
+    "name": "UIX06A · 뒤로 가기 후 화면도 일치",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · 앞으로 가기가 다음 주소로",
+    "pass": true,
+    "expected": "/art/jobs",
+    "actual": "\"/art/jobs\""
+  },
+  {
+    "name": "UIX06A · 앞으로 가기 후 화면도 일치",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · 화면 이동만으로 Compose 요청 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX06A · 화면 이동만으로 생성 요청 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX06A · 왕복 전 입력 반영",
+    "pass": true,
+    "expected": "UIX06A 왕복 보존 확인",
+    "actual": "\"UIX06A 왕복 보존 확인\""
+  },
+  {
+    "name": "UIX06A · 왕복 후 최종 프롬프트 유지",
+    "pass": true,
+    "expected": "UIX06A 왕복 보존 확인",
+    "actual": "\"UIX06A 왕복 보존 확인\""
+  },
+  {
+    "name": "UIX06A · 왕복 후 모델 유지",
+    "pass": true,
+    "expected": "fake-sd15",
+    "actual": "\"fake-sd15\""
+  },
+  {
+    "name": "UIX06A 상태 보존",
+    "pass": null,
+    "detail": "{\"typed\":{\"prompt\":\"UIX06A 왕복 보존 확인\"},\"kept\":{\"prompt\":\"UIX06A 왕복 보존 확인\",\"model\":\"fake-sd15\"}}"
+  },
+  {
+    "name": "UIX07 · 페이지 검증에 작업 13건 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX07 · 작업 2페이지 주소",
+    "pass": true,
+    "expected": "?page=1",
+    "actual": "\"?page=1\""
+  },
+  {
+    "name": "UIX07 · 작업 2페이지에 실제 카드",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX07 · 2페이지 직접 진입 카드 유지",
+    "pass": true,
+    "expected": "[\"04370263cfa440fc82ec5fef84dae728\"]",
+    "actual": "\"[\\\"04370263cfa440fc82ec5fef84dae728\\\"]\""
+  },
+  {
+    "name": "UIX07 · 이전 페이지 주소 복원",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "UIX06A · 작업 퍼머링크 주소",
+    "pass": true,
+    "expected": "/art/jobs/1226064f138142489d4f8b2040d9afc5",
+    "actual": "\"/art/jobs/1226064f138142489d4f8b2040d9afc5\""
+  },
+  {
+    "name": "UIX06A · 작업 퍼머링크가 그 작업을 찾음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · 퍼머링크가 다른 작업을 대신 고르지 않음",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX06A 이미지 퍼머링크",
+    "pass": null,
+    "detail": "이미지가 없어 건너뜀"
+  },
+  {
+    "name": "UIX06A · 없는 이미지는 뷰어를 열지 않음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX06A 없는 이미지",
+    "pass": null,
+    "detail": "{\"path\":\"/art/gallery/nope-does-not-exist\",\"viewer\":false,\"notice\":null}"
+  },
+  {
+    "name": "UIX06A 없는 작업",
+    "pass": null,
+    "detail": "{\"path\":\"/art/jobs/nope-does-not-exist\",\"notice\":\"작업을 찾을 수 없습니다 · Job not found작업 큐로 이동\"}"
+  },
+  {
+    "name": "UIX06A · Pixel Studio 주소",
+    "pass": true,
+    "expected": "/pixel",
+    "actual": "\"/pixel\""
+  },
+  {
+    "name": "UIX06A · Pixel Studio 화면",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · Pixel Studio 복귀 링크",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · 360px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · 360px 메뉴가 화면 안",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX06A · 360px 메뉴 터치 영역 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A 레이아웃 360",
+    "pass": null,
+    "detail": "{\"overflow\":0,\"links\":[{\"label\":\"개요\",\"width\":55,\"height\":44,\"right\":64},{\"label\":\"장면 구성\",\"width\":84,\"height\":44,\"right\":154},{\"label\":\"생성 설정\",\"width\":84,\"height\":44,\"right\":244},{\"label\":\"작업 큐\",\"width\":71,\"height\":44,\"right\":321},{\"label\":\"갤러리\",\"width\":67,\"height\":44,\"right\":76}],\"smallest\":44,\"offscreen\":0}"
+  },
+  {
+    "name": "UIX06A · 1280px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · 1280px 메뉴가 화면 안",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX06A · 1280px 메뉴 터치 영역 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A 레이아웃 1280",
+    "pass": null,
+    "detail": "{\"overflow\":0,\"links\":[{\"label\":\"개요\",\"width\":55,\"height\":44,\"right\":75},{\"label\":\"장면 구성\",\"width\":84,\"height\":44,\"right\":165},{\"label\":\"생성 설정\",\"width\":84,\"height\":44,\"right\":255},{\"label\":\"작업 큐\",\"width\":71,\"height\":44,\"right\":332},{\"label\":\"갤러리\",\"width\":67,\"height\":44,\"right\":405}],\"smallest\":44,\"offscreen\":0}"
+  },
+  {
+    "name": "UIX06A · 메뉴 링크가 포커스를 받음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · 메뉴 링크에 포커스 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX06A · Enter가 링크를 따라감",
+    "pass": true,
+    "expected": "/art/jobs",
+    "actual": "\"/art/jobs\""
+  },
+  {
+    "name": "UIX06A 키보드",
+    "pass": null,
+    "detail": "{\"present\":true,\"focused\":true,\"outlineWidth\":\"2px\"}"
+  }
+]

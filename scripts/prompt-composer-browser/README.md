@@ -11,6 +11,7 @@ sh scripts/prompt-composer-browser/verify.sh
 
 - 기본 포트는 백엔드 4201, 프런트 4206이다. `BACKEND_PORT`/`WEB_PORT`로 바꾼다.
 - `verify.sh`는 `mktemp -d` 데이터 디렉터리, `models.fixture.yaml`, 고정 테스트 키, 일회용 브라우저 프로필만 쓴다. 끝나면 데이터 디렉터리와 프로필을 지운다. 운영 서버·GPU·실데이터를 쓰지 않는다.
+- 갤러리 페이지 이동만 검증하려면 `STUDIO_BROWSER_SUITE=gallery-pagination STUDIO_FAKE_DELAY=0.1 OUT=/tmp/uix07-gallery sh scripts/prompt-composer-browser/verify.sh`를 실행한다. 임시 DB에 이미지 13개를 만든다.
 - 이미 백엔드/프런트를 띄워 두었다면 `APP_URL`을 주면 서버를 새로 띄우지 않는다.
   ```sh
   BACKEND_PORT=4201 sh scripts/prompt-composer-browser/serve.sh   # 다른 터미널, 유지

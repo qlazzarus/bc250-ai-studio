@@ -1,0 +1,709 @@
+[
+  {
+    "name": "증거 출처",
+    "pass": null,
+    "detail": "{\"engine\":\"fake\",\"llm\":\"stubbed in page\",\"storage\":\"real sqlite in the disposable STUDIO_DATA_DIR\",\"app\":\"http://localhost:4236/\",\"claim\":\"storage/http/dom only; translation quality is NOT measured here\"}"
+  },
+  {
+    "name": "UIX03 · 후보 3개",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX03 · 첫 후보만 기본 펼침",
+    "pass": true,
+    "expected": "[true,false,false]",
+    "actual": "\"[true,false,false]\""
+  },
+  {
+    "name": "UIX03 · 제목이 헤더에 보임",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 한국어 차이가 카드에서 읽힘",
+    "pass": true,
+    "expected": "네온과 심도를 더함",
+    "actual": "\"네온과 심도를 더함\""
+  },
+  {
+    "name": "UIX03 · 적용 영향이 헤더에 보임",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · negative 영향도 헤더에 보임",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 본문과 적용 버튼이 같은 카드",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 접힌 본문도 내용을 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 접힌 본문은 aria-expanded=false와 함께 높이 0",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "UIX03 초기",
+    "pass": null,
+    "detail": "[{\"title\":\"원문 충실 · 원문 충실\",\"expanded\":\"true\",\"bodyVisible\":true,\"impact\":\"최종 프롬프트 교체 · negative 유지\"},{\"title\":\"대안 1 · 분위기 강조\",\"expanded\":\"false\",\"bodyVisible\":false,\"impact\":\"최종 프롬프트 교체 · negative 교체\"},{\"title\":\"대안 2 · 구도 강조\",\"expanded\":\"false\",\"bodyVisible\":false,\"impact\":\"최종 프롬프트 교체 · negative 유지\"}]"
+  },
+  {
+    "name": "UIX03 · 두 번째 본문 펼침",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 첫·둘째 본문 동시 펼침",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 펼침은 aria-expanded로도 노출",
+    "pass": true,
+    "expected": "true",
+    "actual": "\"true\""
+  },
+  {
+    "name": "UIX03 · 펼침만으로 요청 없음",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX03 · 펼침만으로 최종 입력 불변",
+    "pass": true,
+    "expected": "{\"prompt\":\"\",\"negative\":\"\"}",
+    "actual": "\"{\\\"prompt\\\":\\\"\\\",\\\"negative\\\":\\\"\\\"}\""
+  },
+  {
+    "name": "UIX03 · 세 후보 동시 펼침",
+    "pass": true,
+    "expected": "[true,true,true]",
+    "actual": "\"[true,true,true]\""
+  },
+  {
+    "name": "UIX03 · 카드별 펼침이 독립적",
+    "pass": true,
+    "expected": "[true,false,true]",
+    "actual": "\"[true,false,true]\""
+  },
+  {
+    "name": "UIX03 · 기본 펼침도 접을 수 있음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX03 · 접어도 다른 본문은 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 접은 첫 카드가 되돌아 열리지 않음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX03 · 다시 펼치면 세 본문이 모두 열림",
+    "pass": true,
+    "expected": "[true,true,true]",
+    "actual": "\"[true,true,true]\""
+  },
+  {
+    "name": "UIX03 · 두 번째 후보 문자열이 최종 입력에 적용",
+    "pass": true,
+    "expected": "rainy alley at night, a lone woman backlit by neon, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shal",
+    "actual": "\"rainy alley at night, a lone woman backlit by neon, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow dep"
+  },
+  {
+    "name": "UIX03 · 그 후보의 negative도 적용",
+    "pass": true,
+    "expected": "blurry, text",
+    "actual": "\"blurry, text\""
+  },
+  {
+    "name": "UIX03 · 빈 입력 교체는 확인 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX03 · 적용된 카드만 적용됨 표시",
+    "pass": true,
+    "expected": "[false,true,false]",
+    "actual": "\"[false,true,false]\""
+  },
+  {
+    "name": "UIX03 · 적용됨 배지가 헤더에 있음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 적용 후에도 카드 3개 유지",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX03 · 적용이 펼침 상태를 바꾸지 않음",
+    "pass": true,
+    "expected": "[true,true,true]",
+    "actual": "\"[true,true,true]\""
+  },
+  {
+    "name": "UIX03 적용",
+    "pass": null,
+    "detail": "{\"prompt\":\"rainy alley at night, a lone woman backl\",\"negative\":\"blurry, text\",\"applied\":[false,true,false]}"
+  },
+  {
+    "name": "UIX03 · 직접 수정 후 적용은 확인을 요구",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX03 · 확인 취소 시 최종 입력 유지",
+    "pass": true,
+    "expected": "my own carefully written prompt",
+    "actual": "\"my own carefully written prompt\""
+  },
+  {
+    "name": "UIX03 · 확인 취소 시 negative 유지",
+    "pass": true,
+    "expected": "blurry, text",
+    "actual": "\"blurry, text\""
+  },
+  {
+    "name": "UIX03 · 확인 승인 시 적용",
+    "pass": true,
+    "expected": "a woman in a wet alley, cold blue grade, wide establishing shot, cold blue grade, wide establishing shot, cold blue grade, wide establishing shot, cold blue grade, wide establishing shot, cold blue gr",
+    "actual": "\"a woman in a wet alley, cold blue grade, wide establishing shot, cold blue grade, wide establishing shot, cold blue grade, wide establishing shot, cold blue grade, wide establishing shot, cold blue grade, wide establishing shot, cold blue grade, wide establishing shot, cold blue grade, wide establishing shot, cold blue grade, wide establishing shot, cold blue grade, wide establishing shot, cold b"
+  },
+  {
+    "name": "UIX03 · 되돌리기가 적용 전 문자열 복원",
+    "pass": true,
+    "expected": "my own carefully written prompt",
+    "actual": "\"my own carefully written prompt\""
+  },
+  {
+    "name": "UIX03 · 되돌리기가 negative도 복원",
+    "pass": true,
+    "expected": "blurry, text",
+    "actual": "\"blurry, text\""
+  },
+  {
+    "name": "UIX03 덮어쓰기·되돌리기",
+    "pass": null,
+    "detail": "{\"refused\":\"my own carefully written prompt\",\"afterUndo\":\"my own carefully written prompt\"}"
+  },
+  {
+    "name": "UIX03 · 원문 수정은 후보를 무효화",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 무효화는 후보를 지우지 않음",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX03 · 무효화만으로 최종 입력 불변",
+    "pass": true,
+    "expected": "{\"prompt\":\"my own carefully written prompt\",\"negative\":\"blurry, text\"}",
+    "actual": "\"{\\\"prompt\\\":\\\"my own carefully written prompt\\\",\\\"negative\\\":\\\"blurry, text\\\"}\""
+  },
+  {
+    "name": "UIX03 · 무효화만으로 요청 없음",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX03 · 무효화된 후보는 적용되지 않음",
+    "pass": true,
+    "expected": "{\"prompt\":\"my own carefully written prompt\",\"negative\":\"blurry, text\"}",
+    "actual": "\"{\\\"prompt\\\":\\\"my own carefully written prompt\\\",\\\"negative\\\":\\\"blurry, text\\\"}\""
+  },
+  {
+    "name": "UIX03 · 무효화 적용 거부 사유가 표시됨",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 무효화",
+    "pass": null,
+    "detail": "{\"notice\":\"입력이나 선택이 바뀌었습니다. 표시된 후보는 이전 장면 기준이므로 적용할 수 없습니다. 다시 생성하세요.\",\"applyBlocked\":true,\"clicked\":true}"
+  },
+  {
+    "name": "UIX03 · 새 응답은 기본 펼침으로 시작",
+    "pass": true,
+    "expected": "[true,false,false]",
+    "actual": "\"[true,false,false]\""
+  },
+  {
+    "name": "UIX03 · 새 응답이 최종 입력을 바꾸지 않음",
+    "pass": true,
+    "expected": "my own carefully written prompt",
+    "actual": "\"my own carefully written prompt\""
+  },
+  {
+    "name": "UIX03 · 새 응답에서 적용 표시가 초기화됨",
+    "pass": true,
+    "expected": "[false,false,false]",
+    "actual": "\"[false,false,false]\""
+  },
+  {
+    "name": "UIX03 새 응답",
+    "pass": null,
+    "detail": "[true,false,false]"
+  },
+  {
+    "name": "UIX03 · 접힌 상태에서 진행 표시",
+    "pass": true,
+    "expected": "pending",
+    "actual": "\"pending\""
+  },
+  {
+    "name": "UIX03 · 진행 문구가 생성 중임을 말함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 접힌 동안 띠가 화면 안에 있음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 응답 도착이 직접 입력을 덮어쓰지 않음",
+    "pass": true,
+    "expected": "typed while composing",
+    "actual": "\"typed while composing\""
+  },
+  {
+    "name": "UIX03 · 응답 도착이 negative를 바꾸지 않음",
+    "pass": true,
+    "expected": "blurry, text",
+    "actual": "\"blurry, text\""
+  },
+  {
+    "name": "UIX03 · 응답 도착이 포커스를 옮기지 않음",
+    "pass": true,
+    "expected": "{\"id\":\"prompt-final\",\"cls\":\"\"}",
+    "actual": "\"{\\\"id\\\":\\\"prompt-final\\\",\\\"cls\\\":\\\"\\\"}\""
+  },
+  {
+    "name": "UIX03 · 포커스가 실제로 영어 필드에 있었음",
+    "pass": true,
+    "expected": "prompt-final",
+    "actual": "\"prompt-final\""
+  },
+  {
+    "name": "UIX03 · 접힌 띠가 준비 상태를 알림",
+    "pass": true,
+    "expected": "ready",
+    "actual": "\"ready\""
+  },
+  {
+    "name": "UIX03 · 띠가 후보 개수를 말함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 접힌 응답",
+    "pass": null,
+    "detail": "{\"prompt\":\"typed while composing\",\"negative\":\"blurry, text\",\"focus\":{\"id\":\"prompt-final\",\"cls\":\"\"},\"strip\":{\"present\":true,\"phase\":\"ready\",\"text\":\"후보 3개가 준비되었습니다. 적용은 한글 장면에서 고르세요.한글 장면으로 돌아가기\",\"folded\":true,\"inViewport\":true}}"
+  },
+  {
+    "name": "UIX03 · 띠의 링크가 한글 영역을 다시 엶",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX03 · 띠의 링크가 최종 입력을 바꾸지 않음",
+    "pass": true,
+    "expected": "typed while composing",
+    "actual": "\"typed while composing\""
+  },
+  {
+    "name": "UIX07 · 화면 이동 중 응답이 큐 포커스를 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX07 · 화면 이동 중 응답이 현재 주소 유지",
+    "pass": true,
+    "expected": "/art/jobs",
+    "actual": "\"/art/jobs\""
+  },
+  {
+    "name": "UIX03 · 접힌 띠가 실패를 알림",
+    "pass": true,
+    "expected": "failed",
+    "actual": "\"failed\""
+  },
+  {
+    "name": "UIX03 · 실패 문구에 실패임이 드러남",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 실패도 최종 입력을 바꾸지 않음",
+    "pass": true,
+    "expected": "typed while composing",
+    "actual": "\"typed while composing\""
+  },
+  {
+    "name": "UIX03 접힌 실패",
+    "pass": null,
+    "detail": "{\"present\":true,\"phase\":\"failed\",\"text\":\"구성에 실패했습니다: 모델 호출 실패.한글 장면으로 돌아가기\",\"folded\":true,\"inViewport\":true,\"prompt\":\"typed while composing\",\"negative\":\"blurry, text\"}"
+  },
+  {
+    "name": "UIX03 · 실패 후 다시 시도가 제공됨",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 다시 시도가 후보를 복구",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX03 · 취소가 띠에 반영됨",
+    "pass": true,
+    "expected": "cancelled",
+    "actual": "\"cancelled\""
+  },
+  {
+    "name": "UIX03 · 취소 문구가 입력 보존을 알림",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 접힌 취소",
+    "pass": null,
+    "detail": "{\"clicked\":true,\"present\":true,\"phase\":\"cancelled\",\"text\":\"구성을 취소했습니다. 입력과 선택은 그대로 남아 있습니다.한글 장면으로 돌아가기\",\"folded\":true,\"inViewport\":false}"
+  },
+  {
+    "name": "UIX03 · 모델 변경 뒤 이전 응답이 적용 불가",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 모델 변경이 최종 입력을 바꾸지 않음",
+    "pass": true,
+    "expected": "typed while composing",
+    "actual": "\"typed while composing\""
+  },
+  {
+    "name": "UIX03 모델 변경",
+    "pass": null,
+    "detail": "{\"cards\":0,\"status\":\"\"}"
+  },
+  {
+    "name": "UIX03 · negative 미지원 모델은 필드가 비활성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 미지원 모델 카드가 negative 빠짐을 알림",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 미지원 본문이 빠짐을 설명",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 첫 적용은 negative 손실을 설명하고 멈춤",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 첫 적용은 최종 입력을 쓰지 않음",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "UIX03 · 두 번째 누름을 안내하는 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 두 번째 누름이 긍정 프롬프트만 적용",
+    "pass": true,
+    "expected": "rainy alley at night, a lone woman backlit by neon, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shal",
+    "actual": "\"rainy alley at night, a lone woman backlit by neon, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow depth of field, shallow dep"
+  },
+  {
+    "name": "UIX03 · 손실 적용은 negative를 남기지 않음",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "UIX03 · 손실 적용 사실을 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 negative 미지원",
+    "pass": null,
+    "detail": "{\"first\":\"이 후보의 negative prompt는 이 모델에서 지원되지 않습니다. 적용하면 긍정 프롬프트만 들어갑니다. 계속하려면 다시 누르세요.\",\"applied\":\"rainy alley at night, a lone w\",\"negative\":\"\"}"
+  },
+  {
+    "name": "UIX03 · 한글 영역으로 복귀해도 후보 유지",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX03 · 헤더 토글이 포커스 가능",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · Enter가 본문 펼침을 토글",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 토글 뒤 본문 높이가 aria-expanded와 일치",
+    "pass": true,
+    "expected": "false",
+    "actual": "\"false\""
+  },
+  {
+    "name": "UIX03 · Enter 뒤에도 포커스가 헤더에 남음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · Space도 같은 토글을 조작",
+    "pass": true,
+    "expected": "true",
+    "actual": "\"true\""
+  },
+  {
+    "name": "UIX03 · 360px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 360px 후보 본문 가로 잘림 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX03 · 360px 카드 내부 넘침 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX03 · 360px 헤더 토글 44px 이상",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX03 · 360px 적용 버튼 44px 이상",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX03 · 360px 본문·버튼이 카드 안",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX03 · 360px 세 본문이 모두 펼쳐짐",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX03 360px",
+    "pass": null,
+    "detail": "{\"overflow\":0,\"headerBelow44\":0,\"applyBelow44\":0,\"clipped\":0,\"separated\":0,\"cardOverflow\":0,\"allOpen\":3}"
+  },
+  {
+    "name": "UIX03 · 1280px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 1280px 후보 본문 가로 잘림 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX03 · 1280px 카드 내부 넘침 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX03 · 1280px 헤더 토글 44px 이상",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX03 · 1280px 적용 버튼 44px 이상",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX03 · 1280px 본문·버튼이 카드 안",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX03 · 1280px 세 본문이 모두 펼쳐짐",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX03 1280px",
+    "pass": null,
+    "detail": "{\"overflow\":-15,\"headerBelow44\":0,\"applyBelow44\":0,\"clipped\":0,\"separated\":0,\"cardOverflow\":0,\"allOpen\":3}"
+  },
+  {
+    "name": "UIX03 · 360 캡처 전 한글 영역 펼침",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX03 · 360 기본 접힘 상태 재현",
+    "pass": true,
+    "expected": "[true,false,false]",
+    "actual": "\"[true,false,false]\""
+  },
+  {
+    "name": "UIX03 · 360 복수 비교 상태 재현",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 360 덮어쓰기 확인이 뜨고 취소됨",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX03 · 360 확인 취소 뒤 입력 유지",
+    "pass": true,
+    "expected": "typed at 360",
+    "actual": "\"typed at 360\""
+  },
+  {
+    "name": "UIX03 · 360 접힌 진행 상태 재현",
+    "pass": true,
+    "expected": "pending",
+    "actual": "\"pending\""
+  },
+  {
+    "name": "UIX03 · 360 접힌 진행 중 입력 보존",
+    "pass": true,
+    "expected": "typed at 360",
+    "actual": "\"typed at 360\""
+  },
+  {
+    "name": "UIX03 · 1280 캡처 전 한글 영역 펼침",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX03 · 1280 기본 접힘 상태 재현",
+    "pass": true,
+    "expected": "[true,false,false]",
+    "actual": "\"[true,false,false]\""
+  },
+  {
+    "name": "UIX03 · 1280 복수 비교 상태 재현",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX03 · 1280 덮어쓰기 확인이 뜨고 취소됨",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX03 · 1280 확인 취소 뒤 입력 유지",
+    "pass": true,
+    "expected": "typed at 1280",
+    "actual": "\"typed at 1280\""
+  },
+  {
+    "name": "UIX03 · 1280 접힌 진행 상태 재현",
+    "pass": true,
+    "expected": "pending",
+    "actual": "\"pending\""
+  },
+  {
+    "name": "UIX03 · 1280 접힌 진행 중 입력 보존",
+    "pass": true,
+    "expected": "typed at 1280",
+    "actual": "\"typed at 1280\""
+  }
+]

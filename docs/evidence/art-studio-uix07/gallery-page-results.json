@@ -1,0 +1,31 @@
+[
+  {
+    "name": "증거 출처",
+    "pass": null,
+    "detail": "{\"engine\":\"fake\",\"llm\":\"stubbed in page\",\"storage\":\"real sqlite in the disposable STUDIO_DATA_DIR\",\"app\":\"http://localhost:4266/\",\"claim\":\"storage/http/dom only; translation quality is NOT measured here\"}"
+  },
+  {
+    "name": "UIX07 · 갤러리용 작업 13건 생성",
+    "pass": true,
+    "expected": "13",
+    "actual": "13"
+  },
+  {
+    "name": "UIX07 · 갤러리 2페이지 주소",
+    "pass": true,
+    "expected": "?page=1",
+    "actual": "\"?page=1\""
+  },
+  {
+    "name": "UIX07 · 갤러리 2페이지 서버 결과",
+    "pass": true,
+    "expected": "[\"ba69e6a8\"]",
+    "actual": "\"[\\\"ba69e6a8\\\"]\""
+  },
+  {
+    "name": "UIX07 · 갤러리 2페이지 직접 진입 결과",
+    "pass": true,
+    "expected": "[\"ba69e6a8\"]",
+    "actual": "\"[\\\"ba69e6a8\\\"]\""
+  }
+]

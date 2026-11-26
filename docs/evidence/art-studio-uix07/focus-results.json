@@ -1,0 +1,507 @@
+[
+  {
+    "name": "증거 출처",
+    "pass": null,
+    "detail": "{\"engine\":\"fake\",\"llm\":\"stubbed in page\",\"storage\":\"real sqlite in the disposable STUDIO_DATA_DIR\",\"app\":\"http://localhost:4216/\",\"claim\":\"storage/http/dom only; translation quality is NOT measured here\"}"
+  },
+  {
+    "name": "UIX02 · 선택 요약이 칩과 함께 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 요약 문구에 네 숫자",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 시작",
+    "pass": null,
+    "detail": "{\"counts\":{\"chosen\":4,\"pinned\":0,\"excluded\":0,\"clashes\":0},\"groups\":[\"인물 12개\",\"인물 21개\",\"장면 전체1개\"]}"
+  },
+  {
+    "name": "UIX02 · 다인 장면은 귀속별 그룹",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 그룹 제목이 인물/장면 전체를 구분",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 그룹화가 선택 순서를 바꾸지 않음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 대상 칩은 처음에 다른 인물",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX07 · 귀속 변경 후 해당 선택에 포커스 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 귀속 변경이 대상 칩에만 적용",
+    "pass": true,
+    "expected": "entity-1",
+    "actual": "\"entity-1\""
+  },
+  {
+    "name": "UIX02 · 귀속 변경 후 그룹이 이동",
+    "pass": true,
+    "expected": "entity-1",
+    "actual": "\"entity-1\""
+  },
+  {
+    "name": "UIX02 · 귀속 변경이 개수를 바꾸지 않음",
+    "pass": true,
+    "expected": "{\"chosen\":4,\"pinned\":0,\"excluded\":0,\"clashes\":0}",
+    "actual": "\"{\\\"chosen\\\":4,\\\"pinned\\\":0,\\\"excluded\\\":0,\\\"clashes\\\":0}\""
+  },
+  {
+    "name": "UIX02 · 귀속 변경만으로 요청이 나가지 않음",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 귀속",
+    "pass": null,
+    "detail": "{\"group\":\"entity-1\",\"entityId\":\"entity-1\"}"
+  },
+  {
+    "name": "UIX02 · 고정 버튼이 대상 칩에 작동",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 대상 칩만 고정됨",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 고정 개수 갱신",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 · 고정 배지 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 다른 칩의 귀속은 그대로",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 다른 칩 제거가 성공",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 제거한 칩이 제외로 이동",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 · 제외가 늘고 선택이 줄어 합계 유지",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX02 · 제거 후에도 대상 칩의 귀속·고정 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 제거 후 고정 개수 유지",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 · 제외 행에 칩 ID와 출처",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 제외 복구가 제외 개수를 줄임",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX02 · 제외 복구는 선택을 되살리지 않음(행 제거)",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX02 · 복구한 칩은 선택 카드에 없음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX02 · 복구는 요청을 보내지 않음",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 연속 조작",
+    "pass": null,
+    "detail": "{\"afterPin\":{\"chosen\":4,\"pinned\":1,\"excluded\":0,\"clashes\":0},\"afterRemove\":{\"chosen\":3,\"pinned\":1,\"excluded\":1,\"clashes\":0},\"afterRestore\":{\"chosen\":3,\"pinned\":1,\"excluded\":0,\"clashes\":0}}"
+  },
+  {
+    "name": "UIX02 · 사전을 열면 검색이 보임",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 검색 결과 0에서 선택은 유지",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX02 · 검색 결과 수와 선택 수를 구분해 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 검색만으로 요청이 나가지 않음",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 · 빈 결과에 검색어 지우기 제공",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 검색만 좁혔을 때 분류 초기화는 없음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX02 · 분류를 고를 수 있음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 분류와 검색이 함께 결과를 좁힘",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 분류 선택이 요약에 표시됨",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 분류만 좁힌 빈 결과에 전체 분류 보기",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 전체 분류 보기가 분류를 해제",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX02 · 분류 초기화도 선택을 바꾸지 않음",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX02 · 분류 초기화도 요청을 보내지 않음",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 · 검색어 지우기가 결과를 되돌림",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 검색 초기화도 선택을 바꾸지 않음",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UIX02 · 접힌 상태에서 선택 요약은 그대로",
+    "pass": true,
+    "expected": "{\"chosen\":3,\"pinned\":1,\"excluded\":0,\"clashes\":0}",
+    "actual": "\"{\\\"chosen\\\":3,\\\"pinned\\\":1,\\\"excluded\\\":0,\\\"clashes\\\":0}\""
+  },
+  {
+    "name": "UIX02 · 접힌 상태에서 사전 영역이 사라짐",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX02 · 접기만으로 요청이 나가지 않음",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 · 접힌 상태에서 요약이 화면에 보임",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 접힌 상태에서도 네 숫자가 읽힘",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 요약은 사전 접힘과 무관하게 존재",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX02 접힌 요약",
+    "pass": null,
+    "detail": "{\"visible\":true,\"inViewport\":true,\"parts\":[\"선택 3개\",\"고정 1개\",\"제외 0개\",\"미해결 충돌 0건\"],\"numbered\":true,\"openPanel\":false}"
+  },
+  {
+    "name": "UIX02 · 재열기 후 선택이 보존됨",
+    "pass": true,
+    "expected": "{\"chosen\":3,\"pinned\":1,\"excluded\":0,\"clashes\":0}",
+    "actual": "\"{\\\"chosen\\\":3,\\\"pinned\\\":1,\\\"excluded\\\":0,\\\"clashes\\\":0}\""
+  },
+  {
+    "name": "UIX02 · 재열기 후 칩 목록이 동일",
+    "pass": true,
+    "expected": "[\"서 있기\",\"네온 조명\",\"거리\"]",
+    "actual": "\"[\\\"서 있기\\\",\\\"네온 조명\\\",\\\"거리\\\"]\""
+  },
+  {
+    "name": "UIX02 · 재열기까지 요청 증가 없음",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 검색·접기",
+    "pass": null,
+    "detail": "{\"chosen\":3,\"requests\":1}"
+  },
+  {
+    "name": "UIX02 · 충돌 준비용 칩 존재",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 제거로 제외 1건 생성",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 · 제외 1건은 미해결 충돌이 아님(아직)",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX02 · 충돌 요약 건수가 올라감",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 · 충돌 행이 당사 항목을 이름으로 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 충돌 행이 인용 문구를 함께 보여 줌",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 해소 동작이 당사 항목 안에 있음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 충돌",
+    "pass": null,
+    "detail": "[{\"id\":\"location.street\",\"label\":\"거리\",\"phrase\":\"원문에 “거리”\",\"buttons\":[\"제외 해제\",\"원문에서 지우기\"],\"buttonsInside\":true}]"
+  },
+  {
+    "name": "UIX02 · 충돌 해소 후 요약 건수 0",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX02 · 충돌 해소가 제외 목록도 비움",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX02 · 충돌 해소는 요청을 보내지 않음",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 충돌 해소",
+    "pass": null,
+    "detail": "{\"chosen\":2,\"pinned\":1,\"excluded\":0,\"clashes\":0}"
+  },
+  {
+    "name": "UIX02 · 실패가 선택 요약을 초기화하지 않음",
+    "pass": true,
+    "expected": "{\"chosen\":2,\"pinned\":1,\"excluded\":0,\"clashes\":0}",
+    "actual": "\"{\\\"chosen\\\":2,\\\"pinned\\\":1,\\\"excluded\\\":0,\\\"clashes\\\":0}\""
+  },
+  {
+    "name": "UIX02 · 실패 후 재시도 제공",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 재시도 후에도 고정이 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 재시도 후에도 고정 개수 1",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UIX02 · 재시도 후 귀속은 서버 파생값",
+    "pass": true,
+    "expected": "entity-2",
+    "actual": "\"entity-2\""
+  },
+  {
+    "name": "UIX02 실패·재시도",
+    "pass": null,
+    "detail": "{\"counts\":{\"chosen\":4,\"pinned\":1,\"excluded\":0,\"clashes\":0},\"kept\":{\"pinned\":true,\"entityId\":\"entity-2\"}}"
+  },
+  {
+    "name": "UIX02 · 360px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 360px 상세 조작 대상 식별",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 360px 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 360px 요약이 화면 안에",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 360px 귀속 라벨이 한 줄",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 360px",
+    "pass": null,
+    "detail": "{\"overflow\":0,\"identifiable\":true,\"minButton\":44,\"barInside\":true,\"labelsOnOneLine\":true}"
+  },
+  {
+    "name": "UIX02 · 1280px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 1280px 상세 조작 대상 식별",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 1280px 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 1280px 요약이 화면 안에",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 · 1280px 귀속 라벨이 한 줄",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX02 1280px",
+    "pass": null,
+    "detail": "{\"overflow\":-15,\"identifiable\":true,\"minButton\":44,\"barInside\":true,\"labelsOnOneLine\":true}"
+  }
+]

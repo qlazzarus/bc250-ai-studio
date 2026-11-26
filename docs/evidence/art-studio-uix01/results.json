@@ -1,0 +1,3391 @@
+[
+  {
+    "name": "증거 출처",
+    "pass": null,
+    "detail": "{\"engine\":\"fake\",\"llm\":\"stubbed in page\",\"storage\":\"real sqlite in the disposable STUDIO_DATA_DIR\",\"app\":\"http://localhost:4226/\",\"claim\":\"storage/http/dom only; translation quality is NOT measured here\"}"
+  },
+  {
+    "name": "환경",
+    "pass": null,
+    "detail": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36 · 1280x900"
+  },
+  {
+    "name": "UX01 · 설명 → 요약 → 세부 조정 → 초안 순서",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX01 단계 위치",
+    "pass": null,
+    "detail": "[488,945,1619,1698]"
+  },
+  {
+    "name": "UX01 · 첫 입력은 한국어 설명",
+    "pass": true,
+    "expected": "free-text-ko",
+    "actual": "\"free-text-ko\""
+  },
+  {
+    "name": "UX01 · 사전 탐색은 기본 접힘",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UX02 · 접힌 탐색은 닫힌 details 안",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX01 · 설명 제목 노출",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX05 · 예시 3개 노출",
+    "pass": true,
+    "expected": "[\"일상\",\"제품\",\"풍경\"]",
+    "actual": "\"[\\\"일상\\\",\\\"제품\\\",\\\"풍경\\\"]\""
+  },
+  {
+    "name": "UX05 · 기존 입력이 있으면 확인",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UX05 · 취소 시 입력 유지",
+    "pass": true,
+    "expected": "직접 쓴 장면 설명",
+    "actual": "\"직접 쓴 장면 설명\""
+  },
+  {
+    "name": "UX05 · 취소 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX05 · 예시가 설명을 채움",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX04 · 원문 영역이 같은 문자열을 보여줌",
+    "pass": true,
+    "expected": "비 오는 밤, 편의점 앞에서 우산을 접으며 친구를 기다리는 사람. 네온 조명이 젖은 바닥에 반사된다.",
+    "actual": "\"비 오는 밤, 편의점 앞에서 우산을 접으며 친구를 기다리는 사람. 네온 조명이 젖은 바닥에 반사된다.\""
+  },
+  {
+    "name": "UX05 · 예시 적용 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX05 · 예시는 생성을 호출하지 않음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UX05 예시 적용",
+    "pass": null,
+    "detail": "{\"length\":56,\"notice\":\"“일상” 예시를 넣었습니다. 필요한 부분을 고쳐 쓰세요.\"}"
+  },
+  {
+    "name": "UIX01 · 두 입력 경로 노출",
+    "pass": true,
+    "expected": "[\"한글 장면으로 만들기\",\"최종 프롬프트 직접 입력\"]",
+    "actual": "\"[\\\"한글 장면으로 만들기\\\",\\\"최종 프롬프트 직접 입력\\\"]\""
+  },
+  {
+    "name": "UIX01 · 경로 그룹 이름",
+    "pass": true,
+    "expected": "프롬프트 입력 경로",
+    "actual": "\"프롬프트 입력 경로\""
+  },
+  {
+    "name": "UIX01 · 모델 다음 두 경로에 키보드 도달",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 키보드 경로",
+    "pass": null,
+    "detail": "[\"한글 장면으로 만들기\",\"최종 프롬프트 직접 입력\"]"
+  },
+  {
+    "name": "UIX01 · 직접 입력이 접힌 한글 영역을 숨김",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 직접 입력이 최종 필드로 포커스",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 전환 후 영어 값 보존",
+    "pass": true,
+    "expected": "a woman standing in a rainy alley",
+    "actual": "\"a woman standing in a rainy alley\""
+  },
+  {
+    "name": "UIX01 · 접혀도 한글 값 보존",
+    "pass": true,
+    "expected": "비 오는 골목의 여성",
+    "actual": "\"비 오는 골목의 여성\""
+  },
+  {
+    "name": "UIX01 · 한글 경로 복귀 시 영역 노출",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 한글 경로 복귀 시 설명으로 포커스",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 왕복 후 한글 값 보존",
+    "pass": true,
+    "expected": "비 오는 골목의 여성",
+    "actual": "\"비 오는 골목의 여성\""
+  },
+  {
+    "name": "UIX01 · 왕복 후 영어 값 보존",
+    "pass": true,
+    "expected": "a woman standing in a rainy alley",
+    "actual": "\"a woman standing in a rainy alley\""
+  },
+  {
+    "name": "UIX01 · 왕복이 요청을 보내지 않음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UIX01 왕복",
+    "pass": null,
+    "detail": "{\"koreanVisible\":true,\"focused\":true,\"korean\":\"비 오는 골목의 여성\",\"english\":\"a woman standing in a rainy alley\",\"requests\":null}"
+  },
+  {
+    "name": "UIX01 · 패널 마운트 유지(재생성 없음)",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 사전 초안·고급 도구 명칭",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 중복된 '프롬프트 구성 열기' 없음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX01 고급 도구 명칭",
+    "pass": null,
+    "detail": "{\"openLabel\":\"사전 초안·고급 도구 닫기\",\"stale\":false}"
+  },
+  {
+    "name": "UIX01 · 360px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 360px 경로 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 360px 두 경로에 키보드 도달",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 복원 상태가 접히는 패널 밖",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UIX01 · 복원 상태가 보이는 위치",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 360px",
+    "pass": null,
+    "detail": "{\"overflow\":0,\"buttons\":[{\"w\":151,\"h\":44},{\"w\":168,\"h\":44}],\"narrowStops\":[\"한글 장면으로 만들기\",\"최종 프롬프트 직접 입력\"],\"statusPlacement\":{\"nested\":false,\"present\":false,\"visible\":null}}"
+  },
+  {
+    "name": "GAP03 · 초기 목록은 전체",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP03 · 빈 상태에 시작 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX02 · 시작 버튼이 세부 조정을 엶",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP03 · 대상 분류로 좁힘",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP03 · 좁힌 뒤 검색 입력 포커스",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "선택 3개 · 칩 3개",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "칩 그룹 순서 고정",
+    "pass": true,
+    "expected": "[\"대상\",\"조명·스타일\",\"분위기\"]",
+    "actual": "\"[\\\"대상\\\",\\\"조명·스타일\\\",\\\"분위기\\\"]\""
+  },
+  {
+    "name": "UX04 · 요약 행 7개",
+    "pass": true,
+    "expected": "7",
+    "actual": "7"
+  },
+  {
+    "name": "UX04 · 선택 없는 행은 지정 안 함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX04 · 선택한 세 행만 칩을 가짐",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX04 · 요약은 원문을 바꾸지 않음",
+    "pass": true,
+    "expected": "비 오는 밤, 편의점 앞에서 우산을 접으며 친구를 기다리는 사람. 네온 조명이 젖은 바닥에 반사된다.",
+    "actual": "\"비 오는 밤, 편의점 앞에서 우산을 접으며 친구를 기다리는 사람. 네온 조명이 젖은 바닥에 반사된다.\""
+  },
+  {
+    "name": "UX04 요약",
+    "pass": null,
+    "detail": "[\"대상:1\",\"외형·의상:0\",\"표정·행동:0\",\"장소·시간:0\",\"구도:0\",\"조명·스타일:1\",\"분위기:1\"]"
+  },
+  {
+    "name": "GAP01 · 중간 제거 후 다음 칩으로 포커스",
+    "pass": true,
+    "expected": "차분한 분위기 선택 해제",
+    "actual": "\"차분한 분위기 선택 해제\""
+  },
+  {
+    "name": "GAP01 중간 제거",
+    "pass": null,
+    "detail": "제거 부드러운 조명 선택 해제 → 포커스 차분한 분위기 선택 해제"
+  },
+  {
+    "name": "GAP01 · 전체 마지막 칩 제거 후 이전 칩으로",
+    "pass": true,
+    "expected": "인물 선택 해제",
+    "actual": "\"인물 선택 해제\""
+  },
+  {
+    "name": "GAP01 · 마지막 칩 제거 후 탐색 입력으로",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX02 · 마지막 칩 제거 시 접힌 세부 조정을 엶",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX02 · 열린 뒤 검색 입력으로 포커스",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "전체 비우기 · 취소 시 유지",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "전체 비우기 · 확인창 호출",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "전체 비우기 · 마지막 포커스는 탐색 입력",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 별도 보관 포함 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 원문 미변환은 주의로 중복 표시하지 않음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 메시지는 접힌 상세에 숨지 않음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 별도 보관 메시지",
+    "pass": null,
+    "detail": "[]"
+  },
+  {
+    "name": "UX04 · 설명만으로는 요약이 채워지지 않음",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "UX04 · 원문은 설명 그대로",
+    "pass": true,
+    "expected": "비 오는 네온 거리, 두 사람",
+    "actual": "\"비 오는 네온 거리, 두 사람\""
+  },
+  {
+    "name": "GAP02 · 원문 포함 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 원문 1회 포함",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UX04 · 영어 초안은 기본 접힘",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UX04 · 적용 버튼은 접힘 밖",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UX04 · 초안 펼치기",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "stale 초안 · 재생성 또는 적용 차단",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "stale 초안 상태",
+    "pass": null,
+    "detail": "{\"regenerated\":true,\"disabled\":false,\"caution\":false}"
+  },
+  {
+    "name": "stale 초안 · 옛 초안으로 덮어쓰지 않음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 미변환 선택은 주의 등급",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 미변환은 오류가 아닌 주의",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "GAP02 · 미변환 목록은 접힘 밖에서 보임",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 미지원 계열",
+    "pass": null,
+    "detail": "{\"total\":3,\"caution\":[\"이 모델로 번역되지 않은 선택 항목인물부드러운 조명선택한 항목의 unknown-family 표현이 사전에 없어 초안에서 빠졌습니다. 다른 항목을 고르거나 최종 프롬프트에 직접 입력하세요.\",\"이 모델 계열의 사전 변환은 아직 제공되지 않습니다.\"],\"hasSelectionWarning\":true,\"errors\":0,\"listVisible\":true,\"listInDisclosure\":false}"
+  },
+  {
+    "name": "계열 복귀 · 초안 재생성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "계열 복귀 상태",
+    "pass": null,
+    "detail": "{\"chips\":2,\"hasDraft\":true}"
+  },
+  {
+    "name": "GAP02 · 한도 초과는 오류 등급",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 · 오류는 접힌 상세 밖",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "GAP02 · 오류 시 생성 차단",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "GAP02 오류 표시",
+    "pass": null,
+    "detail": "{\"exists\":true,\"text\":\"8001/8000자: 내용을 줄여 주세요.\",\"inDisclosure\":false,\"generateDisabled\":true}"
+  },
+  {
+    "name": "키보드 Tab 순회",
+    "pass": null,
+    "detail": "[{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"저장 범위 안내\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"자세히\"},{\"tag\":\"TEXTAREA\",\"id\":\"free-text-ko\",\"className\":null,\"label\":null,\"text\":\"비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"29/4000자\"}]"
+  },
+  {
+    "name": "키보드 Shift+Tab 순회",
+    "pass": null,
+    "detail": "[{\"tag\":\"TEXTAREA\",\"id\":\"free-text-ko\",\"className\":null,\"label\":null,\"text\":\"비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"자세히\"},{\"tag\":\"SUMMARY\",\"id\":null,\"className\":null,\"label\":null,\"text\":\"저장 범위 안내\"},{\"tag\":\"BUTTON\",\"id\":null,\"className\":\"quiet\",\"label\":null,\"text\":\"사전 초안·고급 도구 닫기\"}]"
+  },
+  {
+    "name": "키보드 · 설명 입력이 첫 입력",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 접힌 세부 조정 내부는 순회 밖",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 역순 정확히 일치",
+    "pass": true,
+    "expected": "[\"TEXTAREA:free-text-ko:비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\",\"SUMMARY::자세히\",\"SUMMARY::저장 범위 안내\",\"BUTTON::사전 초안·고급 도구 닫기\"]",
+    "actual": "\"[\\\"TEXTAREA:free-text-ko:비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\\\",\\\"SUMMARY::자세히\\\",\\\"SUMMARY::저장 범위 안내\\\",\\\"BUTTON::사전 초안·고급 도구 닫기\\\"]\""
+  },
+  {
+    "name": "키보드 · Enter로 세부 조정 열기",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 열린 탐색의 검색 입력 도달",
+    "pass": true,
+    "expected": "search",
+    "actual": "\"search\""
+  },
+  {
+    "name": "키보드 · 검색 입력 포커스",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 분류 버튼 도달",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · Space로 분류 전환",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 표현 상세 열기",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "키보드 · 표현 상세 닫기",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "상세 토글 · 선택 불변",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "제거 버튼 터치 크기 ≥26px",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "제거 버튼 크기",
+    "pass": null,
+    "detail": "{\"w\":26,\"h\":26}"
+  },
+  {
+    "name": "적용 후 초안 영역 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "390px · 설명 → 요약 → 세부 조정 → 초안 1열",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "390px · 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "390px · 적용 버튼",
+    "pass": null,
+    "detail": "{\"w\":314,\"h\":37}"
+  },
+  {
+    "name": "390px · 적용 버튼 노출",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "360px · 설명 → 요약 → 세부 조정 → 초안 1열",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "360px · 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "360px · 적용 버튼",
+    "pass": null,
+    "detail": "{\"w\":284,\"h\":37}"
+  },
+  {
+    "name": "360px · 적용 버튼 노출",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "적용 · 최종 프롬프트 일치",
+    "pass": true,
+    "expected": "a person, soft lighting\n비 오는 네온 거리, 두 사람, 그리고 세 번째 사람",
+    "actual": "\"a person, soft lighting\\n비 오는 네온 거리, 두 사람, 그리고 세 번째 사람\""
+  },
+  {
+    "name": "적용 · 상태 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "덮어쓰기 · 취소 시 최종 유지",
+    "pass": true,
+    "expected": "직접 쓴 프롬프트",
+    "actual": "\"직접 쓴 프롬프트\""
+  },
+  {
+    "name": "덮어쓰기 · 확인창 호출",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "적용 후 수정 · 상태 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "작업 큐 초기 상태",
+    "pass": null,
+    "detail": "{\"toggle\":\"펼치기\",\"counts\":\"최근 작업이 없습니다\",\"footnote\":\"실행 0 · 대기 0 · 완료 0 · 실패 0\",\"cards\":0}"
+  },
+  {
+    "name": "생성 결과 상태",
+    "pass": null,
+    "detail": "running"
+  },
+  {
+    "name": "직접 생성 · 작업 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "작업 큐 · 첫 작업 후 펼쳐짐",
+    "pass": true,
+    "expected": "true",
+    "actual": "\"true\""
+  },
+  {
+    "name": "작업 큐 · aria-controls 연결",
+    "pass": true,
+    "expected": "jobs-body",
+    "actual": "\"jobs-body\""
+  },
+  {
+    "name": "과거 복원",
+    "pass": null,
+    "detail": "생성 결과 없음 · 이 환경에서는 재사용 경로 미실행 (미검증으로 남김)"
+  },
+  {
+    "name": "HTTP 422 · 오류 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "HTTP 422 · 입력 보존",
+    "pass": true,
+    "expected": "kept prompt after rejection",
+    "actual": "\"kept prompt after rejection\""
+  },
+  {
+    "name": "HTTP 422 · 재시도 가능",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "HTTP 422",
+    "pass": null,
+    "detail": "{\"message\":\"프롬프트 형식이 올바르지 않습니다.닫기\",\"prompt\":\"kept prompt after rejection\",\"enabled\":true}"
+  },
+  {
+    "name": "HTTP 413 · 오류 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "HTTP 413 · 입력 보존",
+    "pass": true,
+    "expected": "kept prompt after rejection",
+    "actual": "\"kept prompt after rejection\""
+  },
+  {
+    "name": "HTTP 413 · 재시도 가능",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "HTTP 413",
+    "pass": null,
+    "detail": "{\"message\":\"요청 본문이 너무 큽니다.닫기\",\"prompt\":\"kept prompt after rejection\",\"enabled\":true}"
+  },
+  {
+    "name": "계열 전환 · 최종 프롬프트 문자열 동일",
+    "pass": true,
+    "expected": "kept prompt after rejection",
+    "actual": "\"kept prompt after rejection\""
+  },
+  {
+    "name": "계열 전환 · 재생성 경로 제공",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "계열 전환 · 적용 불가 상태",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "계열 전환 상태",
+    "pass": null,
+    "detail": "{\"prompt\":27,\"hasResult\":true,\"regenerate\":true,\"applyDisabled\":null}"
+  },
+  {
+    "name": "같은 계열 전환 · 모델 변경됨",
+    "pass": true,
+    "expected": "fake-sd15-alt",
+    "actual": "\"fake-sd15-alt\""
+  },
+  {
+    "name": "같은 계열 전환 · 최종 프롬프트 동일",
+    "pass": true,
+    "expected": "kept prompt after rejection",
+    "actual": "\"kept prompt after rejection\""
+  },
+  {
+    "name": "같은 계열 전환 · 선택 유지",
+    "pass": true,
+    "expected": "[\"인물\",\"부드러운 조명\"]",
+    "actual": "\"[\\\"인물\\\",\\\"부드러운 조명\\\"]\""
+  },
+  {
+    "name": "같은 계열 전환 · 초안 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "같은 계열 전환",
+    "pass": null,
+    "detail": "{\"before\":\"적용 후 수정됨\",\"chips\":2,\"maybeCleared\":false}"
+  },
+  {
+    "name": "재시도 준비",
+    "pass": null,
+    "detail": "{\"created\":202,\"cancel\":200,\"terminal\":\"cancelled\"}"
+  },
+  {
+    "name": "재시도 · 종료된 작업 카드",
+    "pass": true,
+    "expected": "cancelled",
+    "actual": "\"cancelled\""
+  },
+  {
+    "name": "재시도 · 카드에 재시도 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "재시도 · 카드 버튼으로 새 작업 생성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "재시도 · 구성 보존",
+    "pass": true,
+    "expected": "retry probe",
+    "actual": "\"retry probe\""
+  },
+  {
+    "name": "재시도 · 모델 보존",
+    "pass": true,
+    "expected": "fake-sd15",
+    "actual": "\"fake-sd15\""
+  },
+  {
+    "name": "재시도 결과",
+    "pass": null,
+    "detail": "{\"job_id\":\"a9bc5ff66d4b48f29f646f9d239150f7\",\"prompt\":\"retry probe\",\"model_id\":\"fake-sd15\",\"status\":\"running\"}"
+  },
+  {
+    "name": "capability 실패 · 안내 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "capability 실패 · 화면 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "capability 네트워크 실패",
+    "pass": null,
+    "detail": "{\"notice\":true,\"builder\":true,\"probe\":true}"
+  },
+  {
+    "name": "LLM-I04 · capability 없음 · AI 버튼 없음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "LLM-I04 · capability 없음 · 규칙 제안 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I04 · capability 없음 · 폴백 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I04 폴백",
+    "pass": null,
+    "detail": "{\"panel\":true,\"ai\":false,\"aiDisabled\":null,\"rule\":true,\"fallback\":\"이 서버에서는 AI 제안을 사용할 수 없습니다. 지금은 원문에서 사전 항목만 찾습니다.\"}"
+  },
+  {
+    "name": "capability 미지원 · 안내 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "capability 미지원 · 화면 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "capability 미지원 · 직접 입력 가능",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "capability 미지원",
+    "pass": null,
+    "detail": "{\"notice\":true,\"builder\":true,\"canStillType\":true}"
+  },
+  {
+    "name": "UIX01 · 미지원 사유와 직접 입력이 같은 블록",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 사유가 직접 입력보다 먼저",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 미지원 블록의 직접 입력 버튼",
+    "pass": true,
+    "expected": "최종 프롬프트 직접 입력",
+    "actual": "\"최종 프롬프트 직접 입력\""
+  },
+  {
+    "name": "UIX01 미지원 블록",
+    "pass": null,
+    "detail": "{\"block\":true,\"fallback\":\"이 서버에서는 통합 생성을 사용할 수 없습니다. 사전에서 직접 고르고 초안을 적용하세요.\",\"exit\":\"최종 프롬프트 직접 입력\",\"reasonBeforeExit\":true}"
+  },
+  {
+    "name": "UIX01 · 미지원에서 최종 입력으로 포커스",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 미지원에서 한글 영역 접힘",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 미지원에서 직접 생성 가능",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 · 미지원 직접 생성이 접수됨",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UIX01 미지원 생성",
+    "pass": null,
+    "detail": "{\"focused\":true,\"hidden\":true,\"enabled\":true,\"status\":\"completed\"}"
+  },
+  {
+    "name": "LLM-I04 · capability 있음 · AI 버튼 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I04 · capability 있음 · 버튼 이름",
+    "pass": true,
+    "expected": "장면 정리하기",
+    "actual": "\"장면 정리하기\""
+  },
+  {
+    "name": "LLM-I04 · capability 있음 · 폴백 문구 없음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "LLM-I04 · 자동 호출 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I04 · 입력만으로 호출 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I04 · 버튼 한 번에 요청 한 번",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "LLM-I04 · 요청 kind",
+    "pass": true,
+    "expected": "selection_hint",
+    "actual": "\"selection_hint\""
+  },
+  {
+    "name": "LLM-I04 · 원문 그대로 전송",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람",
+    "actual": "\"네온이 비치는 골목에 선 사람\""
+  },
+  {
+    "name": "LLM-I04 · revisions 3개",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "LLM-I04 · 응답 상태 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I04 · 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람",
+    "actual": "\"네온이 비치는 골목에 선 사람\""
+  },
+  {
+    "name": "LLM-I04 응답",
+    "pass": null,
+    "detail": "{\"calls\":1,\"kind\":\"selection_hint\",\"family\":\"sd15\",\"text\":\"네온이 비치는 골목에 선 사람\",\"hasRevisions\":3,\"status\":\"제안 1개를 받았습니다. 아직 선택에 반영하지 않았습니다.\",\"freeText\":\"네온이 비치는 골목에 선 사람\",\"chips\":0}"
+  },
+  {
+    "name": "LLM-I04 · 두 번째 요청",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "LLM-I04 · 오래된 응답 폐기 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I04 · 편집한 원문 유지",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람, 그리고 개",
+    "actual": "\"네온이 비치는 골목에 선 사람, 그리고 개\""
+  },
+  {
+    "name": "LLM-I04 · 선택 불변",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I04 오래된 응답",
+    "pass": null,
+    "detail": "{\"calls\":2,\"status\":\"원문이나 선택이 바뀌어 이전 제안을 버렸습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"freeText\":\"네온이 비치는 골목에 선 사람, 그리고 개\",\"chips\":0,\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "LLM-I05 · 카드 4개",
+    "pass": true,
+    "expected": "4",
+    "actual": "4"
+  },
+  {
+    "name": "LLM-I05 · 유형 구분",
+    "pass": true,
+    "expected": "quoted,inferred,unresolved,ambiguous",
+    "actual": "\"quoted,inferred,unresolved,ambiguous\""
+  },
+  {
+    "name": "LLM-I05 · 미표현 구절 원문",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 수락 버튼은 2개",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "LLM-I05 · AI 추가도 개별 수락",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 구절은 수락 불가",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "LLM-I05 · 일괄 문구는 원문 근거만",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 닫기 제공",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 수락 전 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I05 · 수락 전 선택 불변",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I05 · 수락 전 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "LLM-I05 카드",
+    "pass": null,
+    "detail": "{\"count\":4,\"kinds\":[\"quoted\",\"inferred\",\"unresolved\",\"ambiguous\"],\"labels\":[\"네온 조명\",\"개\",\"골목에 선\",\"그 사람\"],\"acceptButtons\":2,\"inferredAccepts\":true,\"spanAccepts\":false,\"batchLabel\":\"원문 근거 1개 선택에 추가\",\"dismiss\":true,\"status\":\"제안 2개를 받았습니다. 아직 선택에 반영하지 않았습니다.\",\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"chips\":0,\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "LLM-I05 · 수락 시 선택 추가",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 수락 시 원문 유지",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I05 · 수락은 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "LLM-I05 · 수락 후 상태 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 · 수락 후 포커스 유지",
+    "pass": true,
+    "expected": "BUTTON",
+    "actual": "\"BUTTON\""
+  },
+  {
+    "name": "LLM-I05 수락",
+    "pass": null,
+    "detail": "{\"chips\":[\"네온 조명\"],\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"finalPrompt\":\"\",\"status\":\"제안 1개를 선택에 반영했습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"focused\":true,\"focusTag\":\"BUTTON\",\"focusText\":\"선택에 추가\",\"cards\":4}"
+  },
+  {
+    "name": "LLM-I05 · 거절 시 카드 제거",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I05 · 거절 시 선택 불변",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "LLM-I05 · 거절 시 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I05 · 거절 안내 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 거절",
+    "pass": null,
+    "detail": "{\"cards\":0,\"chips\":1,\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"notice\":\"AI 제안을 닫았습니다. 원문과 선택은 그대로입니다.\"}"
+  },
+  {
+    "name": "LLM-I05 · 편집 후 카드 철회",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I05 · 편집 후 철회 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I05 철회",
+    "pass": null,
+    "detail": "{\"cards\":0,\"status\":\"원문이나 선택이 바뀌어 이전 제안을 버렸습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"chips\":1}"
+  },
+  {
+    "name": "LLM-I06 · 범위 문구에 고정 개수",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 범위 버튼 눌림 표시",
+    "pass": true,
+    "expected": "배경",
+    "actual": "\"배경\""
+  },
+  {
+    "name": "LLM-I06 · 버튼 이름이 부분 변경으로",
+    "pass": true,
+    "expected": "선택한 그룹만 정리",
+    "actual": "\"선택한 그룹만 정리\""
+  },
+  {
+    "name": "LLM-I06 · 고정은 동일 인물 보장이 아님",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 범위",
+    "pass": null,
+    "detail": "{\"label\":\"부분 변경 범위 배경만 변경 · 고정 1개\",\"pressed\":[\"배경\"],\"aiLabel\":\"선택한 그룹만 정리\",\"lockNote\":\"고른 그룹만 바꾸는 제안을 요청합니다. 나머지 선택 1개는 잠금으로 보내고, 잠긴 값을 바꾸는 제안은 표시하지 않습니다. 고정은 선택 값의 유지를 뜻하며 생성 이미지의 동일 인물을 보장하지 않습니다.\"}"
+  },
+  {
+    "name": "RULE02 · 규칙 목록이 변경 범위를 밝힘",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 · 범위 밖 네온은 목록에서 빠짐",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "RULE02 · 보류한 제안의 개수와 이름 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 · 범위 때문에 비었음을 설명",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 규칙 목록 범위",
+    "pass": null,
+    "detail": "{\"notice\":\"“배경만 변경” 범위라 1개 제안(네온 조명)을 목록에서 뺐습니다. 범위를 넓히려면 부분 변경 범위에서 그룹을 해제하세요.\",\"offered\":[],\"empty\":\"이 범위에서 새로 추가할 사전 항목을 찾지 못했습니다. 직접 선택하거나 원문을 그대로 사용하세요.\"}"
+  },
+  {
+    "name": "RULE02 360px · 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 360px · 안내가 화면 안",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 360px · 안내 문장이 목록 폭에서 줄바꿈",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "RULE02 360px",
+    "pass": null,
+    "detail": "{\"overflow\":true,\"inside\":true,\"wraps\":true,\"height\":53,\"width\":288}"
+  },
+  {
+    "name": "LLM-I06 · 부분 변경 요청 1회",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "LLM-I06 · 요청 kind",
+    "pass": true,
+    "expected": "partial_change",
+    "actual": "\"partial_change\""
+  },
+  {
+    "name": "LLM-I06 · 요청 target_groups",
+    "pass": true,
+    "expected": "[\"setting\"]",
+    "actual": "\"[\\\"setting\\\"]\""
+  },
+  {
+    "name": "LLM-I06 · 요청 locked_ids",
+    "pass": true,
+    "expected": "[\"subject.person\"]",
+    "actual": "\"[\\\"subject.person\\\"]\""
+  },
+  {
+    "name": "LLM-I06 · 제목이 부분 변경",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 범위 밖·고정 카드 차단",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "LLM-I06 · 수락 가능 카드는 1개",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "LLM-I06 · diff 머리글",
+    "pass": true,
+    "expected": "고정 1 · 추가 1 · 적용 불가 1",
+    "actual": "\"고정 1 · 추가 1 · 적용 불가 1\""
+  },
+  {
+    "name": "LLM-I06 · diff 행 구분",
+    "pass": true,
+    "expected": "kept:인물,change:단색 배경,blocked:네온 조명",
+    "actual": "\"kept:인물,change:단색 배경,blocked:네온 조명\""
+  },
+  {
+    "name": "LLM-I06 · diff 고정 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 수락 전 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I06 · 수락 전 선택 불변",
+    "pass": true,
+    "expected": "인물",
+    "actual": "\"인물\""
+  },
+  {
+    "name": "LLM-I06 부분 변경",
+    "pass": null,
+    "detail": "{\"calls\":1,\"kind\":\"partial_change\",\"groups\":[\"setting\"],\"locked\":[\"subject.person\"],\"cards\":3,\"acceptButtons\":1,\"blocked\":2,\"heading\":\"부분 변경 제안 3개\",\"diffCounts\":\"고정 1 · 추가 1 · 적용 불가 1\",\"diffRows\":[\"kept:인물\",\"change:단색 배경\",\"blocked:네온 조명\"],\"lockNote\":\"고정은 선택 값의 유지를 뜻하며 생성 이미지의 동일 인물을 보장하지 않습니다.\",\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"chips\":[\"인물\"]}"
+  },
+  {
+    "name": "LLM-I06 · 수락 시 대상 항목만 추가",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 수락해도 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I06 · 수락해도 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "LLM-I06 · 되돌리기 버튼 노출",
+    "pass": true,
+    "expected": "“단색 배경” 추가 되돌리기",
+    "actual": "\"“단색 배경” 추가 되돌리기\""
+  },
+  {
+    "name": "LLM-I06 · 되돌리기 사용 가능",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "LLM-I06 수락",
+    "pass": null,
+    "detail": "{\"chips\":[\"인물\",\"단색 배경\"],\"undo\":\"“단색 배경” 추가 되돌리기\",\"undoDisabled\":false,\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "LLM-I06 · 되돌리면 선택 복원",
+    "pass": true,
+    "expected": "인물",
+    "actual": "\"인물\""
+  },
+  {
+    "name": "LLM-I06 · 되돌리기 후 버튼 사라짐",
+    "pass": true,
+    "expected": "null",
+    "actual": "null"
+  },
+  {
+    "name": "LLM-I06 · 되돌리기 안내 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 되돌려도 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람과 개",
+    "actual": "\"네온이 비치는 골목에 선 사람과 개\""
+  },
+  {
+    "name": "LLM-I06 · 되돌려도 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "LLM-I06 되돌리기",
+    "pass": null,
+    "detail": "{\"chips\":[\"인물\"],\"undo\":null,\"notice\":\"제안 3개를 받았습니다. 아직 선택에 반영하지 않았습니다. | 방금 추가한 \\\"단색 배경\\\"을(를) 되돌렸습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"freeText\":\"네온이 비치는 골목에 선 사람과 개\",\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "LLM-I06 · 편집 후 카드 철회",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "LLM-I06 · 편집 후 되돌리기 차단",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 · 차단 사유 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "LLM-I06 되돌리기 차단",
+    "pass": null,
+    "detail": "{\"cards\":0,\"undo\":\"되돌리기 사용 불가\",\"disabled\":true,\"hint\":\"수락 이후 선택이나 원문이 바뀌어 되돌릴 수 없습니다. 필요한 항목만 직접 해제하세요. 직접 바꾼 선택은 덮어쓰지 않습니다.\",\"notice\":\"원문이나 선택이 바뀌어 이전 제안을 버렸습니다. 원문과 최종 프롬프트는 그대로입니다. | \\\"단색 배경\\\"을(를) 선택에 추가했습니다. 원문과 최종 프롬프트는 그대로입니다.\"}"
+  },
+  {
+    "name": "VAR02 · 기준 선택 4개",
+    "pass": true,
+    "expected": "4",
+    "actual": "4"
+  },
+  {
+    "name": "VAR02 · 상황 요청 1회",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "VAR02 · 요청 kind",
+    "pass": true,
+    "expected": "situation_variants",
+    "actual": "\"situation_variants\""
+  },
+  {
+    "name": "VAR02 · 요청 target_groups",
+    "pass": true,
+    "expected": "[\"pose\",\"setting\"]",
+    "actual": "\"[\\\"pose\\\",\\\"setting\\\"]\""
+  },
+  {
+    "name": "VAR02 · 인물·의상은 잠금",
+    "pass": true,
+    "expected": "[\"subject.person\",\"clothing.white_shirt\"]",
+    "actual": "\"[\\\"subject.person\\\",\\\"clothing.white_shirt\\\"]\""
+  },
+  {
+    "name": "VAR02 · 후보 3장",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "VAR02 · 머리글에 표시 불가 1",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 후보 순서 유지",
+    "pass": true,
+    "expected": "공원에서 걷기,카페에 앉기,개와 함께",
+    "actual": "\"공원에서 걷기,카페에 앉기,개와 함께\""
+  },
+  {
+    "name": "VAR02 · 범위 밖 후보 차단",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "VAR02 · 적용 버튼은 2개",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "VAR02 · 차단 사유 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 바뀌는 항목 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 사전 밖 표현은 원문 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 후보 표시만으로 선택 불변",
+    "pass": true,
+    "expected": "인물,흰 셔츠,서 있기,거리",
+    "actual": "\"인물,흰 셔츠,서 있기,거리\""
+  },
+  {
+    "name": "VAR02 · 후보 표시만으로 원문 불변",
+    "pass": true,
+    "expected": "같은 인물과 의상으로 다른 상황",
+    "actual": "\"같은 인물과 의상으로 다른 상황\""
+  },
+  {
+    "name": "VAR02 · 후보 표시만으로 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "VAR02 · 아직 반영 전 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 후보",
+    "pass": null,
+    "detail": "{\"calls\":1,\"kind\":\"situation_variants\",\"groups\":[\"pose\",\"setting\"],\"locked\":[\"subject.person\",\"clothing.white_shirt\"],\"count\":3,\"headline\":\"상황 후보 3개 · 표시 불가 1\",\"labels\":[\"공원에서 걷기\",\"카페에 앉기\",\"개와 함께\"],\"blocked\":1,\"applyButtons\":2,\"changes\":[\"add:배경 · 공원 추가|add:포즈 · 걷기 추가|remove:배경 · 거리 제거|remove:포즈 · 서 있기 제거\",\"add:배경 · 카페 추가|add:포즈 · 앉기 추가|remove:배경 · 거리 제거|remove:포즈 · 서 있기 제거\",\"add:대상 · 개 추가\"],\"blocks\":[\"사용할 수 없음 · 이번 요청의 변경 대상이 아닙니다\"],\"unresolved\":\"사전 밖 표현: 우산을 접으며\",\"status\":\"상황 후보 3개를 받았습니다. 아직 선택에 반영하지 않았습니다.\",\"freeText\":\"같은 인물과 의상으로 다른 상황\",\"chips\":[\"인물\",\"흰 셔츠\",\"서 있기\",\"거리\"],\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "VAR02 360px · 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 360px · 카드가 화면 안",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 360px · 적용 버튼 화면 안",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 360px · 적용 버튼은 문장 아래",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 360px",
+    "pass": null,
+    "detail": "{\"overflow\":true,\"stacked\":true,\"buttonInside\":true,\"buttonWidth\":272,\"buttonBelow\":true}"
+  },
+  {
+    "name": "VAR02 · 적용 시 장소·행동 교체",
+    "pass": true,
+    "expected": "인물,흰 셔츠,앉기,카페",
+    "actual": "\"인물,흰 셔츠,앉기,카페\""
+  },
+  {
+    "name": "VAR02 · 적용한 카드 표시",
+    "pass": true,
+    "expected": "카페에 앉기",
+    "actual": "\"카페에 앉기\""
+  },
+  {
+    "name": "VAR02 · 적용 표시 문구",
+    "pass": true,
+    "expected": "· 지금 선택에 반영됨",
+    "actual": "\"· 지금 선택에 반영됨\""
+  },
+  {
+    "name": "VAR02 · 적용 후 머리글 유지",
+    "pass": true,
+    "expected": "상황 후보 3개 · 표시 불가 1",
+    "actual": "\"상황 후보 3개 · 표시 불가 1\""
+  },
+  {
+    "name": "VAR02 · 적용 후 남은 적용 버튼 1개",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "VAR02 · 미반영 표현 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 적용해도 원문 불변",
+    "pass": true,
+    "expected": "같은 인물과 의상으로 다른 상황",
+    "actual": "\"같은 인물과 의상으로 다른 상황\""
+  },
+  {
+    "name": "VAR02 · 적용해도 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "VAR02 · 적용 후 초안 재생성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 적용 후 포커스 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 되돌리기 버튼 노출",
+    "pass": true,
+    "expected": "“카페에 앉기” 상황 적용 되돌리기",
+    "actual": "\"“카페에 앉기” 상황 적용 되돌리기\""
+  },
+  {
+    "name": "VAR02 · 되돌리기 사용 가능",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "VAR02 · 되돌리기 줄은 하나",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "VAR02 · 패널 상태 문구",
+    "pass": true,
+    "expected": "“카페에 앉기” 상황을 적용했습니다. 다른 후보와 비교하거나 바로 되돌릴 수 있습니다.",
+    "actual": "\"“카페에 앉기” 상황을 적용했습니다. 다른 후보와 비교하거나 바로 되돌릴 수 있습니다.\""
+  },
+  {
+    "name": "VAR02 적용",
+    "pass": null,
+    "detail": "{\"chips\":[\"인물\",\"흰 셔츠\",\"앉기\",\"카페\"],\"applied\":[\"카페에 앉기\"],\"appliedText\":\"· 지금 선택에 반영됨\",\"applyButtons\":1,\"headline\":\"상황 후보 3개 · 표시 불가 1\",\"undo\":\"“카페에 앉기” 상황 적용 되돌리기\",\"undoDisabled\":false,\"cardUndoLines\":0,\"status\":\"“카페에 앉기” 상황을 적용했습니다. 다른 후보와 비교하거나 바로 되돌릴 수 있습니다.\",\"notice\":\"“카페에 앉기” 상황을 적용했습니다. 다른 후보와 비교하거나 바로 되돌릴 수 있습니다. | “카페에 앉기” 상황을 선택에 반영했습니다. 사전에 없는 표현 “우산을 접으며”은(는) 반영되지 않았습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"freeText\":\"같은 인물과 의상으로 다른 상황\",\"finalPrompt\":\"\",\"draft\":\"a person, white shirt, sitting, in a cafe\"}"
+  },
+  {
+    "name": "VAR02 · 되돌리면 선택 복원",
+    "pass": true,
+    "expected": "인물,흰 셔츠,서 있기,거리",
+    "actual": "\"인물,흰 셔츠,서 있기,거리\""
+  },
+  {
+    "name": "VAR02 · 되돌린 뒤 버튼 사라짐",
+    "pass": true,
+    "expected": "null",
+    "actual": "null"
+  },
+  {
+    "name": "VAR02 · 되돌린 뒤 적용 표시 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "VAR02 · 되돌린 뒤 표시 불가 복귀",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 되돌리기 안내 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 되돌려도 원문 불변",
+    "pass": true,
+    "expected": "같은 인물과 의상으로 다른 상황",
+    "actual": "\"같은 인물과 의상으로 다른 상황\""
+  },
+  {
+    "name": "VAR02 · 되돌려도 최종 prompt 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "VAR02 되돌리기",
+    "pass": null,
+    "detail": "{\"chips\":[\"인물\",\"흰 셔츠\",\"서 있기\",\"거리\"],\"undo\":null,\"applied\":0,\"headline\":\"상황 후보 3개 · 표시 불가 1\",\"notice\":\"상황 후보 3개를 받았습니다. 아직 선택에 반영하지 않았습니다. | “카페에 앉기” 상황 적용을 되돌렸습니다. 원문과 최종 프롬프트는 그대로입니다.\",\"freeText\":\"같은 인물과 의상으로 다른 상황\",\"finalPrompt\":\"\"}"
+  },
+  {
+    "name": "VAR02 · 편집 후 후보 폐기",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "VAR02 · 편집 후 되돌리기 차단",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 편집 후 차단 사유",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "VAR02 · 편집 후 선택 유지",
+    "pass": true,
+    "expected": "인물,흰 셔츠,걷기,공원",
+    "actual": "\"인물,흰 셔츠,걷기,공원\""
+  },
+  {
+    "name": "VAR02 되돌리기 차단",
+    "pass": null,
+    "detail": "{\"cards\":0,\"undo\":\"상황 되돌리기 사용 불가\",\"disabled\":true,\"hint\":\"상황을 적용한 뒤 선택이나 원문이 바뀌어 되돌릴 수 없습니다. 필요한 항목만 직접 해제하세요. 지금 선택은 덮어쓰지 않습니다.\",\"chips\":[\"인물\",\"흰 셔츠\",\"걷기\",\"공원\"]}"
+  },
+  {
+    "name": "TRANS06 capability",
+    "pass": null,
+    "detail": "{\"server\":{\"composition\":{\"schema_versions\":[1,2,3]},\"proposals\":null},\"viaFetch\":{\"composition\":{\"schema_versions\":[1,2]},\"proposals\":{\"schema_versions\":[1],\"dictionary_version\":\"1.2.0\",\"timeout_ms\":20000,\"max_response_bytes\":16384}},\"translateButton\":true,\"panel\":true}"
+  },
+  {
+    "name": "TRANS06 · 번역 요청 버튼 이름",
+    "pass": true,
+    "expected": "사전에 없는 구절 번역 제안",
+    "actual": "\"사전에 없는 구절 번역 제안\""
+  },
+  {
+    "name": "TRANS06 · 원문 없으면 비활성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 원문을 쓰면 활성",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "TRANS06 · 카드가 원문과 제안 번역을 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 포함 개수 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 포함 직후 최종 프롬프트 불변",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "TRANS06 · 적용 전 초안 존재",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 적용 후 상태",
+    "pass": true,
+    "expected": "적용됨",
+    "actual": "\"적용됨\""
+  },
+  {
+    "name": "TRANS06 · 최종 프롬프트가 초안 + 번역",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 계열 변경됨",
+    "pass": true,
+    "expected": "fake-flux2",
+    "actual": "\"fake-flux2\""
+  },
+  {
+    "name": "TRANS06 · 상태가 기록 유지를 밝힘",
+    "pass": true,
+    "expected": "모델 계열 변경 · 기록 유지",
+    "actual": "\"모델 계열 변경 · 기록 유지\""
+  },
+  {
+    "name": "TRANS06 · 포함한 번역 패널 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 번역과 원문이 그대로",
+    "pass": true,
+    "expected": "[\"비치는 골목에 선 → a street lit by neon\"]",
+    "actual": "\"[\\\"비치는 골목에 선 → a street lit by neon\\\"]\""
+  },
+  {
+    "name": "TRANS06 · 안내가 다시 적용을 설명",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 다른 계열 초안은 폐기",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "TRANS06 · 최종 프롬프트 불변",
+    "pass": true,
+    "expected": "a person\na street lit by neon",
+    "actual": "\"a person\\na street lit by neon\""
+  },
+  {
+    "name": "TRANS06 계열 변경",
+    "pass": null,
+    "detail": "{\"model\":\"fake-flux2\",\"status\":\"모델 계열 변경 · 기록 유지\",\"detail\":\"자세히모델 계열을 바꿔 이 구성은 지금 계열로 저장되지 않습니다. 포함한 번역과 출처는 패널에 그대로 남고, 지금 계열에서 다시 적용하면 같은 번역으로 새로 기록됩니다.이 기록은 포함한 번역의 출처를 잃지 않기 위해 유지됩니다. 지금 계열로 저장되는 구성은 아래 \\\"적용\\\"으로 다시 기록하는 것입니다.\",\"panel\":\"포함한 번역 1개비치는 골목에 선 → a street lit by neon빼기\",\"panelItems\":[\"비치는 골목에 선 → a street lit by neon\"],\"finalPrompt\":29,\"hasDraft\":false}"
+  },
+  {
+    "name": "TRANS06 · 새 계열에서 초안 만들기 제공",
+    "pass": true,
+    "expected": "초안 만들기",
+    "actual": "\"초안 만들기\""
+  },
+  {
+    "name": "TRANS06 · 새 계열에서 적용 가능",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "TRANS06 · 재적용 후 상태",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 재적용도 번역을 포함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 재적용 후에도 목록 유지",
+    "pass": true,
+    "expected": "[\"비치는 골목에 선 → a street lit by neon\"]",
+    "actual": "\"[\\\"비치는 골목에 선 → a street lit by neon\\\"]\""
+  },
+  {
+    "name": "TRANS06 재적용",
+    "pass": null,
+    "detail": "{\"status\":\"적용됨\",\"draft\":8,\"finalPrompt\":29,\"panelItems\":[\"비치는 골목에 선 → a street lit by neon\"]}"
+  },
+  {
+    "name": "TRANS06 · 요청에 구성 이력 포함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 재적용은 v2로 기록",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "TRANS06 · 구성 계열은 새 계열",
+    "pass": true,
+    "expected": "flux2",
+    "actual": "\"flux2\""
+  },
+  {
+    "name": "TRANS06 · remainder 항목 1개",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "TRANS06 · 원문/번역 보존",
+    "pass": true,
+    "expected": "비치는 골목에 선|a street lit by neon",
+    "actual": "\"비치는 골목에 선|a street lit by neon\""
+  },
+  {
+    "name": "TRANS06 · 출처 보존",
+    "pass": true,
+    "expected": "prop-browser|stub",
+    "actual": "\"prop-browser|stub\""
+  },
+  {
+    "name": "TRANS06 · 수락 시각 기록",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · draft_prompt는 초안 그대로",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 · 최종 prompt는 번역 포함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "TRANS06 제출 본문",
+    "pass": null,
+    "detail": "{\"schema\":2,\"family\":\"flux2\",\"remainder\":1,\"entry\":{\"source_ko\":\"비치는 골목에 선\",\"suggested_en\":\"a street lit by neon\",\"proposal_id\":\"prop-browser\",\"proposal_model\":\"stub\",\"accepted_at\":\"2026-11-23T09:37:46Z\"}}"
+  },
+  {
+    "name": "U12 · 적용된 최종 프롬프트가 번역으로 끝남",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · v2 작업이 자산을 남김",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 제출 작업",
+    "pass": null,
+    "detail": "{\"jobId\":\"cefabc6420fc4dcc8169f9dc7bd362e5\",\"assetId\":\"c2814942880144e193ccd5fcca2a2a8f\"}"
+  },
+  {
+    "name": "U12 · 조회된 기록이 v2",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "U12 · 조회된 remainder 항목 1개",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "U12 · 조회된 원문/번역",
+    "pass": true,
+    "expected": "비치는 골목에 선|a street lit by neon",
+    "actual": "\"비치는 골목에 선|a street lit by neon\""
+  },
+  {
+    "name": "U12 · 조회된 출처",
+    "pass": true,
+    "expected": "prop-browser|stub",
+    "actual": "\"prop-browser|stub\""
+  },
+  {
+    "name": "U12 · 조회된 수락 시각",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · draft_prompt에는 번역 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 저장된 기록",
+    "pass": null,
+    "detail": "{\"status\":200,\"schema\":2,\"remainder\":[{\"source_ko\":\"비치는 골목에 선\",\"suggested_en\":\"a street lit by neon\",\"proposal_id\":\"prop-browser\",\"proposal_model\":\"stub\",\"accepted_at\":\"2026-11-23T09:37:46Z\"}],\"draft\":8,\"prompt\":\"a person\\na street lit by neon\"}"
+  },
+  {
+    "name": "U12 · 이력 화면에 포함한 번역",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 이력 화면에 번역 출처",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 이력 화면에 스키마 v2",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 이력 화면이 차이를 번역으로 설명",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 이력 화면이 출처 없음을 주장하지 않음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "U12 이력 화면",
+    "pass": null,
+    "detail": "{\"included\":true,\"phrase\":true,\"provenance\":true,\"proposal\":true,\"schema\":true,\"explanation\":true,\"emptyClaim\":false}"
+  },
+  {
+    "name": "U12 · 복원 시 포함 목록이 기록에서 재구성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 복원해도 원문 불변",
+    "pass": true,
+    "expected": "네온이 비치는 골목에 선 사람",
+    "actual": "\"네온이 비치는 골목에 선 사람\""
+  },
+  {
+    "name": "U12 · 복원 상태 문구가 출처를 부정하지 않음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 복원",
+    "pass": null,
+    "detail": "{\"panel\":\"비치는 골목에 선 → a street lit by neon빼기\",\"status\":\"과거 복원 · 적용 문자열 미기록\",\"freeText\":\"네온이 비치는 골목에 선 사람\"}"
+  },
+  {
+    "name": "U12 · 새로고침 후에도 이력 동일",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 새로고침 후 이력",
+    "pass": null,
+    "detail": "{\"included\":true,\"phrase\":true,\"provenance\":true,\"proposal\":true,\"schema\":true,\"explanation\":true,\"emptyClaim\":false}"
+  },
+  {
+    "name": "U12 · 재시도용 v2 작업 접수",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 카드의 재시도 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 재시도가 새 작업을 만듦",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "U12 · 재시도도 v2",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "U12 · 재시도가 출처까지 보존",
+    "pass": true,
+    "expected": "비치는 골목에 선|a street lit by neon|prop-browser|stub",
+    "actual": "\"비치는 골목에 선|a street lit by neon|prop-browser|stub\""
+  },
+  {
+    "name": "U12 · 재시도 prompt에 번역 1회",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "U12 재시도",
+    "pass": null,
+    "detail": "{\"jobId\":\"5ee86f1800074b9d92ae3187f718442c\",\"schema\":2,\"remainder\":1,\"prompt\":\"u12 retry probe\\na street lit by neon\"}"
+  },
+  {
+    "name": "UCP08 · ComposePanel 렌더링",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 지원 시 폴백 문구 없음",
+    "pass": true,
+    "expected": "null",
+    "actual": "null"
+  },
+  {
+    "name": "UCP08 · 초기에는 후보 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 초기 생성 버튼 비활성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 초기",
+    "pass": null,
+    "detail": "{\"brief\":\"\",\"status\":\"\",\"fallback\":null}"
+  },
+  {
+    "name": "UCP08 · 한글 장면 입력 반영",
+    "pass": true,
+    "expected": "비 오는 골목에 서 있는 여성",
+    "actual": "\"비 오는 골목에 서 있는 여성\""
+  },
+  {
+    "name": "UCP08 · 입력만으로 후보 요청 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 입력 후 생성 버튼 활성",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UCP08 · Enter가 이미지 생성 폼을 제출하지 않음",
+    "pass": true,
+    "expected": "8",
+    "actual": "8"
+  },
+  {
+    "name": "UCP08 · Enter가 후보 요청을 보내지 않음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · Enter 후 입력 유지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 Enter",
+    "pass": null,
+    "detail": "{\"jobsBeforeEnter\":8,\"jobsAfterEnter\":8,\"newline\":true}"
+  },
+  {
+    "name": "UCP08 · 조합 중 Enter 취소",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 조합 중 Enter로 문자 유실 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 조합 중 Enter로 요청 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 IME",
+    "pass": null,
+    "detail": "{\"cancelled\":true,\"valueLength\":17}"
+  },
+  {
+    "name": "UCP08 · 사전 패널 열림",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 분류 버튼 노출",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 한글 사전 검색이 결과를 좁힘",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 검색 결과에 네온 포함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 검색이 분류 선택을 바꾸지 않음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 사전 검색",
+    "pass": null,
+    "detail": "{\"options\":[\"네온 조명\"],\"count\":1,\"group\":\"전체0\"}"
+  },
+  {
+    "name": "UCP08 · 사전 검색 Enter가 생성 폼을 제출하지 않음",
+    "pass": true,
+    "expected": "8",
+    "actual": "8"
+  },
+  {
+    "name": "UCP08 · 사전 항목 클릭으로 선택",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 선택한 항목이 눌린 상태로 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "\"true\""
+  },
+  {
+    "name": "UCP08 · 선택 수에 반영",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 응답 전에는 칩 목록이 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 후보 3개 표시",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UCP08 · 첫 후보는 '원문 충실'",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 후보 본문 노출",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · 차이 설명 노출",
+    "pass": true,
+    "expected": "원문 그대로",
+    "actual": "\"원문 그대로\""
+  },
+  {
+    "name": "UCP08 · 요약 노출",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 후보별 diff 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 요청이 한글 원문을 담음",
+    "pass": true,
+    "expected": "비 오는 골목에 서 있는 여성",
+    "actual": "\"비 오는 골목에 서 있는 여성\""
+  },
+  {
+    "name": "UCP08 · 요청이 manual 출처를 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 요청이 대상 모델/프로필을 담음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 요청 본문",
+    "pass": null,
+    "detail": "{\"brief\":\"비 오는 골목에 서 있는 여성\\n\",\"selections\":[{\"id\":\"lighting.neon\",\"source\":\"manual\",\"pinned\":false}],\"target\":\"fake-sd15/sd15/2\",\"candidate_count\":3}"
+  },
+  {
+    "name": "UCP08 · 자동 칩 출처 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 칩에 대상 귀속 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 개체/관계 수 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 사전 미등록 디테일 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 고정 버튼 동작",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 고정 후 고정 상태 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 고정 배지 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 귀속 선택지에 장면 전체+두 인물",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UCP08 · 귀속 변경이 화면에 반영",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 귀속 라벨이 인물 이름",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 귀속",
+    "pass": null,
+    "detail": "{\"options\":[{\"value\":\"\",\"label\":\"장면 전체\"},{\"value\":\"entity-1\",\"label\":\"인물 1\"},{\"value\":\"entity-2\",\"label\":\"인물 2\"}],\"chips\":[\"인물:auto:entity-2\",\"서 있기:auto:entity-1\",\"네온 조명:manual:\",\"거리:auto:\"]}"
+  },
+  {
+    "name": "UCP08 · AI에게 맡기기 버튼 존재",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 맡긴 뒤 수동 출처가 사라짐",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 맡긴 칩이 사라지지 않음",
+    "pass": true,
+    "expected": "4",
+    "actual": "4"
+  },
+  {
+    "name": "UCP08 · 제거 버튼으로 칩 제외",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 제외 항목이 별도 목록에 남음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 제외 후 선택 칩 감소",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 제외",
+    "pass": null,
+    "detail": "{\"label\":\"네온 조명 제거\",\"excluded\":[\"네온 조명제외 해제\"]}"
+  },
+  {
+    "name": "UCP08 · 제외가 다음 요청에 전달",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 제외 행에는 pin/귀속 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 제외/원문 충돌 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 충돌 해결 선택지 2개",
+    "pass": true,
+    "expected": "[\"제외 해제\",\"원문에서 지우기\"]",
+    "actual": "\"[\\\"제외 해제\\\",\\\"원문에서 지우기\\\"]\""
+  },
+  {
+    "name": "UCP08 · 충돌 해결 후 경고 사라짐",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 제외 해제가 목록에서 사라짐",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 충돌 해결 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 충돌 해결",
+    "pass": null,
+    "detail": "{\"clashes\":0,\"excluded\":0,\"status\":\"충돌을 정리했습니다. 다시 생성하면 정리된 장면으로 후보를 만듭니다.\"}"
+  },
+  {
+    "name": "UCP08 · 편집 후 후보 만료 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 만료된 후보는 적용되지 않음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UCP08 · 만료된 후보 적용 시 사유 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 만료 후에도 최종 프롬프트 유지",
+    "pass": true,
+    "expected": "",
+    "actual": "\"\""
+  },
+  {
+    "name": "UCP08 · 만료 거부 문구가 stale 계약",
+    "pass": true,
+    "expected": "원문이나 선택이 바뀌어 이 후보는 지금 장면과 다릅니다. 다시 생성하거나 후보를 확인하세요.",
+    "actual": "\"원문이나 선택이 바뀌어 이 후보는 지금 장면과 다릅니다. 다시 생성하거나 후보를 확인하세요.\""
+  },
+  {
+    "name": "UCP08 만료",
+    "pass": null,
+    "detail": "{\"notice\":\"입력이나 선택이 바뀌었습니다. 표시된 후보는 이전 장면 기준이므로 적용할 수 없습니다. 다시 생성하세요.\",\"applyDisabled\":false,\"applyStatus\":\"원문이나 선택이 바뀌어 이 후보는 지금 장면과 다릅니다. 다시 생성하거나 후보를 확인하세요.\"}"
+  },
+  {
+    "name": "UCP08 · 재생성 후 후보 적용 가능",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 만료 안내가 사라짐",
+    "pass": true,
+    "expected": "null",
+    "actual": "null"
+  },
+  {
+    "name": "UCP08 · 적용이 최종 프롬프트를 교체",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · 적용 후 카드가 적용됨 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 빈 프롬프트 교체는 확인 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 적용 후 되돌리기 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 적용",
+    "pass": null,
+    "detail": "{\"finalPrompt\":\"a woman standing on a rainy alley, neon lighting\",\"negative\":\"blurry, text\"}"
+  },
+  {
+    "name": "UCP08 · 같은 후보 재적용은 확인 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 다른 후보 적용이 본문 교체",
+    "pass": true,
+    "expected": "rainy alley, a standing woman, back view",
+    "actual": "\"rainy alley, a standing woman, back view\""
+  },
+  {
+    "name": "UCP08 · 패널이 쓴 문자열 교체는 확인 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 직접 수정 후 적용은 확인을 요구",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UCP08 · 확인 취소 시 프롬프트 유지",
+    "pass": true,
+    "expected": "my own carefully written prompt",
+    "actual": "\"my own carefully written prompt\""
+  },
+  {
+    "name": "UCP08 · 확인 취소 시 negative 유지",
+    "pass": true,
+    "expected": "my own negative",
+    "actual": "\"my own negative\""
+  },
+  {
+    "name": "UCP08 · 확인 승인 시 적용",
+    "pass": true,
+    "expected": "1",
+    "actual": "1"
+  },
+  {
+    "name": "UCP08 · 승인 후 프롬프트 교체",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · 승인 후 negative도 후보 값",
+    "pass": true,
+    "expected": "blurry, text",
+    "actual": "\"blurry, text\""
+  },
+  {
+    "name": "UCP08 덮어쓰기",
+    "pass": null,
+    "detail": "{\"confirmCalls\":1,\"afterCancel\":\"my own carefully written prompt\",\"afterConfirm\":\"a woman standing on a rainy alley, neon lighting\"}"
+  },
+  {
+    "name": "UCP08 · Undo가 적용 전 문자열 복원",
+    "pass": true,
+    "expected": "my own carefully written prompt",
+    "actual": "\"my own carefully written prompt\""
+  },
+  {
+    "name": "UCP08 · Undo 후 적용 표시 해제",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UCP08 · Undo 후 버튼 사라짐",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UCP08 Undo",
+    "pass": null,
+    "detail": "{\"finalPrompt\":\"my own carefully written prompt\",\"negative\":\"my own negative\",\"applied\":0}"
+  },
+  {
+    "name": "UCP08 · K2 기준 적용 완료",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · K2 적용 기록 negative",
+    "pass": true,
+    "expected": "blurry, text",
+    "actual": "\"blurry, text\""
+  },
+  {
+    "name": "UCP08 · K2 되돌린 negative가 적용 전 값",
+    "pass": true,
+    "expected": "my own negative",
+    "actual": "\"my own negative\""
+  },
+  {
+    "name": "UCP08 · K2 negative가 어긋난 기록은 복원하지 않음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UCP08 K2 negative 되돌리기",
+    "pass": null,
+    "detail": "{\"negative\":\"my own negative\",\"appliedCards\":0}"
+  },
+  {
+    "name": "UCP08 · K3 전환 전 적용 완료",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 K3 모델 목록",
+    "pass": null,
+    "detail": "{\"current\":\"fake-sd15\",\"options\":[\"fake-sd15\",\"fake-sd15-alt\",\"fake-flux2\",\"fake-unknown\"]}"
+  },
+  {
+    "name": "UCP08 · K3 요청 캡처 설치",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · K3 모델 변경 후 다른 모델 적용 기록 없음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UCP08 · K3 최종 프롬프트는 사용자 작업으로 유지",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 K3 모델 전환",
+    "pass": null,
+    "detail": "{\"submitted\":true,\"schema\":null,\"target\":null,\"applied\":null}"
+  },
+  {
+    "name": "UCP08 · 모델 변경 후 만료 경고",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 만료 경고가 원인을 말함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 모델 변경 후 후보 사라짐",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 모델 변경 후 원문 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 모델 변경",
+    "pass": null,
+    "detail": "{\"alerts\":[{\"category\":\"failure\",\"title\":\"이전 결과 만료\",\"message\":\"모델이나 출력 프로필이 바뀌어 이전 후보를 적용할 수 없습니다. 다시 생성하세요.\"}],\"candidates\":0,\"brief\":\"비 오는 골목에 서 있는 여성 뒤돌아보며\"}"
+  },
+  {
+    "name": "UCP08 · 실패 시 경고 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 실패 경고가 원인을 말함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 실패 후에도 원문 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 실패 후에도 칩 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 실패 후 다시 시도 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 실패",
+    "pass": null,
+    "detail": "{\"alerts\":[{\"category\":\"failure\",\"title\":\"모델 호출 실패\",\"message\":\"장면을 해석하는 모델 호출이 실패했습니다. 다시 생성해 보세요.\"}],\"brief\":\"비 오는 골목에 서 있는 여성 뒤돌아보며\",\"chips\":4}"
+  },
+  {
+    "name": "UCP08 · 요청 중 생성 버튼이 대기 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 요청 중 중복 요청 차단",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 요청 중 취소 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 요청 중에도 칩 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 취소 후 원문 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 취소 후 칩 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 취소 안내 문구",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 취소 후 재시도 가능",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 취소",
+    "pass": null,
+    "detail": "{\"status\":\"요청을 취소했습니다. 입력과 선택은 그대로 남아 있습니다.\",\"brief\":\"비 오는 골목에 서 있는 여성 뒤돌아보며\",\"chips\":4}"
+  },
+  {
+    "name": "UCP08 · 확인 필요 섹션 표시",
+    "pass": true,
+    "expected": "2",
+    "actual": "2"
+  },
+  {
+    "name": "UCP08 · 확인 중에는 후보 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 확인 중 적용 버튼 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 답변 후 후보 표시",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UCP08 · 답변이 요청에 전달",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 답변이 원문과 칩을 지우지 않음",
+    "pass": true,
+    "expected": "비 오는 골목에 서 있는 여성 뒤돌아보며",
+    "actual": "\"비 오는 골목에 서 있는 여성 뒤돌아보며\""
+  },
+  {
+    "name": "UCP08 확인",
+    "pass": null,
+    "detail": "{\"options\":[\"여성\",\"남성\"],\"answered\":3,\"choices\":[{\"question_id\":\"q1\",\"option_id\":\"o1\"}]}"
+  },
+  {
+    "name": "UCP08 · 미지원 계열은 폴백 안내",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 미지원 계열은 생성 비활성",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 미지원 계열은 후보 없음",
+    "pass": true,
+    "expected": "0",
+    "actual": "0"
+  },
+  {
+    "name": "UCP08 · 미지원 계열도 원문 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 미지원 계열",
+    "pass": null,
+    "detail": "{\"fallback\":\"이 모델 계열의 출력 프로필을 서버가 광고하지 않아 통합 생성을 쓸 수 없습니다. 사전에서 직접 고르고 초안을 적용하세요.\",\"disabled\":true,\"candidates\":0,\"brief\":\"비 오는 골목에 서 있는 여성 뒤돌아보며\"}"
+  },
+  {
+    "name": "UCP08 · Tab이 구성기 안에 머무름",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · Tab 순회가 실제 키 이벤트로 이동",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 Tab 순회",
+    "pass": null,
+    "detail": "[{\"tag\":\"BUTTON\",\"id\":null,\"text\":\"프롬프트 만들기\",\"inCompose\":true},{\"tag\":\"BUTTON\",\"id\":null,\"text\":\"사전 접기\",\"inCompose\":true},{\"tag\":\"INPUT\",\"id\":null,\"text\":\"\",\"inCompose\":true},{\"tag\":\"BUTTON\",\"id\":null,\"text\":\"전체4\",\"inCompose\":true},{\"tag\":\"BUTTON\",\"id\":null,\"text\":\"조명1\",\"inCompose\":true},{\"tag\":\"BUTTON\",\"id\":null,\"text\":\"네온 조명조명\",\"inCompose\":true}]"
+  },
+  {
+    "name": "UCP08 · 360px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 360px 적용 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 360px 칩 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 360px 입력 글자 16px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 360px",
+    "pass": null,
+    "detail": "{\"overflow\":0,\"apply\":{\"w\":284,\"h\":44},\"chipButton\":{\"w\":44,\"h\":44},\"briefFont\":\"16px\",\"candidateRight\":{\"w\":310,\"h\":278},\"columns\":\"310px\"}"
+  },
+  {
+    "name": "UCP08 · 390px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 390px 적용 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 390px 칩 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 390px 입력 글자 16px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 390px",
+    "pass": null,
+    "detail": "{\"overflow\":0,\"apply\":{\"w\":314,\"h\":44},\"chipButton\":{\"w\":44,\"h\":44},\"briefFont\":\"16px\",\"candidateRight\":{\"w\":340,\"h\":278},\"columns\":\"340px\"}"
+  },
+  {
+    "name": "UCP08 · 430px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 430px 적용 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 430px 칩 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 430px 입력 글자 16px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 430px",
+    "pass": null,
+    "detail": "{\"overflow\":0,\"apply\":{\"w\":338,\"h\":44},\"chipButton\":{\"w\":44,\"h\":44},\"briefFont\":\"16px\",\"candidateRight\":{\"w\":364,\"h\":280},\"columns\":\"364px\"}"
+  },
+  {
+    "name": "UCP08 · 768px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 768px 적용 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 768px 칩 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 768px 입력 글자 16px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 768px",
+    "pass": null,
+    "detail": "{\"overflow\":-15,\"apply\":{\"w\":612,\"h\":44},\"chipButton\":{\"w\":44,\"h\":44},\"briefFont\":\"16px\",\"candidateRight\":{\"w\":638,\"h\":259},\"columns\":\"638px\"}"
+  },
+  {
+    "name": "UCP08 · 1280px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 1280px 적용 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 1280px 칩 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 1280px 입력 글자 16px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 1280px",
+    "pass": null,
+    "detail": "{\"overflow\":-15,\"apply\":{\"w\":463,\"h\":44},\"chipButton\":{\"w\":44,\"h\":44},\"briefFont\":\"16px\",\"candidateRight\":{\"w\":489,\"h\":259},\"columns\":\"489.078px\"}"
+  },
+  {
+    "name": "UCP08 · 1440px 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 1440px 적용 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 1440px 칩 버튼 44px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 1440px 입력 글자 16px 이상",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 1440px",
+    "pass": null,
+    "detail": "{\"overflow\":-15,\"apply\":{\"w\":533,\"h\":44},\"chipButton\":{\"w\":44,\"h\":44},\"briefFont\":\"16px\",\"candidateRight\":{\"w\":559,\"h\":259},\"columns\":\"559.469px\"}"
+  },
+  {
+    "name": "UCP08 · 가로 화면에서도 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 회전 후 원문 보존",
+    "pass": true,
+    "expected": "비 오는 골목에 서 있는 여성 뒤돌아보며",
+    "actual": "\"비 오는 골목에 서 있는 여성 뒤돌아보며\""
+  },
+  {
+    "name": "UCP08 · 회전 후 칩 보존",
+    "pass": true,
+    "expected": "4",
+    "actual": "4"
+  },
+  {
+    "name": "UCP08 · 회전 후 후보 보존",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UCP08 · 회전이 재요청을 만들지 않음",
+    "pass": true,
+    "expected": "9",
+    "actual": "9"
+  },
+  {
+    "name": "UCP08 · 장문 후보 본문 전부 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 장문 후보 가로 잘림 없음",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UCP08 · 장문 후보에서도 적용 버튼 보임",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 장문 후보에서도 가로 넘침 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 장문",
+    "pass": null,
+    "detail": "{\"textLength\":1260,\"clipped\":false,\"applyVisible\":true,\"overflow\":0,\"promptHeight\":668}"
+  },
+  {
+    "name": "UCP08 · 저장 전 수동 선택 추가",
+    "pass": true,
+    "expected": "차분한 분위기",
+    "actual": "\"차분한 분위기\""
+  },
+  {
+    "name": "UCP08 · 응답 후에도 수동 칩이 남음",
+    "pass": true,
+    "expected": "차분한 분위기",
+    "actual": "\"차분한 분위기\""
+  },
+  {
+    "name": "UCP08 · 수동 칩에 '직접' 배지",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 저장 전 최종 프롬프트가 후보 값",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · v3 작업이 완료되고 자산을 남김",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 v3 작업",
+    "pass": null,
+    "detail": "{\"jobId\":\"26d60a4b58f843e98c18b6db24025393\",\"assetId\":\"37ca32aa7dbf4e2ab05d5c09cb941256\"}"
+  },
+  {
+    "name": "UCP08 · 이미지 생성 본문이 v3 스냅샷",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UCP08 · 생성 본문 prompt가 적용 값",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · 스냅샷이 실제 적용 문자열을 기록",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · 스냅샷이 수동 선택을 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 스냅샷이 장면 귀속을 보존",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 v3 본문",
+    "pass": null,
+    "detail": "{\"schema\":3,\"applied\":\"a woman standing on a rainy alley, neon lighting\",\"selections\":5,\"trim\":[],\"bytes\":1299}"
+  },
+  {
+    "name": "UCP08 · 되읽은 기록이 v3",
+    "pass": true,
+    "expected": "3",
+    "actual": "3"
+  },
+  {
+    "name": "UCP08 · 되읽은 applied가 제출 값",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · 되읽은 prompt가 제출 값",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · 되읽은 선택 출처에 manual 존재",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · events 스트림의 스냅샷이 v3",
+    "pass": true,
+    "expected": "[3]",
+    "actual": "\"[3]\""
+  },
+  {
+    "name": "UCP08 · events 스트림의 prompt가 제출 값",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · events 스트림이 비어 있지 않음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 저장된 environment에 null 키 없음",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 되읽기",
+    "pass": null,
+    "detail": "{\"status\":200,\"schema\":3,\"applied\":\"a woman standing on a rainy alley, neon lighting\",\"prompt\":\"a woman standing on a rainy alley, neon lighting\",\"selections\":[\"auto\",\"auto\",\"auto\",\"auto\",\"manual\"],\"environment\":{\"location_ko\":\"비 오는 골목\",\"time_ko\":\"밤\",\"lighting_ko\":\"네온\"},\"eventCount\":6,\"eventSchemas\":[3],\"eventPrompt\":\"a woman standing on a rainy alley, neon lighting\"}"
+  },
+  {
+    "name": "UCP08 · 갤러리에서 v3 복원 경로 존재",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 정보 창이 v3로 표시",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 정보 창에 복원 버튼",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 복원이 적용 문자열을 되살림",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · 복원이 negative도 되살림",
+    "pass": true,
+    "expected": "blurry, text",
+    "actual": "\"blurry, text\""
+  },
+  {
+    "name": "UCP08 · 복원이 모델을 기록에서 고름",
+    "pass": true,
+    "expected": "fake-sd15",
+    "actual": "\"fake-sd15\""
+  },
+  {
+    "name": "UCP08 · 완전한 v3 복원에는 누락 안내 없음",
+    "pass": true,
+    "expected": "null",
+    "actual": "null"
+  },
+  {
+    "name": "UCP08 갤러리 복원",
+    "pass": null,
+    "detail": "{\"finalPrompt\":\"a woman standing on a rainy alley, neon lighting\",\"negative\":\"blurry, text\",\"model\":\"fake-sd15\",\"notice\":null,\"modal\":{\"hasRestore\":true,\"v3\":true}}"
+  },
+  {
+    "name": "UCP08 · 새로고침 후에도 복원이 동작",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · 새로고침 후 복원된 프롬프트가 동일",
+    "pass": true,
+    "expected": "a woman standing on a rainy alley, neon lighting",
+    "actual": "\"a woman standing on a rainy alley, neon lighting\""
+  },
+  {
+    "name": "UCP08 · 새로고침 후 negative가 동일",
+    "pass": true,
+    "expected": "blurry, text",
+    "actual": "\"blurry, text\""
+  },
+  {
+    "name": "UCP08 재시작 복원",
+    "pass": null,
+    "detail": "{\"finalPrompt\":\"a woman standing on a rainy alley, neon lighting\",\"negative\":\"blurry, text\",\"model\":\"fake-sd15\",\"notice\":null,\"modal\":{\"hasRestore\":true,\"v3\":true}}"
+  },
+  {
+    "name": "UCP08 · 복원된 프롬프트로 재생성 가능",
+    "pass": true,
+    "expected": "false",
+    "actual": "false"
+  },
+  {
+    "name": "UCP08 · 413 저장 거부가 화면에 표시됨",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 413 응답의 사유가 그대로 노출",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 413 처리",
+    "pass": null,
+    "detail": "{\"text\":\"Prompt composition exceeds 32 KiB and could not be trimmed닫기\",\"visible\":true}"
+  },
+  {
+    "name": "UCP08 · 축소된 기록의 정보 창이 열림",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 · 축소 안내가 단계 이름을 포함",
+    "pass": true,
+    "expected": "true",
+    "actual": "true"
+  },
+  {
+    "name": "UCP08 snapshot_trim 안내",
+    "pass": null,
+    "detail": "\"저장 시 축소됨: evidence_ko, brief_2000. 축소된 필드는 원래 값이 남아 있지 않습니다.\""
+  }
+]

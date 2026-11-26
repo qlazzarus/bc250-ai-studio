@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { connectBrowser, pageClient } from "./driver.mjs";
 import { runSuite } from "./suite.mjs";
+import { runUix07Gallery } from "./suite-uix07-gallery.mjs";
 
 const CHROME = process.env.CHROME_PATH
   || `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`;
@@ -85,7 +86,8 @@ const main = async () => {
   await page.call("Page.navigate", { url: APP });
   await page.waitFor("!!document.querySelector('.prompt-builder > .quiet')", { label: "app mount" });
   try {
-    await runSuite({ page, browser, sessionId, check, record, sleep, shots: SHOTS, app: APP });
+    const suite = process.env.STUDIO_BROWSER_SUITE === "gallery-pagination" ? runUix07Gallery : runSuite;
+    await suite({ page, browser, sessionId, check, record, sleep, shots: SHOTS, app: APP });
   } catch (error) {
     record("suite error", error.message);
     results.push({ name: "suite error", pass: false, actual: error.message });

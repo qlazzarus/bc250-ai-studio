@@ -120,7 +120,7 @@ function App() {
   /**
    * UIX06A: the page numbers come from the URL, not from their own state.
    *
-   * A `?page=2` link has to open page 2 on a cold load, and Back has to return to the page the
+   * A `?page=1` link has to open the second page on a cold load, and Back has to return to the page the
    * user left — neither is possible if a separate `useState(0)` is the authority. The setters
    * below write the URL, and the value is read back from the same `route` the screen uses, so
    * there is exactly one answer.

@@ -199,7 +199,7 @@ export async function runContracts({ page, check, record, sleep, shots }) {
         const job = await (await fetch('/api/v1/jobs/${probeId}',
           { headers: auth ? { Authorization: auth } : {} })).json();
         return job.status === 'cancelled' ? job.status : false;
-      })()`, { timeout: 8000, label: "probe cancelled" });
+      })()`, { timeout: 25000, label: "probe cancelled" });
     } catch { return null; }
   })() : null;
   record("재시도 준비", JSON.stringify({ created: probe?.status ?? null, cancel: cancelStatus, terminal }));

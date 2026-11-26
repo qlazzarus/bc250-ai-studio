@@ -267,7 +267,14 @@ export async function runUix05({ page, check, record, sleep, shots }) {
   check("UIX05 · 이동이 정확히 그 작업 카드만 표시", JSON.stringify([acceptedId]),
     JSON.stringify(spotlightIds));
   // The highlighted card must agree with the server about the status, and show it in Korean.
-  const acceptedStatus = serverJob?.status ?? null;
+  // The job may finish between the receipt lookup and navigation. Compare against a fresh
+  // server read, rather than the earlier snapshot taken before several seconds of UI work.
+  const acceptedStatus = await evaluate(`(async () => {
+    const auth = window.__authHeader || '';
+    const response = await fetch('${JOBS}/${acceptedId}',
+      { headers: auth ? { Authorization: auth } : {} });
+    return response.ok ? (await response.json()).status : null;
+  })()`);
   const spotlit = moved.cards.find((card) => card.spotlight);
   check("UIX05 · 표시된 카드의 상태가 서버와 일치", acceptedStatus, spotlit?.status ?? null);
   check("UIX05 · 카드가 상태를 한국어로 표시", true,
@@ -612,7 +619,7 @@ export async function runUix05({ page, check, record, sleep, shots }) {
   // ── L. the four required states at both widths ─────────────────────────────
   // State is re-established per width rather than inherited, so the two widths document the
   // same fixture and the same starting point — including the screen, which step (2) leaves.
-  for (const [width, height, label] of [[360, 800, "360"], [1280, 900, "1280"]]) {
+  for (const [width, height, label] of [[360, 800, "360"], [390, 844, "390"], [1280, 900, "1280"]]) {
     await page.viewport(width, height, width < 500);
     await showOverview();
     await page.viewport(width, height, width < 500);

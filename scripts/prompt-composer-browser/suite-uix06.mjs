@@ -317,7 +317,7 @@ export async function runUix06({ page, check, record, sleep, shots }) {
   // `/art/generate` — so without this the second width would measure a hidden gallery and every
   // card would report a zero-size button. Navigating back is part of establishing the state,
   // not a way to make the numbers pass.
-  for (const [width, height, label] of [[360, 800, "360"], [1280, 900, "1280"]]) {
+  for (const [width, height, label] of [[360, 800, "360"], [390, 844, "390"], [1280, 900, "1280"]]) {
     await page.viewport(width, height, width < 500);
     await clickByText(".art-nav a", "갤러리").catch(() => false);
     await waitFor(`location.pathname === '/art/gallery'`, { label: `${label} gallery`, timeout: 10000 })

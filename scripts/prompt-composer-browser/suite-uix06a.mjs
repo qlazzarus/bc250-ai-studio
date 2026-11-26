@@ -225,6 +225,37 @@ export async function runUix06a({ page, check, record, sleep, shots }) {
     const jobs = await response.json();
     return jobs.map((job) => job.job_id);
   })()`);
+  // Exercise pagination with a nonempty second page, including a cold load of the URL.
+  check("UIX07 · 페이지 검증에 작업 13건 이상", true, jobsList.length >= 13);
+  if (jobsList.length >= 13) {
+    await navigate(`${origin}/art/jobs`);
+    await waitFor(`!!document.querySelector('.jobs-body .pagination button:last-child:not(:disabled)')`,
+      { label: "second jobs page available", timeout: 20000 });
+    await clickByText('.jobs-body .pagination button', '다음');
+    await waitFor(`location.search === '?page=1'`, { label: "jobs page 2 URL" });
+    await waitFor(`document.querySelector('.jobs-body .pagination span')?.textContent.includes('2 페이지')`,
+      { label: "jobs page 2 content" });
+    const expectedSecondPage = await evaluate(`(async () => {
+      const response = await fetch('/api/v1/jobs?limit=12&offset=12',
+        { headers: { Authorization: window.__authHeader || '' } });
+      return (await response.json()).map(job => job.job_id);
+    })()`);
+    await waitFor(`JSON.stringify([...document.querySelectorAll('.job')].map(n => n.dataset.jobId)) === ${JSON.stringify(JSON.stringify(expectedSecondPage))}`,
+      { label: "second page jobs loaded", timeout: 20000 });
+    const secondPage = await evaluate(`[...document.querySelectorAll('.job')].map(n => n.dataset.jobId)`);
+    check("UIX07 · 작업 2페이지 주소", '?page=1', (await at()).search);
+    check("UIX07 · 작업 2페이지에 실제 카드", true, secondPage.length > 0);
+    await navigate(`${origin}/art/jobs?page=1`);
+    await waitFor(`document.querySelector('.jobs-body .pagination span')?.textContent.includes('2 페이지')`,
+      { label: "cold jobs page 2", timeout: 20000 });
+    await waitFor(`JSON.stringify([...document.querySelectorAll('.job')].map(n => n.dataset.jobId)) === ${JSON.stringify(JSON.stringify(secondPage))}`,
+      { label: "cold page cards", timeout: 20000 });
+    check("UIX07 · 2페이지 직접 진입 카드 유지", JSON.stringify(secondPage),
+      JSON.stringify(await evaluate(`[...document.querySelectorAll('.job')].map(n => n.dataset.jobId)`)));
+    await clickByText('.jobs-body .pagination button', '이전');
+    await waitFor(`location.search === ''`, { label: "jobs page 1 URL" });
+    check("UIX07 · 이전 페이지 주소 복원", '', (await at()).search);
+  }
   const targetJob = Array.isArray(jobsList) ? jobsList[0] ?? null : null;
   if (targetJob) {
     await navigate(`${origin}/art/jobs/${targetJob}`);
@@ -310,8 +341,8 @@ export async function runUix06a({ page, check, record, sleep, shots }) {
   await shot(shots, "uix06a-07-pixel.png");
 
   // ── H. 360 and 1280: no sideways overflow, 44px targets ─────────────────────
-  for (const width of [360, 1280]) {
-    await page.viewport(width, width === 360 ? 780 : 900);
+  for (const width of [360, 390, 1280]) {
+    await page.viewport(width, width === 360 ? 780 : width === 390 ? 844 : 900);
     await navigate(`${origin}/art`);
     await waitFor("!!document.querySelector('.art-nav')", { label: `nav at ${width}`, timeout: 20000 });
     await sleep(900);
@@ -333,7 +364,7 @@ export async function runUix06a({ page, check, record, sleep, shots }) {
     check(`UIX06A · ${width}px 메뉴가 화면 안`, 0, layout.offscreen);
     check(`UIX06A · ${width}px 메뉴 터치 영역 44px 이상`, true, layout.smallest >= 44);
     record(`UIX06A 레이아웃 ${width}`, JSON.stringify(layout));
-    await shot(shots, `uix06a-${width === 360 ? "01-nav-360" : "02-nav-1280"}.png`);
+    await shot(shots, `uix06a-nav-${width}.png`);
   }
 
   // ── I. keyboard: the menu is reachable and Enter follows the link ───────────
