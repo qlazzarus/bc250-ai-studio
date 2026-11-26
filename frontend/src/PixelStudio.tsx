@@ -1,5 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { type Asset, type PixelAsset, type PixelProject, StudioApi } from "./api";
+import { ART_HOME } from "./lib/routes";
 
 const sizes: Record<PixelAsset["kind"], number> = {
   unit: 64, building: 128, terrain: 32, decoration: 32, item: 32, ui: 32, effect: 32,
@@ -7,7 +9,7 @@ const sizes: Record<PixelAsset["kind"], number> = {
 
 const kinds = Object.keys(sizes) as PixelAsset["kind"][];
 
-export function PixelStudio({ api, reportError, onArt }: { api: StudioApi; reportError(message: string): void; onArt(): void }) {
+export function PixelStudio({ api, reportError }: { api: StudioApi; reportError(message: string): void }) {
   const [projects, setProjects] = useState<PixelProject[]>([]);
   const [sources, setSources] = useState<Asset[]>([]);
   const [sourceUrls, setSourceUrls] = useState<Record<string, string>>({});
@@ -148,7 +150,7 @@ export function PixelStudio({ api, reportError, onArt }: { api: StudioApi; repor
   }
 
   return <main className="shell pixel-shell">
-    <header><div><p className="eyebrow">BC-250 · PIXEL PIPELINE</p><h1>Pixel Studio</h1></div><div className="header-actions"><button className="quiet" onClick={onArt}>Art Studio</button></div></header>
+    <header><div><p className="eyebrow">BC-250 · PIXEL PIPELINE</p><h1>Pixel Studio</h1></div><div className="header-actions"><Link className="quiet" to={ART_HOME}>Art Studio</Link></div></header>
     <div className="pixel-layout">
       <section className="panel"><div className="section-title"><h2>프로젝트 / Art Bible</h2><span>{projects.length} projects</span></div>
         <label>프로젝트<select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">프로젝트 선택</option>{projects.map((project) => <option key={project.project_id} value={project.project_id}>{project.name}</option>)}</select></label>

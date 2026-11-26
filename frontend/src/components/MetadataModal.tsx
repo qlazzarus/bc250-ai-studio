@@ -1,5 +1,7 @@
 import { isLegacyComposition, type AssetMetadata, type StoredSnapshotV3 } from "./../api";
 import { fromSnapshot } from "../prompt/composeSnapshot";
+import { dialogLabel, useDialogTrap } from "../lib/dialog";
+import { useRef } from "react";
 
 /** Reads a stored string, so a damaged row renders as blank rather than `[object Object]`. */
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
@@ -40,12 +42,25 @@ function SnapshotDetails({ data }: { data: StoredSnapshotV3 }) {
   </>;
 }
 
-function Metadata({ data, archived, close, reuse, changeArchive, destroy }: { data: AssetMetadata; archived: boolean; close(): void; reuse(item: AssetMetadata): void; changeArchive(restore: boolean): Promise<void>; destroy(): Promise<void> }) {
+function Metadata({ data, archived, close, reuse, changeArchive, destroy, busy, failure }: { data: AssetMetadata; archived: boolean; close(): void; reuse(item: AssetMetadata): void; changeArchive(restore: boolean): Promise<void>; destroy(): Promise<void>; busy?: boolean; failure?: string | null }) {
+  // UIX06: focus returns to the reuse button when a cancelled overwrite keeps the dialog open,
+  // so a keyboard user is back where they made the choice instead of at the top of the dialog.
+  const reuseRef = useRef<HTMLButtonElement | null>(null);
+  const trap = useDialogTrap<HTMLElement>({
+    onClose: close,
+    initialFocus: () => reuseRef.current,
+  });
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={close}>
-        <aside className="modal preview-modal" role="dialog" aria-modal="true" aria-label="생성 이미지 상세" onMouseDown={(event) => event.stopPropagation()}><button className="close" onClick={close} aria-label="닫기">×</button>
+        <aside ref={trap} className="modal preview-modal" role="dialog" aria-modal="true"
+          aria-label={dialogLabel("생성 이미지 상세", data.asset_id)} aria-busy={busy ? true : undefined}
+          tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}><button className="close" onClick={close} aria-label="닫기">×</button>
         <p className="eyebrow">GENERATE METADATA</p>
         <h2>{data.model_id}</h2>
+        {/* UIX06: the asset id is what the receipt, the queue card and the URL all name, so the
+            detail view states it instead of leaving the image identifiable only by thumbnail. */}
+        <p className="asset-detail-id">이미지 <span data-asset-id={data.asset_id}>{data.asset_id}</span></p>
+        {failure && <p className="modal-failure" role="alert">{failure}</p>}
         <dl>
             <dt>Seed</dt>
             <dd>{data.seed}</dd>
@@ -94,16 +109,16 @@ function Metadata({ data, archived, close, reuse, changeArchive, destroy }: { da
           </> : <SnapshotDetails data={data.prompt_composition} />}
         </details>}
         <div className="metadata-actions">
-            <button className="quiet" onClick={() => void changeArchive(archived)}>
-                {archived ? "갤러리로 복원" : "보관"}
+            <button className="quiet" disabled={busy} onClick={() => void changeArchive(archived)}>
+                {busy ? "처리 중…" : archived ? "갤러리로 복원" : "보관"}
             </button>
             {archived && (
-                <button className="danger" onClick={() => void destroy()}>
+                <button className="danger" disabled={busy} onClick={() => void destroy()}>
                     영구 삭제
                 </button>
             )}
         </div>
-        <button className="generate" onClick={() => reuse(data)}>
+        <button ref={reuseRef} className="generate" disabled={busy} onClick={() => reuse(data)}>
             이 설정으로 다시 생성
         </button>
     </aside>

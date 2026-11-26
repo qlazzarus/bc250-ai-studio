@@ -33,6 +33,8 @@ const SRC = join(here, 'src');
 /** Bare specifiers the modules may use, mapped to absolute URLs. */
 function bareSpecifier(specifier) {
   if (specifier === 'react/jsx-runtime') return pathToFileURL(require.resolve('react/jsx-runtime')).href;
+  // UIX06: `lib/dialog.ts` uses the hooks themselves, so the runtime alone is not enough.
+  if (specifier === 'react') return pathToFileURL(require.resolve('react')).href;
   return null;
 }
 

@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { type Asset, type AssetMetadata, type Job, type StudioModel, type SystemStatus, StudioApi, isLegacyComposition } from "./api";
 import { PixelStudio } from "./PixelStudio";
 import Settings from "./types/Settings";
@@ -26,6 +27,56 @@ import { characterCount, validateSubmission, type ValidationIssue } from "./prom
 import { queueCounts, queueExpanded, queueSummary } from "./lib/queue";
 import { queueNavMessage, receiptText, type QueueNavPhase } from "./lib/jobsView";
 import { detailSummary, FIELD_IN_DETAILS, FIELD_LABEL, FIELD_SELECTOR, firstIssue, seedIssue } from "./lib/generate";
+import { resolveReturn, type ReturnTarget } from "./lib/dialog";
+import { artPath, parseArtRoute, ART_HOME, galleryFallback, type ArtScreen } from "./lib/routes";
+
+/**
+ * UIX06A: one read's outcome, without a throw that would take its siblings down with it.
+ *
+ * The four startup reads are independent, so they are settled independently. `Promise.all`
+ * would reject on the first failure and discard the other three replies.
+ */
+type Settled<T> = { ok: true; value: T } | { ok: false; reason: unknown };
+
+async function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
+  try {
+    return { ok: true, value: await promise };
+  } catch (reason) {
+    return { ok: false, reason };
+  }
+}
+
+/** The sentence a failed read reports, in the shape `.errorbox` has always shown. */
+function reasonText(reason: unknown): string {
+  return reason instanceof Error ? reason.message : "API 연결에 실패했습니다.";
+}
+
+/**
+ * UIX06A: the visible screen switcher. Each entry is a real address, so it can be opened in a
+ * new tab and the browser's own Back works. `screen` decides the `aria-current` marker.
+ */
+const NAV_ITEMS: { to: string; label: string; screen: ArtScreen }[] = [
+  { to: artPath.overview(), label: "개요", screen: "overview" },
+  { to: artPath.compose(), label: "장면 구성", screen: "compose" },
+  { to: artPath.generate(), label: "생성 설정", screen: "generate" },
+  { to: artPath.jobs(), label: "작업 큐", screen: "jobs" },
+  { to: artPath.gallery(), label: "갤러리", screen: "gallery" },
+];
+
+/**
+ * UIX06A: which panels a screen shows.
+ *
+ * `overview` is the screen this app always had — composer, queue and gallery on one page — and
+ * every earlier task measured that page. The focused routes are the same panels with the others
+ * out of the way, so a link to `/art/jobs` shows the queue and nothing else while `/art` stays
+ * exactly what it was. A route must never be able to *hide work*: the panels are only ever
+ * hidden, never unmounted, so nothing here can cancel a request or drop a session.
+ */
+function showsPanel(screen: ArtScreen, panel: "composer" | "jobs" | "gallery"): boolean {
+  if (screen === "overview") return true;
+  if (panel === "composer") return screen === "compose" || screen === "generate";
+  return screen === panel;
+}
 
 const initialSettings: Settings = {
   modelId: "", prompt: "", negativePrompt: "", preset: "balanced", resolution: "512x512",
@@ -50,21 +101,72 @@ function App() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [models, setModels] = useState<StudioModel[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [jobPage, setJobPage] = useState(0);
+  /**
+   * UIX06A: the URL is the screen selector. There is no `view`/`studio` state beside it.
+   *
+   * `route` is read from the address bar on every render, so a pasted link, a reload, Back and
+   * Forward all land on the same screen by construction. The only thing this component writes
+   * is an explicit move by the user (`navigate`), which is also what creates a history entry.
+   *
+   * Nothing here is a React `key`: the editor tree below is not remounted by a route change,
+   * so the compose session, the request in flight and the receipt all survive navigation.
+   */
+  const location = useLocation();
+  const navigate = useNavigate();
+  const route = useMemo(
+    () => parseArtRoute(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
+  /**
+   * UIX06A: the page numbers come from the URL, not from their own state.
+   *
+   * A `?page=2` link has to open page 2 on a cold load, and Back has to return to the page the
+   * user left — neither is possible if a separate `useState(0)` is the authority. The setters
+   * below write the URL, and the value is read back from the same `route` the screen uses, so
+   * there is exactly one answer.
+   */
+  const jobPage = route.page;
+  const assetPage = route.page;
   /**
    * UX03: `null` means the user has not chosen yet, so the polled list decides the
    * default. Once they click, the choice is kept and polling never resets it.
    */
   const [jobsExpanded, setJobsExpanded] = useState<boolean | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [showArchived, setShowArchived] = useState(false);
-  const [assetPage, setAssetPage] = useState(0);
+  /** UIX06A: a shareable filter, so it is read from `?archived=1` rather than held in state. */
+  const showArchived = route.archived;
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [missingAssetIds, setMissingAssetIds] = useState<Record<string, true>>({});
   const assetUrlsRef = useRef<Record<string, string>>({});
   const [metadata, setMetadata] = useState<AssetMetadata | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  /**
+   * UIX06A: the image id whose single-resource lookup *succeeded*.
+   *
+   * The dialog's visibility comes from the URL, but a URL alone is not proof the image exists:
+   * this gate means "we asked the server and it answered", so a mistyped `/art/gallery/nope`
+   * shows the not-found notice instead of an empty viewer.
+   */
   const [viewedId, setViewedId] = useState<string | null>(null);
+  /**
+   * UIX06A: a permalink's single-resource lookup failed.
+   *
+   * Kept apart from `error` because it is about the address the user opened, and it belongs
+   * next to the list it refers to — with a way back — rather than in the global banner.
+   */
+  const [imageLookupFailure, setImageLookupFailure] = useState<string | null>(null);
+  const [jobLookupFailure, setJobLookupFailure] = useState<string | null>(null);
+  /**
+   * UIX06: the element that opened the dialog, and where focus must go when it closes. A ref
+   * rather than state because it is read once, at close time, and writing it must not render.
+   * `returnTo` names the *cause* of closing (opener / final prompt / gallery heading) rather
+   * than an element, so the decision survives the card being removed by a refresh.
+   */
+  const openerRef = useRef<HTMLElement | null>(null);
+  const returnToRef = useRef<ReturnTarget | null>(null);
+  const galleryHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const [metadataBusy, setMetadataBusy] = useState(false);
+  const [metadataFailure, setMetadataFailure] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [builder, setBuilder] = useState(initialBuilderState);
   const [compositionSupported, setCompositionSupported] = useState(false);
@@ -149,7 +251,16 @@ function App() {
    * job is not in this page of the list — and is kept apart from `error` because the fixes differ.
    */
   const [queueNav, setQueueNav] = useState<{ jobId: string; phase: QueueNavPhase } | null>(null);
-  const [studio, setStudio] = useState<"art" | "pixel">("art");
+  /**
+   * UIX06A: did the dialog open from inside this session?
+   *
+   * A dialog opened by clicking a card can be closed by popping the history entry that opening
+   * it pushed. One opened from a pasted link has no such entry — popping would leave the app
+   * entirely — so closing it replaces the location with the gallery instead. This flag is the
+   * difference between those two cases, and it is the *only* thing that decides between
+   * `navigate(-1)` and `navigate(path, { replace: true })`.
+   */
+  const openedFromListRef = useRef(false);
   const [promptDirty, setPromptDirty] = useState(false);
   const [promptBlurred, setPromptBlurred] = useState(false);
   /**
@@ -314,34 +425,66 @@ function App() {
     // later be mistaken for the newest read.
     jobsTokenRef.current += 1;
     const token = jobsTokenRef.current;
-    try {
-      const [nextStatus, nextModels, nextJobs, nextAssets] = await Promise.all([
-        api.status(controller.signal), api.models(controller.signal), api.jobs(JOBS_PER_PAGE, jobPage * JOBS_PER_PAGE, controller.signal),
-        api.assets(showArchived, ASSETS_PER_PAGE, assetPage * ASSETS_PER_PAGE, controller.signal),
-      ]);
-      if (controller.signal.aborted) return;
-      setStatus(nextStatus); setModels(nextModels); setAssets(nextAssets);
-      applyJobs(nextJobs, token);
-      const first = nextModels.find((model) => model.execution_enabled);
+    /**
+     * UIX06A: each read settles on its own.
+     *
+     * `Promise.all` rejected the whole batch when *any* one of the four failed, so a failing
+     * `/jobs` (or `/assets`) threw away perfectly good `status` and `models` replies: the
+     * generate form stayed disabled with no model until the next poll happened to succeed, and
+     * a permalink into the gallery could not initialise anything else either. The four reads
+     * share no data, so one failure is one resource's failure — the other three still apply.
+     *
+     * This is not a move to `allSettled` for its own sake: the ordering guard, the single
+     * `applyJobs` writer and the poll interval are unchanged. Only the *coupling* is removed.
+     */
+    const [statusRead, modelsRead, jobsRead, assetsRead] = await Promise.all([
+      settle(api.status(controller.signal)),
+      settle(api.models(controller.signal)),
+      settle(api.jobs(JOBS_PER_PAGE, jobPage * JOBS_PER_PAGE, controller.signal)),
+      settle(api.assets(showArchived, ASSETS_PER_PAGE, assetPage * ASSETS_PER_PAGE, controller.signal)),
+    ]);
+    if (controller.signal.aborted) return;
+
+    // A resource that answered is applied even when a sibling failed. A resource that failed
+    // leaves its previous value alone: blanking `models` on one bad poll would take the
+    // selected model and the whole generate form with it.
+    if (statusRead.ok) setStatus(statusRead.value);
+    if (modelsRead.ok) {
+      setModels(modelsRead.value);
+      const first = modelsRead.value.find((model) => model.execution_enabled);
       setSettings((old) => old.modelId ? old : { ...old, modelId: first?.model_id || "" });
-    } catch (reason) {
-      if (!signal?.aborted) setError(timedOut ? "API 응답 시간이 초과되었습니다. 다시 시도합니다." : reason instanceof Error ? reason.message : "API 연결에 실패했습니다.");
+    }
+    if (assetsRead.ok) setAssets(assetsRead.value);
+    if (jobsRead.ok) applyJobs(jobsRead.value, token);
+
+    /**
+     * One sentence for whatever failed, and the first failure in a fixed order so a repeated
+     * poll reports the same thing rather than alternating. `status` leads because it is the
+     * health line the user reads first.
+     */
+    const failure = [statusRead, modelsRead, jobsRead, assetsRead]
+      .find((read): read is { ok: false; reason: unknown } => !read.ok);
+    if (failure) {
+      if (!signal?.aborted) {
+        setError(timedOut ? "API 응답 시간이 초과되었습니다. 다시 시도합니다." : reasonText(failure.reason));
+      }
       /**
        * UIX05: a read that fails while the queue was asked to find a job is the queue's answer
        * too. Resolved here rather than at the call site because `refresh` swallows the error —
        * its callers (the poll, a card's cancel/retry) must not treat a list failure as their own
        * — so this is the only place that knows the read did not produce a list.
        */
-      const target = navTargetRef.current;
-      if (target) {
-        navTargetRef.current = null;
-        setQueueNav({ jobId: target, phase: "error" });
+      if (!jobsRead.ok) {
+        const target = navTargetRef.current;
+        if (target) {
+          navTargetRef.current = null;
+          setQueueNav({ jobId: target, phase: "error" });
+        }
       }
-    } finally {
-      window.clearTimeout(timeout);
-      signal?.removeEventListener("abort", cancel);
-      controller.abort();
     }
+    window.clearTimeout(timeout);
+    signal?.removeEventListener("abort", cancel);
+    controller.abort();
   }, [api, assetPage, jobPage, showArchived, applyJobs]);
 
   useEffect(() => { 
@@ -446,8 +589,16 @@ function App() {
 
   useEffect(() => {
     if (!finalFocusTick) return;
+    /**
+     * UIX06A: the prompt lives in the composer panel, and a route change is what reveals it.
+     * React Router applies its location update inside a transition, so it can commit *after* the
+     * tick that asked for focus — focusing a field inside a still-hidden panel does nothing, and
+     * the user was left on `<body>` (seen at both 360 and 1280 after a reuse). Keying the effect
+     * on the screen as well means the focus happens whichever of the two commits second.
+     */
+    if (!showsPanel(route.screen, "composer")) return;
     finalPromptRef.current?.focus();
-  }, [finalFocusTick]);
+  }, [finalFocusTick, route.screen]);
 
   function changeBuilderFamily(family: string): boolean {
     if (!builder.scene.targetFamily || builder.scene.targetFamily === family) return true;
@@ -592,7 +743,9 @@ function App() {
    */
   function changeJobPage(page: number) {
     if (navTargetRef.current) { navTargetRef.current = null; setQueueNav(null); }
-    setJobPage(page);
+    // UIX06A: the page is in the URL, so moving pages is a navigation — `?page=N` is shareable
+    // and Back returns here. `replace` is wrong: the user asked to go somewhere.
+    navigate(artPath.jobs(page));
   }
 
   /**
@@ -684,7 +837,9 @@ function App() {
       setReceipt({ jobId: accepted.job_id, status: accepted.status });
       setQueueNav(null);
       navTargetRef.current = null;
-      setJobPage(0);
+      // UIX06A: a fresh job is the newest row, so page 0 — expressed as the plain queue URL.
+      // `replace` because the receipt is not a place the user asked to go.
+      if (jobPage !== 0) navigate(artPath.jobs(0), { replace: true });
     } catch (reason) {
       // Server answers stay in `.errorbox`: they are not fixable by moving to a field, and
       // reporting them next to the button would suggest they are.
@@ -709,6 +864,10 @@ function App() {
     setJobsExpanded(true);
     setQueueNav({ jobId, phase: "loading" });
     navTargetRef.current = jobId;
+    // UIX06A: the queue is asked for one job, and the address says so. A job on page 0 is the
+    // common case; `artPath.job` carries no `?page=`, so arriving here from page 3 also resets
+    // the page — the same move `setJobPage(0)` used to make, now visible in the URL.
+    if (jobPage !== 0 || route.jobId !== jobId) navigate(artPath.job(jobId));
     if (jobPage === 0) {
       // Same page: `refresh` resolves the navigation in `applyJobs`, or reports `error` in its
       // catch. Neither path needs anything from this call site.
@@ -718,21 +877,94 @@ function App() {
     // A page change re-runs the poll effect with the new page, and that read answers. Reading
     // here as well would be a second concurrent request whose answer could arrive first and be
     // thrown away by the ordering guard.
-    setJobPage(0);
   }
 
-  async function inspect(asset: Asset) {
-    if (!api) return;
-    try {
-      setSelectedAsset(asset);
-      setMetadata(await api.metadata(asset.asset_id));
-    } catch (reason) {
-      setSelectedAsset(null);
-      setError(reason instanceof Error ? reason.message : "메타데이터 조회 실패");
+  /**
+   * UIX06A: opening a dialog is a navigation, because the dialog's identity is in the URL.
+   *
+   * `viewer` opens `/art/gallery/:id`; `metadata` opens `/art/gallery/:id/metadata`. Both push a
+   * history entry and set `openedFromListRef`, which is what later lets closing *pop* back to
+   * the list instead of replacing the location — the difference between a dialog opened here
+   * and one opened from a pasted link, which has no entry of ours to pop.
+   */
+  function openViewer(asset: Asset, opener: HTMLElement | null) {
+    openerRef.current = opener;
+    openedFromListRef.current = true;
+    returnToRef.current = { to: "opener" };
+    navigate(artPath.image(asset.asset_id));
+  }
+
+  function openMetadata(asset: Asset, opener: HTMLElement | null) {
+    openerRef.current = opener;
+    openedFromListRef.current = true;
+    returnToRef.current = { to: "opener" };
+    setMetadataFailure(null);
+    // The URL is the source of truth for *which* image and *which* dialog. The effect below
+    // loads it, so opening does not duplicate that fetch here.
+    navigate(artPath.imageMetadata(asset.asset_id));
+  }
+
+  /**
+   * UIX06A: the address a closed dialog returns to.
+   *
+   * Popping is only correct when *this* session pushed the entry that opened the dialog. A
+   * dialog reached by pasting a link, or by reloading on one, has no such entry: popping would
+   * leave the app entirely. Those close by replacing the location with the gallery instead.
+   */
+  /** UIX06: focus the gallery heading after a card disappears from the list it was in. */
+  function focusGalleryHeading() {
+    window.requestAnimationFrame(() => galleryHeadingRef.current?.focus());
+  }
+
+  function closeDialogLocation() {
+    if (openedFromListRef.current) {
+      openedFromListRef.current = false;
+      navigate(-1);
+      return;
     }
+    navigate(galleryFallback({ archived: showArchived }), { replace: true });
+  }
+
+  /** UIX06: one place that closes the detail dialog and puts focus where the cause says. */
+  function closeMetadata() {
+    const target = returnToRef.current;
+    returnToRef.current = null;
+    setMetadata(null);
+    setSelectedAsset(null);
+    setMetadataFailure(null);
+    closeDialogLocation();
+    if (!target) return;
+    const node = resolveReturn(target, {
+      opener: () => openerRef.current,
+      finalPrompt: () => finalPromptRef.current,
+      galleryHeading: () => galleryHeadingRef.current,
+    });
+    // After the commit, so the node being focused is the one that will still exist.
+    window.requestAnimationFrame(() => node?.focus());
+  }
+
+  /**
+   * UIX06A: leaving a dialog for a *different screen*.
+   *
+   * The restore rewrote the final prompt, so the user belongs on the generate screen looking at
+   * it. `replace` is deliberate: the dialog the user opened is gone, and Back should return to
+   * the gallery rather than to a dialog that no longer describes the current prompt.
+   */
+  function goToGenerate() {
+    setMetadata(null);
+    setSelectedAsset(null);
+    setMetadataFailure(null);
+    returnToRef.current = null;
+    openedFromListRef.current = false;
+    navigate(artPath.generate(), { replace: true });
+    // The screen is now the generate one; focus follows after that commit.
+    setFinalFocusTick((tick) => tick + 1);
   }
 
   function reuse(item: AssetMetadata) {
+    // UIX06: a cancelled overwrite leaves the dialog open and focus where the choice was made.
+    // `closeMetadata` is not called, so `returnToRef` is not consumed and the opener survives
+    // for a later plain close.
     if (settings.prompt && settings.prompt !== item.prompt && !window.confirm("현재 최종 프롬프트를 선택한 결과의 프롬프트로 바꿉니다. 계속할까요?")) return;
     const model = models.find((entry) => entry.model_id === item.model_id);
     if (model && !changeBuilderFamily(model.family)) return;
@@ -759,7 +991,10 @@ function App() {
     if (!isLegacyComposition(item.prompt_composition) && item.prompt_composition) {
       const read = fromSnapshot(item.prompt_composition);
       if (!read.ok) {
-        setError(read.message);
+        // UIX06: a record this client cannot interpret restores nothing. The dialog stays open
+        // and says why, so the user can pick another image — closing it would look like the
+        // restore had worked.
+        setMetadataFailure(`이 기록을 복원하지 못했습니다 · ${read.message}`);
         return;
       }
       const gaps = restoreGaps(read.restored);
@@ -772,7 +1007,9 @@ function App() {
         preset: item.preset, resolution: `${item.width}x${item.height}`, steps: item.steps,
         cfgScale: item.cfg_scale, samplingMethod: item.sampling_method ?? null,
         scheduler: item.scheduler ?? null, seed: String(item.seed), batchCount: 1 });
-      setMetadata(null); setSelectedAsset(null);
+      // UIX06: a successful restore rewrites the final prompt, so that is where the user must
+      // be — not back on the card they opened. UIX06A: that place is now `/art/generate`.
+      goToGenerate();
       return;
     }
     // TRANS06: both branches start a new composition session (the inclusion list is keyed
@@ -792,45 +1029,182 @@ function App() {
       preset: item.preset, resolution: `${item.width}x${item.height}`, steps: item.steps,
       cfgScale: item.cfg_scale, samplingMethod: item.sampling_method ?? null,
       scheduler: item.scheduler ?? null, seed: String(item.seed), batchCount: 1 });
-    setMetadata(null); setSelectedAsset(null);
+    // UIX06A: same destination as the v3 branch — the restored prompt is on the generate screen.
+    goToGenerate();
+  }
+
+  /** UIX06: closing the viewer returns to the card that opened it, or the heading if it is gone. */
+  function closeViewer() {
+    setViewedId(null);
+    returnToRef.current = null;
+    closeDialogLocation();
+    const node = resolveReturn({ to: "opener" }, {
+      opener: () => openerRef.current,
+      finalPrompt: () => finalPromptRef.current,
+      galleryHeading: () => galleryHeadingRef.current,
+    });
+    window.requestAnimationFrame(() => node?.focus());
   }
 
   async function changeArchive(restore: boolean) {
-    if (!api || !selectedAsset) return;
+    if (!api || !selectedAsset || metadataBusy) return;
+    setMetadataBusy(true);
+    setMetadataFailure(null);
     try {
       if (restore) await api.restore(selectedAsset.asset_id);
       else await api.archive(selectedAsset.asset_id);
-      setMetadata(null); setSelectedAsset(null);
+      // UIX06: archiving removes the card from this list, so returning to it would land on a
+      // node that is about to be unmounted. The gallery heading is the stable place to resume.
+      // UIX06A: the dialog's URL has to leave with it, or the address would still name a
+      // dialog that is no longer open.
+      returnToRef.current = { to: "gallery-heading" };
+      openedFromListRef.current = false;
+      setMetadata(null); setSelectedAsset(null); setMetadataFailure(null);
+      navigate(artPath.gallery({ page: assetPage, archived: showArchived }), { replace: true });
       await refresh();
+      focusGalleryHeading();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "보관 상태 변경 실패");
+      // The dialog stays open: the action failed, and closing it would hide the reason behind
+      // a message the user has to hunt for in the page-level error box.
+      setMetadataFailure(`${restore ? "복원" : "보관"} 실패 · ${reason instanceof Error ? reason.message : "알 수 없는 오류"}`);
+    } finally {
+      setMetadataBusy(false);
     }
   }
 
   async function destroySelected() {
-    if (!api || !selectedAsset || !window.confirm("보관함에서 이 이미지와 메타데이터를 삭제합니다. 계속할까요?")) return;
+    if (!api || !selectedAsset || metadataBusy) return;
+    if (!window.confirm("보관함에서 이 이미지와 메타데이터를 삭제합니다. 계속할까요?")) return;
+    setMetadataBusy(true);
+    setMetadataFailure(null);
     try {
       await api.destroy(selectedAsset.asset_id);
-      setMetadata(null); setSelectedAsset(null);
+      returnToRef.current = { to: "gallery-heading" };
+      openedFromListRef.current = false;
+      setMetadata(null); setSelectedAsset(null); setMetadataFailure(null);
+      navigate(artPath.gallery({ page: assetPage, archived: showArchived }), { replace: true });
       await refresh();
+      focusGalleryHeading();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "이미지 삭제 실패");
+      setMetadataFailure(`삭제 실패 · ${reason instanceof Error ? reason.message : "알 수 없는 오류"}`);
+    } finally {
+      setMetadataBusy(false);
     }
   }
 
   const changeAssetPage = (page: number) => {
     Object.values(assetUrlsRef.current).forEach(URL.revokeObjectURL);
-    setAssetUrls({}); setMissingAssetIds({}); setAssetPage(page);
+    setAssetUrls({}); setMissingAssetIds({});
+    navigate(artPath.gallery({ page, archived: showArchived }));
   };
   const toggleArchived = () => {
     Object.values(assetUrlsRef.current).forEach(URL.revokeObjectURL);
-    setAssetUrls({}); setMissingAssetIds({}); setAssetPage(0); setShowArchived((value) => !value);
+    setAssetUrls({}); setMissingAssetIds({});
+    // The filter is part of the address, so switching it is a navigation and page 0 is implied.
+    navigate(artPath.gallery({ page: 0, archived: !showArchived }));
   };
 
-  if (studio === "pixel") return <><PixelStudio api={api} reportError={reportError} onArt={() => setStudio("art")} />{error && <div className="floating-error"><span>{error}</span><button onClick={() => setError("")}>닫기</button></div>}</>;
+  /**
+   * UIX06A: `/` is the old address. It is *replaced*, so Back does not bounce between the two.
+   */
+  useEffect(() => {
+    if (location.pathname === "/" ) navigate(ART_HOME, { replace: true });
+  }, [location.pathname, navigate]);
+
+  /**
+   * UIX06A: a permalink names a resource the current page may not contain.
+   *
+   * `GET /jobs/{id}` and `GET /assets/{id}` already exist, so a link to job 47 resolves without
+   * walking the list — no unbounded paging, and no new endpoint. The lookup is keyed on the id
+   * in the URL, so Back/Forward between two permalinks loads the right one and a poll that
+   * reorders the list cannot change which id is being shown.
+   *
+   * A failed lookup says so and offers the list; it never substitutes a neighbour.
+   */
+  useEffect(() => {
+    const imageId = route.imageId;
+    // Nothing to load. The dialog's visibility is derived from the URL, so leaving the route
+    // needs no state reset here — and resetting it in an effect would be a cascading render.
+    if (!imageId) return;
+    // Already loaded (a click, or the same id re-rendered): nothing to fetch.
+    if (selectedAsset?.asset_id === imageId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const asset = await api.asset(imageId);
+        if (cancelled) return;
+        setViewedId(asset.asset_id);
+        if (route.metadata) {
+          setSelectedAsset(asset);
+          setMetadataFailure(null);
+          setMetadata(await api.metadata(asset.asset_id));
+        }
+      } catch (reason) {
+        if (cancelled) return;
+        // Keep the URL: it is what the user asked for. The message says the lookup failed and
+        // the gallery link is the way out.
+        setViewedId(null); setMetadata(null); setSelectedAsset(null);
+        setImageLookupFailure(`이미지를 찾을 수 없습니다 · ${reason instanceof Error ? reason.message : "알 수 없는 오류"}`);
+      }
+    })();
+    return () => { cancelled = true; };
+    // `route.metadata` is a dependency because the same image has two dialogs.
+  }, [api, route.imageId, route.metadata, selectedAsset?.asset_id]);
+
+  /**
+   * UIX06A: `/art/jobs/:jobId` names one job.
+   *
+   * The list is still what renders the cards, so the job is also asked for directly: that is
+   * what makes a permalink to a job on another page work, and it is the same single-resource
+   * endpoint the queue already uses. It does not select a substitute when the id is unknown.
+   */
+  useEffect(() => {
+    const jobId = route.jobId;
+    if (!jobId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const job = await api.job(jobId);
+        if (cancelled) return;
+        setJobsExpanded(true);
+        setQueueNav({ jobId: job.job_id, phase: "found" });
+        setJobLookupFailure(null);
+      } catch (reason) {
+        if (cancelled) return;
+        setQueueNav(null);
+        setJobLookupFailure(`작업을 찾을 수 없습니다 · ${reason instanceof Error ? reason.message : "알 수 없는 오류"}`);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [api, route.jobId]);
+
+  if (route.pixel) {
+    return <><PixelStudio api={api} reportError={reportError} />{error && <div className="floating-error"><span>{error}</span><button onClick={() => setError("")}>닫기</button></div>}</>;
+  }
+
+  /**
+   * UIX06A: a path this app does not serve.
+   *
+   * It says so instead of rendering a screen, because showing the studio under a URL that
+   * describes nothing would leave the address bar disagreeing with the page.
+   */
+  if (!route.known) {
+    return <main className="shell not-found">
+      <header><div><p className="eyebrow">BC-250 · LOCAL AI</p><h1>Art Studio</h1></div></header>
+      <section className="panel">
+        <h2>페이지를 찾을 수 없습니다</h2>
+        <p className="prompt-hint">{location.pathname} 주소는 이 앱이 제공하지 않습니다.</p>
+        <p><Link className="quiet" to={ART_HOME}>Art Studio로 돌아가기</Link></p>
+      </section>
+    </main>;
+  }
 
   return <main className="shell">
-    <header><div><p className="eyebrow">BC-250 · LOCAL AI</p><h1>Art Studio</h1></div><div className="header-actions"><button className="quiet" onClick={() => setStudio("pixel")}>Pixel Studio</button></div></header>
+    <header><div><p className="eyebrow">BC-250 · LOCAL AI</p><h1>Art Studio</h1></div><div className="header-actions"><Link className="quiet" to={artPath.pixel()}>Pixel Studio</Link></div></header>
+    <nav className="art-nav" aria-label="화면 이동">
+      {NAV_ITEMS.map((item) => <Link key={item.to} className="quiet" to={item.to}
+        aria-current={route.screen === item.screen ? "page" : undefined}>{item.label}</Link>)}
+    </nav>
     <section className="statusbar"><span className={status?.recovery_required ? "dot error" : "dot"} />
       <span>정책: {status?.policy || "…"}</span>
       {status?.policy === "manual" && <span className="notice">작업 접수 후 관리자의 실행 허가가 필요합니다.</span>}
@@ -838,7 +1212,12 @@ function App() {
     </section>
     {error && <div className="errorbox"><span>{error}</span><button onClick={() => setError("")}>닫기</button></div>}
     <div className="workspace">
-      <section className="panel composer"><div className="section-title"><h2>새 이미지</h2><span>{activeModel?.verification_status || "모델 선택"}</span></div>
+      {/* UIX06A: the panels are hidden, never unmounted. A route change is a change of what is
+          *visible*, not a remount — the compose session, its in-flight request, the receipt and
+          every input keep their identity, which is the whole point of keeping the editor mounted
+          under the router. `hidden` also removes them from the tab order, so the keyboard cannot
+          reach a screen that is not on show. */}
+      <section className="panel composer" hidden={!showsPanel(route.screen, "composer")}><div className="section-title"><h2>새 이미지</h2><span>{activeModel?.verification_status || "모델 선택"}</span></div>
         <form onSubmit={submit}>
           <label>모델<select value={settings.modelId} onChange={(event) => chooseModel(event.target.value)}>
             <option value="">모델 선택</option>{models.map((model) => <option key={model.model_id} value={model.model_id} disabled={!model.execution_enabled}>{model.display_name}{model.execution_enabled ? "" : " · 사용 불가"}</option>)}
@@ -970,7 +1349,7 @@ function App() {
           </p>}
         </form>
       </section>
-      <section className="panel jobs" data-collapsed={queueOpen ? undefined : "true"}><div className="section-title jobs-title"><h2>작업 큐</h2>
+      <section className="panel jobs" hidden={!showsPanel(route.screen, "jobs")} data-collapsed={queueOpen ? undefined : "true"}><div className="section-title jobs-title"><h2>작업 큐</h2>
         <span className="jobs-counts" role="status">{queueLine}</span>
         <div className="jobs-actions">
           <button className="quiet" aria-expanded={queueOpen} aria-controls="jobs-body" onClick={() => setJobsExpanded(!queueOpen)}>{queueOpen ? "접기" : "펼치기"}</button>
@@ -981,6 +1360,12 @@ function App() {
         {/* UIX05: the locating message lives above the list it describes, and names the retry
             path when the answer is "not here" or "could not read". It never points at another
             job: the highlight below is the only thing that says which card is the one. */}
+        {/* UIX06A: a permalink whose job could not be read. The URL is kept — it is what the
+            user asked for — and the way out is the list, not a different job. */}
+        {jobLookupFailure && <p className="jobs-nav" role="status" data-phase="missing">
+          <span className="jobs-nav__text">{jobLookupFailure}</span>
+          <button className="quiet" onClick={() => navigate(artPath.jobs())}>작업 큐로 이동</button>
+        </p>}
         {navMessage && <p className="jobs-nav" role="status" data-phase={queueNav?.phase}>
           <span className="jobs-nav__text">{navMessage}</span>
           {queueNav && (queueNav.phase === "missing" || queueNav.phase === "error") &&
@@ -992,9 +1377,21 @@ function App() {
       <p className="jobs-footnote" role="note">실행 {queue.running} · 대기 {queue.queued} · 완료 {queue.completed} · 실패 {queue.failed}</p>
       </section>
     </div>
-    <section className="panel gallery"><div className="section-title"><h2>{showArchived ? "NSFW 보관함" : "NSFW 갤러리"}</h2><span>{assets.length} assets</span><button className="quiet" onClick={toggleArchived}>{showArchived ? "갤러리" : "보관함"}</button></div>{assets.length ? <><div className="asset-grid">{assets.map((asset) => <div className="asset" key={asset.asset_id}><button className="asset-image" onClick={() => setViewedId(asset.asset_id)} aria-label="이미지 보기">{assetUrls[asset.asset_id] ? <img src={assetUrls[asset.asset_id]} alt="생성 결과" /> : missingAssetIds[asset.asset_id] ? <span>이미지를 찾을 수 없음</span> : <span>불러오는 중…</span>}</button><div className="asset-footer"><small>{asset.asset_id.slice(0, 8)} · {date(asset.created_at)}</small><button className="quiet" onClick={() => void inspect(asset)}>정보</button></div></div>)}</div><Pagination page={assetPage} hasNext={assets.length === ASSETS_PER_PAGE} onPage={changeAssetPage} /></> : <p className="empty">{showArchived ? "보관된 이미지가 없습니다." : "아직 저장된 NSFW 결과가 없습니다."}</p>}</section>
-    {viewedId && <ImageViewer api={api} initialAssets={assets} initialPage={assetPage} initialId={viewedId} archived={showArchived} close={() => setViewedId(null)} />}
-    {metadata && selectedAsset && <Metadata data={metadata} archived={Boolean(selectedAsset.archived_at)} close={() => { setMetadata(null); setSelectedAsset(null); }} reuse={reuse} changeArchive={changeArchive} destroy={destroySelected} />}
+    <section className="panel gallery" hidden={!showsPanel(route.screen, "gallery")}><div className="section-title"><h2 ref={galleryHeadingRef} tabIndex={-1}>{showArchived ? "NSFW 보관함" : "NSFW 갤러리"}</h2><span>{assets.length} assets</span><button className="quiet" onClick={toggleArchived}>{showArchived ? "갤러리" : "보관함"}</button></div>
+    {/* UIX06A: a pasted image link that could not be resolved says so here, next to the gallery
+        it belongs to, and offers the list. No other image is opened in its place. */}
+    {imageLookupFailure && <p className="jobs-nav" role="status" data-phase="missing">
+      <span className="jobs-nav__text">{imageLookupFailure}</span>
+      <button className="quiet" onClick={() => { setImageLookupFailure(null); navigate(artPath.gallery({ archived: showArchived }), { replace: true }); }}>갤러리로 이동</button>
+    </p>}
+    {assets.length ? <><div className="asset-grid">{assets.map((asset) => <div className="asset" key={asset.asset_id}><button className="asset-image" onClick={(event) => openViewer(asset, event.currentTarget)} aria-label={`이미지 보기 · ${asset.asset_id.slice(0, 8)}`}>{assetUrls[asset.asset_id] ? <img src={assetUrls[asset.asset_id]} alt="생성 결과" /> : missingAssetIds[asset.asset_id] ? <span>이미지를 찾을 수 없음</span> : <span>불러오는 중…</span>}</button><div className="asset-footer"><small>{asset.asset_id.slice(0, 8)} · {date(asset.created_at)}</small><button className="quiet" onClick={(event) => openMetadata(asset, event.currentTarget)} aria-label={`정보 · ${asset.asset_id.slice(0, 8)}`}>정보</button></div></div>)}</div><Pagination page={assetPage} hasNext={assets.length === ASSETS_PER_PAGE} onPage={changeAssetPage} /></> : <p className="empty">{showArchived ? "보관된 이미지가 없습니다." : "아직 저장된 NSFW 결과가 없습니다."}</p>}</section>
+    {/* UIX06A: the dialogs are driven by the URL, so a permalink opens the same dialog a click
+        does. `viewedId`/`metadata` are the *loaded* resource, not the authority on what is open:
+        a direct entry loads them in the effect above. */}
+    {route.imageId && !route.metadata && viewedId === route.imageId &&
+      <ImageViewer api={api} initialAssets={assets} initialPage={assetPage} initialId={route.imageId} archived={showArchived} close={closeViewer} />}
+    {route.imageId && route.metadata && metadata && selectedAsset &&
+      <Metadata data={metadata} archived={Boolean(selectedAsset.archived_at)} close={closeMetadata} reuse={reuse} changeArchive={changeArchive} destroy={destroySelected} busy={metadataBusy} failure={metadataFailure} />}
   </main>;
 }
 

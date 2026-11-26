@@ -249,7 +249,9 @@ test('the lock is taken after validation, so a rejected submit never needs relea
 
 test('one finally covers the success, HTTP-error and network-error paths', () => {
   const submitAt = appSource.indexOf('async function submit(event: FormEvent)');
-  const body = appSource.slice(submitAt, submitAt + 2200);
+  // To the end of the function, not a fixed number of characters: the body grew when UIX06A
+  // added a navigation on success, and a magic window made a correct function look broken.
+  const body = appSource.slice(submitAt, appSource.indexOf('\n  }\n', submitAt) + 4);
   // A single try/catch/finally around the only await: every exit from `createJob` — resolved,
   // rejected by `ApiError`, or rejected by `fetch` itself — runs the same reset.
   assert.equal([...body.matchAll(/finally \{ submittingRef\.current = false/g)].length, 1,
@@ -268,7 +270,7 @@ test('a completed generation can be started again: nothing latches after success
   // The reset is in `finally`, not in `then`, so it runs for the success path too. A latch in
   // the success branch would leave the button permanently disabled after the first job.
   const submitAt = appSource.indexOf('async function submit(event: FormEvent)');
-  const body = appSource.slice(submitAt, submitAt + 2200);
+  const body = appSource.slice(submitAt, appSource.indexOf('\n  }\n', submitAt) + 4);
   const successAt = body.indexOf('setReceipt({ jobId: accepted.job_id');
   const finallyAt = body.indexOf('finally { submittingRef.current = false');
   assert.ok(successAt > 0 && finallyAt > successAt,

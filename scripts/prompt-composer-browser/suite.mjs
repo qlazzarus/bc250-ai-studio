@@ -11,10 +11,30 @@ import { runUix02 } from "./suite-uix02.mjs";
 import { runUix03 } from "./suite-uix03.mjs";
 import { runUix04 } from "./suite-uix04.mjs";
 import { runUix05 } from "./suite-uix05.mjs";
+import { runUix06 } from "./suite-uix06.mjs";
+import { runUix06a } from "./suite-uix06a.mjs";
 import { adjustOpen, closeAdjust, openAdjust, pickEntry, stageOrder, waitAdjustOpen, waitSearchFocus } from "./ui.mjs";
 
 export async function runSuite({ page, browser, sessionId, check, record, sleep, shots }) {
   const { evaluate, waitFor, click, clickByText, typeInto, select, press, shot } = page;
+
+  /**
+   * UIX06A: every block below starts from the same address.
+   *
+   * Before URL routing, a `Page.reload` was enough to get a clean document, because there was
+   * only one screen. The address bar now decides the screen, so a block that reloads inherits
+   * whatever permalink the block above it left behind — UCP08 was reloading at
+   * `/art/gallery/<id>/metadata`, where the composer it asserts on is *correctly* hidden, and
+   * its model select then matched a different control. Resetting to `/art` restores exactly
+   * the document every block was written against, and it is a navigation the app already
+   * supports, not a test-only back door.
+   */
+  const resetToOverview = async () => {
+    const origin = await evaluate("location.origin");
+    await page.navigate(`${origin}/art`);
+    await waitFor(`!!document.querySelector('.panel.composer') && !document.querySelector('.panel.composer').hidden`,
+      { label: "overview reset", timeout: 20000 });
+  };
 
   // ── A. isolated start ────────────────────────────────────────────────────────
   await waitFor(`document.querySelectorAll('.composer select option').length > 1`, { label: "models loaded", timeout: 20000 });
@@ -350,28 +370,46 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
     pick: (category, index = 0) => pickEntry(page, category, index) });
   await runKeyboard({ page, check, record, sleep, shots });
   await runContracts({ page, check, record, sleep, shots });
+  // UIX06A: each block that reloads gets `/art` first, so it cannot inherit a permalink from
+  // the block above. The reset is a real navigation, so the blocks still exercise the app's
+  // own routing rather than a stubbed document.
+  await resetToOverview();
   // TRANS06 runs last: it reloads the page so it owns the builder state it asserts on.
   await runTrans06({ page, check, record, sleep, shots });
   // U12 needs the v2 capability stub from §N, so it must run after it — and it reloads
   // too, so nothing above can leak a half-built record into the storage checks.
+  await resetToOverview();
   await runU12({ page, check, record, sleep, shots });
   // UCP08 replaces the capability/endpoint stubs with its own and reloads, so it runs
   // last: its v3 submit must not inherit a v2 `remainder` stub from §N.
+  await resetToOverview();
   await runUcp08({ page, check, record, sleep, shots });
   // UIX02 registers its own compose stub and reloads, so it starts from a clean document
   // and does not depend on what UCP08 left applied.
+  await resetToOverview();
   await runUix02({ page, check, record, sleep, shots });
   // UIX03 does the same, and owns its document from a fresh reload: it toggles candidate
   // bodies, changes model mid-request and stubs a negative-less model through `/models`,
   // all of which would leave the shared document in a state the blocks above did not assert.
+  await resetToOverview();
   await runUix03({ page, check, record, sleep, shots });
   // UIX04 runs last and owns a fresh document: it replaces the preset fixture (all four presets
   // are identical in the YAML, which would make a preset assertion vacuous) and ties the negative
   // field to CFG 7. Everything above it has already asserted its own request bodies, so a later
   // fixture swap cannot change what they proved.
+  await resetToOverview();
   await runUix04({ page, check, record, sleep, shots });
   // UIX05 installs its own fetch switchboard and reloads, so it owns a fresh document: it needs
   // a folded queue and a `/jobs` failure that the blocks above never produce. Its probes are
   // created through the API, so it does not depend on what UIX04 left in the composer.
+  await resetToOverview();
   await runUix05({ page, check, record, sleep, shots });
+  // UIX06 runs last because it archives one of the gallery cards, which changes what the gallery
+  // holds. Every block above only reads the gallery, so nothing after this may depend on it.
+  await resetToOverview();
+  await runUix06({ page, check, record, sleep, shots });
+  // UIX06A owns the address bar itself: it navigates between screens and permalinks, so it runs
+  // after every block that assumes a fixed screen and leaves the document on a real URL.
+  await resetToOverview();
+  await runUix06a({ page, check, record, sleep, shots });
 }

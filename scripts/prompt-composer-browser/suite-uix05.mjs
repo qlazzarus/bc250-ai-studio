@@ -120,6 +120,9 @@ const STATE = `(() => {
     navRetry: !!document.querySelector('.jobs-nav button'),
     page: text(document.querySelector('.jobs-body .pagination span')),
     queueOpen: !document.querySelector('#jobs-body')?.hidden,
+    // The form's own state, so a list failure can be shown not to disturb it.
+    model: document.querySelector('.composer select')?.value ?? null,
+    prompt: document.querySelector('#prompt-final')?.value ?? null,
     cards,
     errorBox: text(document.querySelector('.errorbox')),
   };
@@ -209,6 +212,20 @@ export async function runUix05({ page, check, record, sleep, shots }) {
   check("UIX05 · 목록 조회 실패로 POST 재전송 없음", postsBeforeFailure, await total("posts"));
   check("UIX05 · 목록 실패가 오류 상자에 표시됨", true,
     (afterFailure.errorBox || "").includes("목록 조회 실패(테스트)"));
+  // UIX05 review: a failing job list must not disturb what is already on screen. `refresh` is a
+  // `Promise.all`, so the read fails as a whole and no setter runs — the loaded models and the
+  // chosen model therefore stay exactly as they were. This asserts that consequence instead of
+  // leaving it implied, because a later refactor to `allSettled` could change it silently.
+  const formAfterFailure = await evaluate(`(() => ({
+    options: document.querySelectorAll('.composer select option').length,
+    model: document.querySelector('.composer select')?.value ?? null,
+    prompt: document.querySelector('#prompt-final')?.value ?? null,
+    generate: document.querySelector('button.generate')?.disabled ?? null,
+  }))()`);
+  check("UIX05 · 목록 실패가 모델 목록을 비우지 않음", true, formAfterFailure.options > 1);
+  check("UIX05 · 목록 실패가 선택 모델을 바꾸지 않음", acceptedState.model, formAfterFailure.model);
+  check("UIX05 · 목록 실패가 최종 입력을 바꾸지 않음", acceptedState.prompt, formAfterFailure.prompt);
+  record("UIX05 목록 실패 후 폼", JSON.stringify(formAfterFailure));
   record("UIX05 목록 실패", JSON.stringify({ errorBox: afterFailure.errorBox,
     receipt: afterFailure.receipt, posts: await total("posts") }));
   await page.shot(shots, "uix05-02-list-failure.png");
@@ -577,10 +594,27 @@ export async function runUix05({ page, check, record, sleep, shots }) {
   await clickByText(".errorbox button", "닫기").catch(() => false);
   await sleep(500);
 
+  /**
+   * Puts the composer back on screen without a reload.
+   *
+   * The receipt's own button navigates to `/art/jobs/:jobId`, which hides the composer panel — and
+   * a hidden panel has zero-size rects, so anything measured inside it reads 0 and nothing inside
+   * it can take focus. Both width runs and the keyboard walk need the composer visible, so each
+   * one re-establishes it. The in-app link is used rather than a reload: a reload would drop the
+   * receipt, which is the very thing being measured.
+   */
+  const showOverview = async () => {
+    await clickByText(".art-nav a", "개요").catch(() => false);
+    await waitFor(`location.pathname === '/art'`, { label: "overview", timeout: 10000 }).catch(() => false);
+    await sleep(500);
+  };
+
   // ── L. the four required states at both widths ─────────────────────────────
   // State is re-established per width rather than inherited, so the two widths document the
-  // same fixture and the same starting point.
+  // same fixture and the same starting point — including the screen, which step (2) leaves.
   for (const [width, height, label] of [[360, 800, "360"], [1280, 900, "1280"]]) {
+    await page.viewport(width, height, width < 500);
+    await showOverview();
     await page.viewport(width, height, width < 500);
     await sleep(450);
     await setQueue(page, true);
@@ -746,7 +780,9 @@ export async function runUix05({ page, check, record, sleep, shots }) {
 
   // ── M. the new controls are reachable from the keyboard ────────────────────
   // A real Tab walk from the generate button: the receipt's button is the next stop after the
-  // button that produced it, which is where a keyboard user looks for it.
+  // button that produced it, which is where a keyboard user looks for it. The composer must be on
+  // screen for either button to be focusable, and the width loop above ends on the queue.
+  await showOverview();
   await setQueue(page, true);
   await evaluate(`document.querySelector('button.generate').focus()`);
   await page.tab();

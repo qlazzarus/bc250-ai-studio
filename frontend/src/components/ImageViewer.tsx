@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Asset, StudioApi } from "./../api";
 import { ASSETS_PER_PAGE } from "../constants";
+import { dialogLabel, useDialogTrap } from "../lib/dialog";
 
 function ImageViewer({ api, initialAssets, initialPage, initialId, archived, close }: { api: StudioApi; initialAssets: Asset[]; initialPage: number; initialId: string; archived: boolean; close(): void }) {
   const [assets, setAssets] = useState(initialAssets);
@@ -14,7 +15,12 @@ function ImageViewer({ api, initialAssets, initialPage, initialId, archived, clo
   const touchStart = useRef<{ x: number; y: number; id: number } | null>(null);
   const loadingRef = useRef(false);
   const mountedRef = useRef(true);
+  // UIX06: the index is derived from the id on every render and never stored, so a list
+  // refresh that reorders or drops entries cannot move the viewer to a different image — the
+  // id is the only identity, and `index < 0` is the honest answer for a vanished one.
   const index = assets.findIndex((asset) => asset.asset_id === viewedId);
+  const trap = useDialogTrap<HTMLDivElement>({ onClose: close });
+
 
   useEffect(() => {
     mountedRef.current = true;
@@ -63,16 +69,17 @@ function ImageViewer({ api, initialAssets, initialPage, initialId, archived, clo
     }
   }, [api, archived, assets, atEnd, index, page]);
 
+  // Escape is the trap's job now (it owns the key while the dialog is open). This listener
+  // keeps only the arrow keys, which are the viewer's own navigation and not part of the trap.
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-      else if (event.key === "ArrowLeft") { event.preventDefault(); void navigate(-1); }
+      if (event.key === "ArrowLeft") { event.preventDefault(); void navigate(-1); }
       else if (event.key === "ArrowRight") { event.preventDefault(); void navigate(1); }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [close, navigate]);
-  return <div className="modal-backdrop image-backdrop" onMouseDown={close}><div className="image-viewer" role="dialog" aria-modal="true" aria-label="이미지 보기" onMouseDown={(event) => event.stopPropagation()}
+  }, [navigate]);
+  return <div className="modal-backdrop image-backdrop" onMouseDown={close}><div ref={trap} className="image-viewer" role="dialog" aria-modal="true" aria-label={dialogLabel("이미지 보기", viewedId)} tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}
     onTouchStart={(event) => {
       if (event.touches.length !== 1 || (event.target as Element).closest("button")) { touchStart.current = null; return; }
       const touch = event.touches[0];

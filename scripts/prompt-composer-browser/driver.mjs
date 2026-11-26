@@ -133,6 +133,29 @@ export function pageClient(sendTo, sessionId) {
   const viewport = (width, height, mobile = false) => call("Emulation.setDeviceMetricsOverride", {
     width, height, deviceScaleFactor: 1, mobile,
   });
+  /**
+   * UIX06A: open a URL the way a pasted link or a new tab does.
+   *
+   * A full document load, not a router call — that is the case a permalink has to survive, and
+   * the only way to prove the app boots *on* `/art/jobs/<id>` rather than navigating to it from
+   * a screen it already had. Resolves once the load event has fired.
+   */
+  const navigate = async (url, { timeout = 20000 } = {}) => {
+    const loaded = new Promise((resolve) => {
+      const started = Date.now();
+      const poll = async () => {
+        try {
+          const ready = await evaluate("document.readyState");
+          if (ready === "complete" || ready === "interactive") return resolve(true);
+        } catch { /* mid-navigation: the context is being replaced */ }
+        if (Date.now() - started > timeout) return resolve(false);
+        setTimeout(poll, 100);
+      };
+      void poll();
+    });
+    await call("Page.navigate", { url });
+    return loaded;
+  };
   return { call, evaluate, waitFor, shot, click, clickByText, typeInto, select, press, tab, isActive,
-    activeInfo, viewport };
+    activeInfo, viewport, navigate };
 }

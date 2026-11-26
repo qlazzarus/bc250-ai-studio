@@ -268,6 +268,13 @@ export class StudioApi {
   models(signal?: AbortSignal) { return this.request<StudioModel[]>("/models", { signal }); }
   jobs(limit = 20, offset = 0, signal?: AbortSignal) { return this.request<Job[]>(`/jobs?limit=${limit}&offset=${offset}`, { signal }); }
   job(id: string) { return this.request<Job>(`/jobs/${id}`); }
+  /**
+   * UIX06A: one asset by id, for a `/art/gallery/:imageId` permalink.
+   *
+   * `GET /assets/{id}` already exists on the server (`routes.py`), so a permalink can name an
+   * image that is not on the current gallery page without walking the list. No new endpoint.
+   */
+  asset(id: string) { return this.request<Asset>(`/assets/${id}`); }
   assets(archived = false, limit = 24, offset = 0, signal?: AbortSignal) {
     return this.request<Asset[]>(`/assets?namespace=nsfw&limit=${limit}&offset=${offset}&archived=${archived}`, { signal });
   }
