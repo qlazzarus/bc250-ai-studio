@@ -10,6 +10,7 @@ import { runUcp08 } from "./suite-ucp08.mjs";
 import { runUix02 } from "./suite-uix02.mjs";
 import { runUix03 } from "./suite-uix03.mjs";
 import { runUix04 } from "./suite-uix04.mjs";
+import { runUix05 } from "./suite-uix05.mjs";
 import { adjustOpen, closeAdjust, openAdjust, pickEntry, stageOrder, waitAdjustOpen, waitSearchFocus } from "./ui.mjs";
 
 export async function runSuite({ page, browser, sessionId, check, record, sleep, shots }) {
@@ -369,4 +370,8 @@ export async function runSuite({ page, browser, sessionId, check, record, sleep,
   // field to CFG 7. Everything above it has already asserted its own request bodies, so a later
   // fixture swap cannot change what they proved.
   await runUix04({ page, check, record, sleep, shots });
+  // UIX05 installs its own fetch switchboard and reloads, so it owns a fresh document: it needs
+  // a folded queue and a `/jobs` failure that the blocks above never produce. Its probes are
+  // created through the API, so it does not depend on what UIX04 left in the composer.
+  await runUix05({ page, check, record, sleep, shots });
 }

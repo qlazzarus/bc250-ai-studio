@@ -210,9 +210,13 @@ test('a disabled target falls back to the region that explains the limit', () =>
 
 test('a server refusal stays in the error box, apart from input errors', () => {
   // The catch branch reports the server's own message; only the pre-submit branch names fields.
+  // Sliced to the end of the handler rather than a fixed length: a comment added inside the
+  // branch must not be able to hide the line this asserts about.
   const submitAt = appSource.indexOf('async function submit(event: FormEvent)');
-  const body = appSource.slice(submitAt, submitAt + 1400);
-  assert.match(body, /catch \(reason\) \{[\s\S]{0,300}setError\(reason instanceof Error \? reason\.message/);
+  const submitEnd = appSource.indexOf('\n  }\n', appSource.indexOf('finally { submittingRef.current = false', submitAt));
+  assert.ok(submitAt > 0 && submitEnd > submitAt, 'submit body must be bounded');
+  const body = appSource.slice(submitAt, submitEnd);
+  assert.match(body, /catch \(reason\) \{[\s\S]*?setError\(reason instanceof Error \? reason\.message/);
   assert.match(body, /if \(blocking\.length\) \{/);
 });
 
@@ -228,4 +232,58 @@ test('submit keeps its duplicate-request guard: no job is created while submitti
   const guardAt = appSource.indexOf('if (submittingRef.current) return;');
   const bodyAt = appSource.indexOf('const body = buildRequest();', appSource.indexOf('async function submit'));
   assert.ok(guardAt > 0 && bodyAt > guardAt, 'the re-entry guard must precede buildRequest');
+});
+
+// ── UIX04 review: the lock is released on every path, and only taken where it must be ──
+
+test('the lock is taken after validation, so a rejected submit never needs releasing', () => {
+  // Order matters: the validation branch returns *before* `submittingRef.current = true`, so a
+  // blocked submit cannot leave the lock held — there is nothing to release on that path.
+  const submitAt = appSource.indexOf('async function submit(event: FormEvent)');
+  const body = appSource.slice(submitAt, submitAt + 2200);
+  const validateAt = body.indexOf('if (blocking.length) {');
+  const lockAt = body.indexOf('submittingRef.current = true;');
+  assert.ok(validateAt > 0 && lockAt > validateAt,
+    'validation must return before the lock is taken');
+});
+
+test('one finally covers the success, HTTP-error and network-error paths', () => {
+  const submitAt = appSource.indexOf('async function submit(event: FormEvent)');
+  const body = appSource.slice(submitAt, submitAt + 2200);
+  // A single try/catch/finally around the only await: every exit from `createJob` — resolved,
+  // rejected by `ApiError`, or rejected by `fetch` itself — runs the same reset.
+  assert.equal([...body.matchAll(/finally \{ submittingRef\.current = false/g)].length, 1,
+    'exactly one reset, in the single finally');
+  assert.equal([...body.matchAll(/submittingRef\.current = true;/g)].length, 1,
+    'the lock is taken exactly once');
+  // The catch block itself holds no reset: the release belongs to `finally` alone, so it cannot
+  // be skipped by a branch that returns or re-throws from inside `catch`.
+  const catchAt = body.indexOf('} catch (reason) {');
+  const catchEnd = body.indexOf('} finally {', catchAt);
+  assert.ok(catchAt > 0 && catchEnd > catchAt);
+  assert.doesNotMatch(body.slice(catchAt, catchEnd), /submittingRef\.current = false/);
+});
+
+test('a completed generation can be started again: nothing latches after success', () => {
+  // The reset is in `finally`, not in `then`, so it runs for the success path too. A latch in
+  // the success branch would leave the button permanently disabled after the first job.
+  const submitAt = appSource.indexOf('async function submit(event: FormEvent)');
+  const body = appSource.slice(submitAt, submitAt + 2200);
+  const successAt = body.indexOf('setReceipt({ jobId: accepted.job_id');
+  const finallyAt = body.indexOf('finally { submittingRef.current = false');
+  assert.ok(successAt > 0 && finallyAt > successAt,
+    'the success branch must be followed by the shared reset');
+});
+
+test('click and Enter reach the same handler, so they share one guard', () => {
+  // The button is a submit button inside the form: a click and Enter in a field both dispatch
+  // the form's `onSubmit`, so there is one entry point and one guard. A `type="button"` with
+  // its own onClick would be a second path with its own rules.
+  const submitButton = appSource.match(/<button className="generate"[^>]*>/);
+  assert.ok(submitButton, 'the generate button must exist');
+  assert.doesNotMatch(submitButton[0], /type="button"/,
+    'the generate button must stay a submit button');
+  assert.match(appSource, /<form onSubmit=\{submit\}>/);
+  // And nothing else calls the handler, so no second path can bypass the ref.
+  assert.equal([...appSource.matchAll(/onSubmit=\{submit\}/g)].length, 1);
 });

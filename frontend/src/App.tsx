@@ -24,6 +24,7 @@ import type { EditSelection, StructuredScene } from "./prompt/structuredScene";
 import { toSnapshot, fromSnapshot, restoreGaps, COMPOSE_COMPILER_VERSION } from "./prompt/composeSnapshot";
 import { characterCount, validateSubmission, type ValidationIssue } from "./prompt/validation";
 import { queueCounts, queueExpanded, queueSummary } from "./lib/queue";
+import { queueNavMessage, receiptText, type QueueNavPhase } from "./lib/jobsView";
 import { detailSummary, FIELD_IN_DETAILS, FIELD_LABEL, FIELD_SELECTOR, firstIssue, seedIssue } from "./lib/generate";
 
 const initialSettings: Settings = {
@@ -130,6 +131,24 @@ function App() {
    * guard hold for clicks that arrive before React has re-rendered.
    */
   const submittingRef = useRef(false);
+  /**
+   * UIX05: the receipt for the last accepted job — the server's own `job_id`, and the status
+   * it was accepted in.
+   *
+   * Deliberately *not* part of `jobs`: the queue list is a polled snapshot that a failed read
+   * leaves untouched and a slow read replaces wholesale. The receipt is a fact about the POST
+   * and lives in its own state, so a `GET /jobs` failure can neither erase it nor turn it into
+   * a generation failure — and nothing here triggers a retry of the POST.
+   */
+  const [receipt, setReceipt] = useState<{ jobId: string; status: string } | null>(null);
+  /**
+   * UIX05: which job the user asked to see, and how locating it went.
+   *
+   * `loading` is set by the click and cleared by the read that answers it, so the queue can say
+   * "찾는 중" before the list has any chance to contain the job. `missing` is a real answer — the
+   * job is not in this page of the list — and is kept apart from `error` because the fixes differ.
+   */
+  const [queueNav, setQueueNav] = useState<{ jobId: string; phase: QueueNavPhase } | null>(null);
   const [studio, setStudio] = useState<"art" | "pixel">("art");
   const [promptDirty, setPromptDirty] = useState(false);
   const [promptBlurred, setPromptBlurred] = useState(false);
@@ -247,6 +266,39 @@ function App() {
     setSettings((old) => ({ ...old, prompt: input.positive, negativePrompt: input.negative }));
   }, []);
 
+  /**
+   * UIX05: the ordering guard for the job list.
+   *
+   * Two readers write `jobs` — the 4s poll and every explicit refresh (the header button, a
+   * card's cancel/retry, the queue navigation) — and they can overlap. Without a guard the
+   * *older* response wins whenever it happens to resolve last, which puts a stale page or a
+   * stale job status back on screen after the user has already seen the newer one.
+   *
+   * `token` is incremented when a read is issued and compared when it lands, so only the newest
+   * read may write. That covers page changes too, without a second condition: `refresh` is
+   * rebuilt when `jobPage` changes and the poll effect re-runs on it, so a new read always takes
+   * a newer token before the old one can land — and the old one is then discarded.
+   */
+  const jobsTokenRef = useRef(0);
+  /** The job the queue is being asked to find; cleared by the read that answers it. */
+  const navTargetRef = useRef<string | null>(null);
+  /**
+   * The only writer of `jobs`.
+   *
+   * It resolves a pending navigation too: the read that answers "where is my job" is the same
+   * read that fills the list, so asking twice would be a second request for the same answer.
+   * `found` and `missing` are decided here, against the page actually on screen — never against
+   * a different job, and never by silently selecting a neighbour.
+   */
+  const applyJobs = useCallback((next: Job[], token: number) => {
+    if (token !== jobsTokenRef.current) return;
+    setJobs(next);
+    const target = navTargetRef.current;
+    if (!target) return;
+    navTargetRef.current = null;
+    setQueueNav({ jobId: target, phase: next.some((job) => job.job_id === target) ? "found" : "missing" });
+  }, []);
+
   const refresh = useCallback(async (signal?: AbortSignal) => {
     if (!api) return;
     const controller = new AbortController();
@@ -258,23 +310,39 @@ function App() {
       timedOut = true;
       controller.abort();
     }, 10000);
+    // Issued after the abort wiring, so an aborted call still consumes a token and cannot
+    // later be mistaken for the newest read.
+    jobsTokenRef.current += 1;
+    const token = jobsTokenRef.current;
     try {
       const [nextStatus, nextModels, nextJobs, nextAssets] = await Promise.all([
         api.status(controller.signal), api.models(controller.signal), api.jobs(JOBS_PER_PAGE, jobPage * JOBS_PER_PAGE, controller.signal),
         api.assets(showArchived, ASSETS_PER_PAGE, assetPage * ASSETS_PER_PAGE, controller.signal),
       ]);
       if (controller.signal.aborted) return;
-      setStatus(nextStatus); setModels(nextModels); setJobs(nextJobs); setAssets(nextAssets);
+      setStatus(nextStatus); setModels(nextModels); setAssets(nextAssets);
+      applyJobs(nextJobs, token);
       const first = nextModels.find((model) => model.execution_enabled);
       setSettings((old) => old.modelId ? old : { ...old, modelId: first?.model_id || "" });
     } catch (reason) {
       if (!signal?.aborted) setError(timedOut ? "API 응답 시간이 초과되었습니다. 다시 시도합니다." : reason instanceof Error ? reason.message : "API 연결에 실패했습니다.");
+      /**
+       * UIX05: a read that fails while the queue was asked to find a job is the queue's answer
+       * too. Resolved here rather than at the call site because `refresh` swallows the error —
+       * its callers (the poll, a card's cancel/retry) must not treat a list failure as their own
+       * — so this is the only place that knows the read did not produce a list.
+       */
+      const target = navTargetRef.current;
+      if (target) {
+        navTargetRef.current = null;
+        setQueueNav({ jobId: target, phase: "error" });
+      }
     } finally {
       window.clearTimeout(timeout);
       signal?.removeEventListener("abort", cancel);
       controller.abort();
     }
-  }, [api, assetPage, jobPage, showArchived]);
+  }, [api, assetPage, jobPage, showArchived, applyJobs]);
 
   useEffect(() => { 
     if (!api) return;
@@ -509,6 +577,25 @@ function App() {
   const composeStrip = composeStripView(composeStatus);
 
   /**
+   * UIX05: the queue's locating sentence, or `null` when there is nothing to say.
+   *
+   * Derived from `queueNav` on every render, so a phase change cannot leave a stale sentence
+   * behind, and the wording lives in `jobsView.ts` where it can be tested without a browser.
+   */
+  const navMessage = queueNavMessage(queueNav?.phase ?? "found");
+
+  /**
+   * UIX05: switching page through the header pagination.
+   *
+   * A pending navigation is dropped: the user has chosen a different page, so a message about a
+   * job on the page they just left would describe something they can no longer see.
+   */
+  function changeJobPage(page: number) {
+    if (navTargetRef.current) { navTargetRef.current = null; setQueueNav(null); }
+    setJobPage(page);
+  }
+
+  /**
    * UIX04: the first blocking reason in reading order, or `null` when nothing blocks.
    *
    * `firstIssue` sorts by where the field sits on screen rather than by the order the validators
@@ -585,13 +672,53 @@ function App() {
     submittingRef.current = true;
     setSubmitting(true); setError("");
     try {
-      await api.createJob(body);
+      const accepted = await api.createJob(body);
+      /**
+       * UIX05: the receipt comes from the POST's own reply, and only from there.
+       *
+       * It is set before any list read, so the confirmation is on screen even if `/jobs` is slow,
+       * failing, or never asked. `jobPage` is reset to 0 for the same reason it always was: a
+       * fresh job is the newest row, so it belongs on the first page. Nothing here navigates,
+       * scrolls or focuses — that is the explicit button's job.
+       */
+      setReceipt({ jobId: accepted.job_id, status: accepted.status });
+      setQueueNav(null);
+      navTargetRef.current = null;
       setJobPage(0);
     } catch (reason) {
       // Server answers stay in `.errorbox`: they are not fixable by moving to a field, and
       // reporting them next to the button would suggest they are.
       setError(reason instanceof Error ? reason.message : "작업 접수 실패");
     } finally { submittingRef.current = false; setSubmitting(false); }
+  }
+
+  /**
+   * UIX05: the explicit "작업 큐에서 보기" move.
+   *
+   * Four steps, in this order, and each one is the existing contract rather than a new one:
+   *
+   * 1. Unfold the queue (`setJobsExpanded`, the same flag the header button writes).
+   * 2. Go to page 0 — the newest jobs' page, which is where a just-accepted job is.
+   * 3. Read the list once, using `refresh()`. When the page *changed*, `setJobPage` re-runs the
+   *    poll effect with the new page and that read is the one that answers; issuing a second
+   *    read from here would race it and could resolve in either order.
+   * 4. Mark the card on screen (`queueNav`/`spotlight`), which is a highlight, not a selection:
+   *    nothing is written to the job and no other job is chosen if this one is absent.
+   */
+  async function showInQueue(jobId: string) {
+    setJobsExpanded(true);
+    setQueueNav({ jobId, phase: "loading" });
+    navTargetRef.current = jobId;
+    if (jobPage === 0) {
+      // Same page: `refresh` resolves the navigation in `applyJobs`, or reports `error` in its
+      // catch. Neither path needs anything from this call site.
+      await refresh();
+      return;
+    }
+    // A page change re-runs the poll effect with the new page, and that read answers. Reading
+    // here as well would be a second concurrent request whose answer could arrive first and be
+    // thrown away by the ordering guard.
+    setJobPage(0);
   }
 
   async function inspect(asset: Asset) {
@@ -831,6 +958,16 @@ function App() {
             <button type="button" className="quiet" onClick={() => moveToField(blocker.field)}>수정 위치로 이동</button>
           </p>}
           <button className="generate" disabled={submitting || !activeModel?.execution_enabled || allIssues.length > 0}>{submitting ? "접수 중…" : settings.batchCount > 1 ? `${settings.batchCount}개 생성` : "이미지 생성"}</button>
+          {/* UIX05: the receipt sits under the button that produced it, and is rendered from
+              the POST's reply alone. It therefore survives a `/jobs` failure, and its absence
+              means "nothing was accepted", never "the list did not load". Nothing here moves
+              focus or scrolls: seeing the queue is the button's explicit job. */}
+          {receipt && <p className="generate-receipt" role="status" id="generate-receipt">
+            <span className="generate-receipt__text" title={receipt.jobId}>
+              {receiptText(receipt.jobId, receipt.status)}
+            </span>
+            <button type="button" className="quiet" onClick={() => void showInQueue(receipt.jobId)}>작업 큐에서 보기</button>
+          </p>}
         </form>
       </section>
       <section className="panel jobs" data-collapsed={queueOpen ? undefined : "true"}><div className="section-title jobs-title"><h2>작업 큐</h2>
@@ -841,7 +978,16 @@ function App() {
         </div>
       </div>
       <div id="jobs-body" className="jobs-body" hidden={!queueOpen}>
-        {api && jobs.length ? <>{jobs.map((job) => <JobCard key={job.job_id} job={job} api={api} refresh={refresh} />)}<Pagination page={jobPage} hasNext={jobs.length === JOBS_PER_PAGE} onPage={setJobPage} /></> : <p className="empty">최근 작업이 없습니다.</p>}
+        {/* UIX05: the locating message lives above the list it describes, and names the retry
+            path when the answer is "not here" or "could not read". It never points at another
+            job: the highlight below is the only thing that says which card is the one. */}
+        {navMessage && <p className="jobs-nav" role="status" data-phase={queueNav?.phase}>
+          <span className="jobs-nav__text">{navMessage}</span>
+          {queueNav && (queueNav.phase === "missing" || queueNav.phase === "error") &&
+            <button className="quiet" onClick={() => void showInQueue(queueNav.jobId)}>다시 조회</button>}
+        </p>}
+        {api && jobs.length ? <>{jobs.map((job) => <JobCard key={job.job_id} job={job} api={api} refresh={refresh}
+          spotlight={queueNav?.phase === "found" && queueNav.jobId === job.job_id} />)}<Pagination page={jobPage} hasNext={jobs.length === JOBS_PER_PAGE} onPage={changeJobPage} /></> : <p className="empty">최근 작업이 없습니다.</p>}
       </div>
       <p className="jobs-footnote" role="note">실행 {queue.running} · 대기 {queue.queued} · 완료 {queue.completed} · 실패 {queue.failed}</p>
       </section>

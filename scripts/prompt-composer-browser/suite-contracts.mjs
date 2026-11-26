@@ -211,9 +211,13 @@ export async function runContracts({ page, check, record, sleep, shots }) {
       const card = [...document.querySelectorAll('.job')]
         .find((node) => node.textContent.includes('retry probe'));
       return card ? { badge: card.querySelector('.badge')?.textContent ?? null,
+        status: card.querySelector('.badge')?.getAttribute('data-status') ?? null,
         retry: [...card.querySelectorAll('button')].some((b) => b.textContent.includes('재시도')) } : null;
     })()`);
-    check("재시도 · 종료된 작업 카드", "cancelled", retryCard?.badge);
+    // UIX05: the visible word is Korean and the server token moved to `data-status`, so the
+    // check reads the machine value for the contract and the label for what a user sees.
+    check("재시도 · 종료된 작업 카드", "cancelled", retryCard?.status);
+    check("재시도 · 카드 상태가 한국어", "취소됨", retryCard?.badge);
     check("재시도 · 카드에 재시도 버튼", true, retryCard?.retry);
 
     // Click the card button: that covers the UI wiring, and the follow-up API read
